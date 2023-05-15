@@ -1,0 +1,16 @@
+[package]
+name = "o2o-macros"
+version = "0.1.0"
+edition = "2021"
+authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
+description = "Macro definitions of 'o2o' crate"
+license = "MIT OR Apache-2.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+o2o-impl = { version = "0.1.0", path = "../o2o-impl" }
+proc-macro2 = "1.0.51"
+syn = "1.0.109"
+quote = "1.0.23"

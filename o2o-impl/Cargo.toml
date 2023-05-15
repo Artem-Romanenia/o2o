@@ -1,0 +1,19 @@
+[package]
+name = "o2o-impl"
+version = "0.1.0"
+edition = "2021"
+authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
+description = "Implementation of 'o2o' crate"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+proc-macro2 = "1.0.51"
+syn = "1.0.109"
+quote = "1.0.23"
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "o2o_benchmarks"
+harness = false
