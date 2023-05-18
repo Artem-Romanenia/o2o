@@ -20,3 +20,5 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test
+    - name: Run Impl tests
+      run: cargo test --package o2o-impl
