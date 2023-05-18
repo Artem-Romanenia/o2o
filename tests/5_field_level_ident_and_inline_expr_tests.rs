@@ -21,17 +21,17 @@ struct Child {
 
 #[derive(o2o)]
 #[o2o(
-    map_owned(Parent);
-    map_owned(ParentModel);
-    owned_into_existing(Parent);
-    owned_into_existing(ParentModel);
+    map_owned(Parent),
+    map_owned(ParentModel),
+    owned_into_existing(Parent),
+    owned_into_existing(ParentModel),
 )]
 struct ParentDto {
     #[o2o(
-        from_owned(Parent| child.into());
-        owned_into(Parent| child, diff_child.into());
-        from_owned(ParentModel| child_diff.into());
-        owned_into(ParentModel| child_diff, diff_child.into());
+        from_owned(Parent| child.into()),
+        owned_into(Parent| child, diff_child.into()),
+        from_owned(ParentModel| child_diff.into()),
+        owned_into(ParentModel| child_diff, diff_child.into()),
     )]
     diff_child: ChildDto,
     parent_int: i32,

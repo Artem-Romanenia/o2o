@@ -9,10 +9,10 @@ struct UnnamedStructModel(i16, i8, f32);
 
 #[derive(o2o)]
 #[o2o(
-    map(UnnamedStructDto as ());
-    map(UnnamedStructModel as ());
-    into_existing(UnnamedStructDto as ());
-    into_existing(UnnamedStructModel as ());
+    map(UnnamedStructDto as ()),
+    map(UnnamedStructModel as ()),
+    into_existing(UnnamedStructDto as ()),
+    into_existing(UnnamedStructModel as ()),
 )]
 struct NamedStruct {
     #[from(UnnamedStructModel| 0 as i32)]
@@ -45,9 +45,9 @@ struct NamedStructModel {
 #[into_existing(NamedStructModel as {})]
 struct UnnamedStruct(
     #[o2o(
-        map(NamedStructDto| some_int);
-        from(NamedStructModel| some_int as i32);
-        into(NamedStructModel| some_int, 0 as i16);
+        map(NamedStructDto| some_int),
+        from(NamedStructModel| some_int as i32),
+        into(NamedStructModel| some_int, 0 as i16),
     )]
     i32, 
     #[o2o(map(NamedStructDto| another_int))]

@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::ops::Index;
 
 use proc_macro2::{TokenStream, Span};
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 use syn::parse::{ParseStream, Parse};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -40,6 +40,7 @@ enum StructInstruction {
     Map(StructAttr),
     Ghost(StructGhostAttr), 
     Where(WhereAttr),
+    Children(ChildrenAttr),
     PanicDebugInfo, 
 }
 
@@ -50,15 +51,15 @@ enum MemberInstruction {
     Parent(ParentAttr), 
 }
 
-pub(crate) struct Path {
+pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
-    path_str: String
+    pub path_str: String
 }
 
-impl From<syn::Path> for Path {
+impl From<syn::Path> for TypePath {
     fn from(value: syn::Path) -> Self {
-        Path {
+        TypePath {
             span: value.span(),
             path: value.to_token_stream(),
             path_str: value.to_token_stream().to_string()
@@ -66,9 +67,15 @@ impl From<syn::Path> for Path {
     }
 }
 
-impl PartialEq for Path {
+impl PartialEq for TypePath {
     fn eq(&self, other: &Self) -> bool {
         self.path_str == other.path_str
+    }
+}
+impl Eq for TypePath{}
+impl Hash for TypePath {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.path_str.hash(state)
     }
 }
 
@@ -103,6 +110,7 @@ pub(crate) struct StructAttrs {
     pub attrs: Vec<StructAttr>,
     pub ghost_attrs: Vec<StructGhostAttr>,
     pub where_attrs: Vec<WhereAttr>,
+    pub children_attrs: Vec<ChildrenAttr>,
     pub panic_debug_info: bool,
 }
 
@@ -111,14 +119,22 @@ impl<'a> StructAttrs {
         self.attrs.iter().filter(move |x| x.applicable_to[kind]).map(|x| &x.attr)
     }
 
-    pub(crate) fn iter_ghost_attrs_for_container_ty(&'a self, container_ty: &'a Path) -> impl Iterator<Item = &StructGhostAttr> {
-        self.ghost_attrs.iter().filter(move |x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
+    pub(crate) fn ghost_attr(&'a self, container_ty: &'a TypePath) -> Option<&StructGhostAttr> {
+        self.ghost_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.ghost_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn where_attr(&'a self, ident: &Path) -> Option<&WhereAttr>{
+    pub(crate) fn where_attr(&'a self, container_ty: &TypePath) -> Option<&WhereAttr>{
         self.where_attrs.iter()
-            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.where_attrs.iter().find(|x| x.container_ty.is_none()))
+    }
+
+    pub(crate) fn children_attr(&'a self, container_ty: &TypePath) -> Option<&ChildrenAttr>{
+        self.children_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.children_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 }
 
@@ -134,7 +150,7 @@ impl<'a> FieldAttrs {
         self.attrs.iter().filter(move |x| x.applicable_to[kind]).map(|x| &x.attr)
     }
 
-    pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, container_ty: &Path) -> Option<ApplicableAttr> {
+    pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<ApplicableAttr> {
         self.ghost(container_ty)
             .map(|x| ApplicableAttr::Ghost(x))
             .or_else(|| self.field_attr(kind, container_ty)
@@ -143,24 +159,24 @@ impl<'a> FieldAttrs {
                 .map(|x| ApplicableAttr::Field(x)))
     }
 
-    pub(crate) fn child(&'a self, ident: &Path) -> Option<&FieldChildAttr>{
+    pub(crate) fn child(&'a self, ident: &TypePath) -> Option<&FieldChildAttr>{
         self.child_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
             .or_else(|| self.child_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn ghost(&'a self, ident: &Path) -> Option<&GhostAttr>{
+    pub(crate) fn ghost(&'a self, ident: &TypePath) -> Option<&GhostAttr>{
         self.ghost_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
             .or_else(|| self.ghost_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn has_parent_attr(&'a self, ident: &Path) -> bool {
+    pub(crate) fn has_parent_attr(&'a self, ident: &TypePath) -> bool {
         self.parent_attrs.iter()
             .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == ident)
     }
 
-    pub(crate) fn field_attr(&'a self, kind: &'a Kind, ident: &Path) -> Option<&MapFieldAttr>{
+    pub(crate) fn field_attr(&'a self, kind: &'a Kind, ident: &TypePath) -> Option<&MapFieldAttr>{
         self.iter_for_kind(kind)
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
             .or_else(|| self.iter_for_kind(kind).find(|x| x.container_ty.is_none()))
@@ -174,15 +190,14 @@ pub(crate) enum StructKindHint {
     Unspecified = 2
 }
 
-pub(crate) struct StructAttr  {
+pub(crate) struct StructAttr {
     pub attr: MapStructAttr,
-    applicable_to: ApplicableTo,
+    pub applicable_to: ApplicableTo,
 }
 
 pub(crate) struct MapStructAttr {
-    pub ty: Path,
+    pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
-    pub children: Punctuated<ChildData, Token![,]>,
 }
 
 impl Parse  for MapStructAttr {
@@ -190,23 +205,74 @@ impl Parse  for MapStructAttr {
         Ok(MapStructAttr { 
             ty: input.parse::<syn::Path>()?.into(),
             struct_kind_hint: try_parse_struct_kind_hint(input)?,
+        })
+    }
+}
+
+pub(crate) struct StructGhostAttr {
+    pub container_ty: Option<TypePath>,
+    pub ghost_data: Punctuated<GhostData, Token![,]>,
+}
+
+impl Parse for StructGhostAttr{
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(StructGhostAttr { 
+            container_ty: try_parse_container_ident(input, false),
+            ghost_data: Punctuated::parse_separated_nonempty(input)?,
+        })
+    }
+}
+
+pub(crate) struct GhostData {
+    pub ghost_ident: Member,
+    pub action: Action,
+}
+
+impl Parse for GhostData {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(GhostData {
+            ghost_ident: try_parse_ident(input)?,
+            action: Action::Closure(parse_braced_closure(input)?)
+        })
+    }
+}
+
+pub(crate) struct WhereAttr {
+    pub container_ty: Option<TypePath>,
+    pub where_clause: Punctuated<WherePredicate, Token![,]>,
+}
+
+impl Parse for WhereAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(WhereAttr { 
+            container_ty: try_parse_container_ident(input, false),
+            where_clause: Punctuated::parse_separated_nonempty(input)?
+        })
+    }
+}
+
+pub(crate) struct ChildrenAttr {
+    pub container_ty: Option<TypePath>,
+    pub children: Punctuated<ChildData, Token![,]>,
+}
+
+impl Parse for ChildrenAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(ChildrenAttr { 
+            container_ty: try_parse_container_ident(input, false),
             children: try_parse_children(input)?,
         })
     }
 }
 
 pub(crate) struct ChildData {
-    pub ty: Ident,
+    pub ty: syn::Path,
     pub struct_kind_hint: StructKindHint,
-    field_path: Punctuated<Member, Token![.]>,
+    pub field_path: Punctuated<Member, Token![.]>,
     field_path_str: String,
 }
 
 impl ChildData {
-    pub(crate) fn get_child_path(&self) -> &Punctuated<Member, Token![.]> {
-        &&self.field_path
-    }
-
     pub(crate) fn check_match(&self, path: &str) -> bool {
         self.field_path_str == path
     }
@@ -224,45 +290,13 @@ impl Hash for ChildData {
     }
 }
 
-pub(crate) struct StructGhostAttr {
-    pub container_ty: Option<Path>,
-    pub ghost_ident: Member,
-    pub ident: Option<Member>,
-    pub action: Option<Action>,
-}
-
-impl Parse for StructGhostAttr{
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(StructGhostAttr { 
-            container_ty: try_parse_container_ident(input, false),
-            ghost_ident: try_parse_ident(input)?,
-            ident: try_parse_optional_ident(input),
-            action: try_parse_action(input)?,
-        })
-    }
-}
-
-pub(crate) struct WhereAttr {
-    pub container_ty: Option<Path>,
-    pub where_clause: Punctuated<WherePredicate, Token![,]>,
-}
-
-impl Parse for WhereAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(WhereAttr { 
-            container_ty: try_parse_container_ident(input, false),
-            where_clause: Punctuated::parse_separated_nonempty(input)?
-        })
-    }
-}
-
 pub(crate) struct FieldAttr  {
     pub attr: MapFieldAttr,
     applicable_to: ApplicableTo,
 }
 
 pub(crate) struct MapFieldAttr {
-    pub container_ty: Option<Path>,
+    pub container_ty: Option<TypePath>,
     pub ident: Option<Member>,
     pub action: Option<Action>,
 }
@@ -278,7 +312,7 @@ impl Parse for MapFieldAttr {
 }
 
 pub(crate) struct ParentAttr {
-    pub container_ty: Option<Path>,
+    pub container_ty: Option<TypePath>,
 }
 
 impl Parse for ParentAttr {
@@ -290,16 +324,14 @@ impl Parse for ParentAttr {
 }
 
 pub(crate) struct GhostAttr {
-    pub container_ty: Option<Path>,
-    pub ident: Option<Member>,
+    pub container_ty: Option<TypePath>,
     pub action: Option<Action>,
 }
 
 impl Parse for GhostAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(GhostAttr { 
-            container_ty: try_parse_container_ident(input, false),
-            ident: try_parse_optional_ident(input),
+            container_ty: try_parse_container_ident(input, true),
             action: try_parse_action(input)?,
         })
     }
@@ -311,7 +343,7 @@ pub(crate) enum ApplicableAttr<'a> {
 }
 
 pub(crate) struct FieldChildAttr {
-    pub container_ty: Option<Path>,
+    pub container_ty: Option<TypePath>,
     pub field_path: Punctuated<Member, Token![.]>,
     field_path_str: Vec<String>,
 }
@@ -356,7 +388,7 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
     for x in input.iter() {
         if x.path.is_ident("o2o") {
             x.parse_args_with(|input: ParseStream| {
-                let new_instrs: Punctuated<StructInstruction, Token![;]> = Punctuated::parse_terminated_with(input, |input| {
+                let new_instrs: Punctuated<StructInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
                     let p: OptionalParenthesizedTokenStream = input.parse()?;
                     parse_struct_instruction(&instr, p.content())
@@ -372,6 +404,7 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
     }
     let mut ghost_attrs: Vec<StructGhostAttr> = vec![];
     let mut where_attrs: Vec<WhereAttr> = vec![];
+    let mut children_attrs: Vec<ChildrenAttr> = vec![];
     let mut attrs: Vec<StructAttr> = vec![];
     let mut panic_debug_info = false;
     for instr in  instrs {
@@ -379,10 +412,11 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
             StructInstruction::Map(attr) => attrs.push(attr),
             StructInstruction::Ghost(attr) => ghost_attrs.push(attr),
             StructInstruction::Where(attr) => where_attrs.push(attr),
+            StructInstruction::Children(attr) => children_attrs.push(attr),
             StructInstruction::PanicDebugInfo => panic_debug_info = true
         };
     }
-    Ok(StructAttrs {attrs, ghost_attrs, where_attrs, panic_debug_info })
+    Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs, panic_debug_info })
 }
 
 pub(crate) fn get_field_attrs(input: &[Attribute]) -> Result<FieldAttrs> {
@@ -390,7 +424,7 @@ pub(crate) fn get_field_attrs(input: &[Attribute]) -> Result<FieldAttrs> {
     for x in input.iter() {
         if x.path.is_ident("o2o") {
             x.parse_args_with(|input: ParseStream| {
-                let new_instrs: Punctuated<MemberInstruction, Token![;]> = Punctuated::parse_terminated_with(input, |input| {
+                let new_instrs: Punctuated<MemberInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
                     let p: OptionalParenthesizedTokenStream = input.parse()?;
                     parse_member_instruction(&instr, p.content())
@@ -437,6 +471,7 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream) -> Result<StructI
                 ]
             })),
         "ghost" => Ok(StructInstruction::Ghost(syn::parse2(input)?)),
+        "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
         "panic_debug_info" => Ok(StructInstruction::PanicDebugInfo),
         _ => Err(Error::new(instr.span(), format_args!("Struct level instruction '{}' is not supported.", instr)))
@@ -487,10 +522,10 @@ fn try_parse_struct_kind_hint(input: ParseStream) -> Result<StructKindHint> {
     Err(input.error("Only '()' and '{}' are supported struct kind hints."))
 }
 
-fn try_parse_container_ident(input: ParseStream, can_be_empty: bool) -> Option<Path> {
+fn try_parse_container_ident(input: ParseStream, can_be_empty: bool) -> Option<TypePath> {
     if peek_container_path(input, can_be_empty) {
         let ident = input.parse::<syn::Path>();
-        if !can_be_empty {
+        if input.peek(Token![|]) {
             input.parse::<Token![|]>().unwrap();
         }
         return ident.ok().map(|x| x.into());
@@ -500,7 +535,7 @@ fn try_parse_container_ident(input: ParseStream, can_be_empty: bool) -> Option<P
 
 fn try_parse_ident(input: ParseStream) -> Result<Member> {
     let ident = input.parse::<Member>()?;
-    input.parse::<Token![,]>()?;
+    input.parse::<Token![:]>()?;
 
     Ok(ident)
 }
@@ -538,14 +573,10 @@ fn peek_container_path(input: ParseStream, can_be_empty: bool) -> bool {
 }
 
 fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token![,]>> {
-    if input.peek(Token![|]) {
-        input.parse::<Token![|]>()?;
-    }
-
     Ok(input.parse_terminated(|x| {
         let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(x)?;
         x.parse::<Token![:]>()?;
-        let ty = x.parse::<Ident>()?;
+        let ty = x.parse::<syn::Path>()?;
         Ok(ChildData{
             ty,
             struct_kind_hint: try_parse_struct_kind_hint(x)?,
@@ -563,6 +594,27 @@ fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
         return Ok(Some(Action::InlineExpr(input.parse()?)))
     }
     Ok(None)
+}
+
+fn parse_braced_closure(input: ParseStream) -> Result<TokenStream> {
+    validate_closure(input)?;
+
+    let mut tokens = Vec::new();
+    
+    tokens.push(input.parse::<Token![|]>()?.to_token_stream());
+    if input.peek(Ident) {
+        tokens.push(input.parse::<Ident>()?.to_token_stream());
+    } else {
+        tokens.push(input.parse::<Token![_]>()?.to_token_stream());
+    }
+    tokens.push(input.parse::<Token![|]>()?.to_token_stream());
+    let content;
+    braced!(content in input);
+    let content = content.parse::<TokenStream>()?;
+
+    tokens.push(quote!({#content}));
+
+    Ok(TokenStream::from_iter(tokens.into_iter()))
 }
 
 fn validate_closure(input: ParseStream) -> Result<()> {

@@ -35,7 +35,7 @@ struct NamedStructDto {
 struct UnnamedStructDto(
     #[o2o(map(some_int))] i32, 
     #[o2o(map(another_int))] i32, 
-    #[o2o(map(NamedStruct| some_float); map(NamedStructModel| some_float_diff))] f32
+    #[o2o(map(NamedStruct| some_float), map(NamedStructModel| some_float_diff))] f32
 );
 
 #[test]

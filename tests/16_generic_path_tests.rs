@@ -22,18 +22,18 @@ struct Child<T> {
 
 #[derive(o2o)]
 #[o2o(
-    map(Parent::<i32>);
-    map(ParentModel::<i32>);
-    into_existing(Parent::<i32>);
-    into_existing(ParentModel::<i32>);
+    map(Parent::<i32>),
+    map(ParentModel::<i32>),
+    into_existing(Parent::<i32>),
+    into_existing(ParentModel::<i32>),
 )]
 struct ParentDto {
     parent_int: i32,
     #[o2o(
-        from(Parent::<i32>| |x|(&x.child).into());
-        into(Parent::<i32>| child, |x|(&x.diff_child).into());
-        from(ParentModel::<i32>| |x|(&x.child_diff).into());
-        into(ParentModel::<i32>| child_diff, |x|(&x.diff_child).into());
+        from(Parent::<i32>| |x|(&x.child).into()),
+        into(Parent::<i32>| child, |x|(&x.diff_child).into()),
+        from(ParentModel::<i32>| |x|(&x.child_diff).into()),
+        into(ParentModel::<i32>| child_diff, |x|(&x.diff_child).into()),
     )]
     diff_child: ChildDto,
 }

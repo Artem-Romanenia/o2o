@@ -3,11 +3,11 @@ use o2o::traits::IntoExisting;
 
 #[derive(o2o)]
 #[o2o(
-    map(EntityDto);
-    map(TupleEntityDto);
-    map(EntityModel);
-    into_existing(EntityDto);
-    into_existing(TupleEntityDto);
+    map(EntityDto),
+    map(TupleEntityDto),
+    map(EntityModel),
+    into_existing(EntityDto),
+    into_existing(TupleEntityDto),
 )]
 struct Entity {
     #[map(TupleEntityDto| 0)]

@@ -21,18 +21,18 @@ struct NamedStructModel {
 
 #[derive(o2o)]
 #[o2o(
-    map(NamedStruct);
-    map(NamedStructModel);
-    into_existing(NamedStruct);
-    into_existing(NamedStructModel);
+    map(NamedStruct),
+    map(NamedStructModel),
+    into_existing(NamedStruct),
+    into_existing(NamedStructModel),
 )]
 struct NamedStructDto {
     some_int: i32,
     #[o2o(
-        from(NamedStruct| |x|x.another_int as i16);
-        into(NamedStruct| |x|x.another_int as i32);
-        from(NamedStructModel| |x|x.another_int as i16);
-        into(NamedStructModel| |x|x.another_int as i8);
+        from(NamedStruct| |x|x.another_int as i16),
+        into(NamedStruct| |x|x.another_int as i32),
+        from(NamedStructModel| |x|x.another_int as i16),
+        into(NamedStructModel| |x|x.another_int as i8),
     )]
     another_int: i16,
     #[o2o(from(|x|x.some_float as f64))]

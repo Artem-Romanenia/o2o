@@ -21,19 +21,19 @@ struct Child<T> {
 
 #[derive(o2o)]
 #[o2o(
-    map(Parent::<Child::<T>, i32>);
-    map(ParentModel::<T>);
-    into_existing(Parent::<Child::<T>, i32>);
-    into_existing(ParentModel::<T>);
-    where_clause(T: Copy);
+    map(Parent::<Child::<T>, i32>),
+    map(ParentModel::<T>),
+    into_existing(Parent::<Child::<T>, i32>),
+    into_existing(ParentModel::<T>),
+    where_clause(T: Copy),
 )]
 struct ParentDto<T> where T: Copy {
     parent_int: i32,
     #[o2o(
-        from(Parent::<Child::<T>, i32>| |x|(&x.child).into());
-        owned_into(Parent::<Child::<T>, i32>| child, diff_child.into());
-        ref_into(Parent::<Child::<T>, i32>| child, |x|(&x.diff_child).into());
-        from_owned(ParentModel::<T>| child_diff.into());
+        from(Parent::<Child::<T>, i32>| |x|(&x.child).into()),
+        owned_into(Parent::<Child::<T>, i32>| child, diff_child.into()),
+        ref_into(Parent::<Child::<T>, i32>| child, |x|(&x.diff_child).into()),
+        from_owned(ParentModel::<T>| child_diff.into()),
     )]
     #[o2o(from_ref(ParentModel::<T>| |x|(&x.child_diff).into()))]
     #[into(ParentModel::<T>| child_diff, |x|(&x.diff_child).into())]

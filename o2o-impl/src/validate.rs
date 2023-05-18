@@ -1,18 +1,30 @@
 use std::collections::HashSet;
+use proc_macro2::Span;
+use quote::ToTokens;
 use syn::{Result, spanned::Spanned};
-use crate::{ast::Struct, attr::{StructAttr, FieldAttr, FieldChildAttr, Kind, MapStructAttr, MapFieldAttr}};
+use crate::{ast::{Struct, Field}, attr::{Kind, MapStructAttr, StructAttrs, FieldChildAttr, TypePath, ChildrenAttr, StructGhostAttr, WhereAttr}};
 
 pub(crate) fn validate(input: &Struct) -> Result<()> {
-    validate_struct_attrs(input.attrs.iter_for_kind(&Kind::OwnedInto))?;
-    validate_struct_attrs(input.attrs.iter_for_kind(&Kind::RefInto))?;
+    if input.attrs.attrs.len() == 0 {
+        return Err(syn::Error::new(Span::call_site(), "At least one 'map'-like struct level instruction is expected."))
+    }
+
     validate_struct_attrs(input.attrs.iter_for_kind(&Kind::FromOwned))?;
     validate_struct_attrs(input.attrs.iter_for_kind(&Kind::FromRef))?;
-    for x in &input.fields {
-        validate_field_attrs(x.attrs.iter_for_kind(&Kind::OwnedInto), &x.attrs.child_attrs, input.attrs.iter_for_kind(&Kind::OwnedInto))?;
-        validate_field_attrs(x.attrs.iter_for_kind(&Kind::RefInto), &x.attrs.child_attrs, input.attrs.iter_for_kind(&Kind::RefInto))?;
-        validate_field_attrs(x.attrs.iter_for_kind(&Kind::FromOwned), &x.attrs.child_attrs, input.attrs.iter_for_kind(&Kind::FromOwned))?;
-        validate_field_attrs(x.attrs.iter_for_kind(&Kind::FromRef), &x.attrs.child_attrs, input.attrs.iter_for_kind(&Kind::FromRef))?;
-    }
+    validate_struct_attrs(input.attrs.iter_for_kind(&Kind::OwnedInto))?;
+    validate_struct_attrs(input.attrs.iter_for_kind(&Kind::RefInto))?;
+    validate_struct_attrs(input.attrs.iter_for_kind(&Kind::OwnedIntoExisting))?;
+    validate_struct_attrs(input.attrs.iter_for_kind(&Kind::RefIntoExisting))?;
+
+    let type_paths = input.attrs.attrs.iter()
+        .map(|x| &x.attr.ty)
+        .collect::<HashSet<_>>();
+
+    validate_ghost_attrs(&input.attrs.ghost_attrs, &type_paths)?;
+    validate_children_attrs(&input.attrs.children_attrs, &type_paths)?;
+    validate_where_attrs(&input.attrs.where_attrs, &type_paths)?;
+
+    validate_fields(&input.fields, &input.attrs)?;
     Ok(())
 }
 
@@ -21,27 +33,143 @@ fn validate_struct_attrs<'a, I>(attrs: I) -> Result<()>
 {
     let mut unique_ident = HashSet::new();
     for attr in attrs {
-        if !unique_ident.insert(attr.ty.path.to_string()) {
-            return Err(syn::Error::new(attr.ty.span, "Ident here must be unique"))
+        if !unique_ident.insert(&attr.ty) {
+            return Err(syn::Error::new(attr.ty.span, "Ident here must be unique."))
         }
-        let mut unique_child_ident = HashSet::new();
-        for child in &attr.children {
-            if !unique_child_ident.insert(child) {
-                return Err(
-                    syn::Error::new(child.get_child_path().span(), "Child field name here must be unique")
-                )
+    }
+    Ok(())
+}
+
+fn validate_ghost_attrs(ghost_attrs: &Vec<StructGhostAttr>, type_paths: &HashSet<&TypePath>) -> Result<()> {
+    if ghost_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
+        return Err(syn::Error::new(Span::call_site(), "There can be at most one default #[ghost(...)] instruction."))
+    }
+
+    let mut unique_dedicated_attr_type_path = HashSet::new();
+
+    for ghost_attr in ghost_attrs.iter() {
+        if let Some(tp) = &ghost_attr.container_ty{
+            if !type_paths.contains(tp) {
+                return Err(syn::Error::new(tp.span, format!("Type {} doesn't match any type specified in 'map'-like struct level instructions.", tp.path_str)))
+            }
+            if !unique_dedicated_attr_type_path.insert(tp) {
+                return Err(syn::Error::new(tp.span, format!("Dedicated #[ghost(...)] instruction for  type {} is already defined.", tp.path_str)))
             }
         }
     }
     Ok(())
 }
 
-fn validate_field_attrs<'a, IS, IF>(
-    attrs: IF, 
-    child_attr: &'a Vec<FieldChildAttr>, 
-    struct_attrs: IS) -> Result<()> 
-    where IS: Iterator<Item = &'a MapStructAttr>,
-          IF: Iterator<Item = &'a MapFieldAttr>
-{
+fn validate_children_attrs(children_attrs: &Vec<ChildrenAttr>, type_paths: &HashSet<&TypePath>) -> Result<()> {
+    if children_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
+        return Err(syn::Error::new(Span::call_site(), "There can be at most one default #[children(...)] instruction."))
+    }
+
+    let mut unique_dedicated_attr_type_path = HashSet::new();
+
+    for children_attr in children_attrs.iter() {
+        if let Some(tp) = &children_attr.container_ty{
+            if !type_paths.contains(tp) {
+                return Err(syn::Error::new(tp.span, format!("Type {} doesn't match any type specified in 'map'-like struct level instructions.", tp.path_str)))
+            }
+            if !unique_dedicated_attr_type_path.insert(tp) {
+                return Err(syn::Error::new(tp.span, format!("Dedicated #[children(...)] instruction for  type {} is already defined.", tp.path_str)))
+            }
+        }
+
+        let mut unique_field = HashSet::new();
+
+        for child_data in &children_attr.children {
+            if !unique_field.insert(child_data) {
+                return Err(syn::Error::new(child_data.field_path.span(), "Ident here must be unique."))
+            }
+        }
+    }
     Ok(())
+}
+
+fn validate_where_attrs(where_attrs: &Vec<WhereAttr>, type_paths: &HashSet<&TypePath>) -> Result<()> {
+    if where_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
+        return Err(syn::Error::new(Span::call_site(), "There can be at most one default #[where_clause(...)] instruction."))
+    }
+
+    let mut unique_dedicated_attr_type_path = HashSet::new();
+
+    for where_attr in where_attrs.iter() {
+        if let Some(tp) = &where_attr.container_ty{
+            if !type_paths.contains(tp) {
+                return Err(syn::Error::new(tp.span, format!("Type {} doesn't match any type specified in 'map'-like struct level instructions.", tp.path_str)))
+            }
+            if !unique_dedicated_attr_type_path.insert(tp) {
+                return Err(syn::Error::new(tp.span, format!("Dedicated #[where_clause(...)] instruction for  type {} is already defined.", tp.path_str)))
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_fields<'a>(fields: &Vec<Field>, struct_attrs: &StructAttrs) -> Result<()> {
+    let into_type_paths = struct_attrs.iter_for_kind(&Kind::OwnedInto)
+        .chain(struct_attrs.iter_for_kind(&Kind::RefInto))
+        .map(|x| &x.ty)
+        .collect::<HashSet<_>>();
+
+    let from_type_paths = struct_attrs.iter_for_kind(&Kind::FromOwned)
+        .chain(struct_attrs.iter_for_kind(&Kind::FromRef))
+        .map(|x| &x.ty)
+        .collect::<HashSet<_>>();
+
+    let mut errors = HashSet::new();
+
+    for child_attr in fields.iter().flat_map(|x| &x.attrs.child_attrs) {
+        match &child_attr.container_ty {
+            Some(tp) => check_child_errors(child_attr, struct_attrs, tp, &mut errors),
+            None => for tp in into_type_paths.iter(){
+                check_child_errors(child_attr, struct_attrs, tp, &mut errors)
+            }
+        }
+    }
+
+    for field in fields {
+        for ghost_attr in field.attrs.ghost_attrs.iter() {
+            if ghost_attr.action.is_some() {
+                continue;
+            }
+            match &ghost_attr.container_ty {
+                Some(tp) => {
+                    if  from_type_paths.contains(tp)  {
+                        errors.insert(format!("Member level instruction #[ghost(...)] should provide default value for field '{}' for type {}", field.member.to_token_stream().to_string(), tp.path_str));
+                    }
+                },
+                None => {
+                    let field_name_str = field.member.to_token_stream().to_string();
+                    for tp in from_type_paths.iter(){
+                        errors.insert(format!("Member level instruction #[ghost(...)] should provide default value for field '{}' for type {}", field_name_str, tp.path_str));
+                    }
+                }
+            }
+        }
+    }
+
+    if errors.len() > 0 {
+        let errors: Vec<String> = errors.into_iter().collect();
+        return Err(syn::Error::new(Span::call_site(), errors.join("\n")))
+    }
+
+    Ok(())
+}
+
+fn check_child_errors(child_attr: &FieldChildAttr, struct_attrs: &StructAttrs, tp: &TypePath, errors: &mut HashSet<String>) {
+    let children_attr = struct_attrs.children_attr(tp);
+    for (idx, _level) in child_attr.field_path.iter().enumerate() {
+        let path = child_attr.get_field_path_str(Some(idx));
+            match children_attr {
+                Some(children_attr) => {
+                    if !children_attr.children.iter().any(|x| x.check_match(path)) {
+                        errors.insert(format!("Missing '{}: [Type Path]' instruction for type {}", path, tp.path_str));
+                    }
+                },
+                None => { errors.insert(format!("Missing #[children(...)] instruction for {}", tp.path_str)); }
+            }
+    }
 }
