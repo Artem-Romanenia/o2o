@@ -228,7 +228,15 @@ fn struct_init_block_inner(
     if ctx.kind != Kind::FromOwned && ctx.kind != Kind::FromRef {
         if let Some(ghost_attr) = ctx.input.attrs.ghost_attr(ctx.container_ty) {
             ghost_attr.ghost_data.iter().for_each(|x| {
-                fragments.push(render_ghost_line(x, ctx))
+                match (&x.child_path, field_ctx) {
+                    (Some(_), Some(field_ctx)) => {
+                        if x.get_child_path_str() == field_ctx.0.get_field_path_str(Some(field_ctx.2)) {
+                            fragments.push(render_ghost_line(x, ctx))
+                        }
+                    },
+                    (None, None) => fragments.push(render_ghost_line(x, ctx)),
+                    _ => ()
+                }
             });
         }
     }
@@ -435,12 +443,19 @@ fn render_line(
 }
 
 fn render_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
+    let ch = match &ghost_data.child_path {
+        Some(ghost_data) => {
+            let ch = ghost_data.to_token_stream();
+            quote!(#ch.)
+        },
+        None => TokenStream::new()
+    };
     let right_side = quote_action(&ghost_data.action, None, ctx);
     match (&ghost_data.ghost_ident, &ctx.kind) {
         (Member::Named(ident), Kind::OwnedInto | Kind::RefInto) => quote!(#ident: #right_side,),
         (Member::Unnamed(_), Kind::OwnedInto | Kind::RefInto) => quote!(#right_side,),
-        (Member::Named(ident), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => quote!(other.#ident = #right_side;),
-        (Member::Unnamed(index), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => quote!(other.#index = #right_side;),
+        (Member::Named(ident), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => quote!(other.#ch #ident = #right_side;),
+        (Member::Unnamed(index), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => quote!(other.#ch #index = #right_side;),
         (_, _) => panic!("weird"),
     }
 }

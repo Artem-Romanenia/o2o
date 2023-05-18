@@ -1,9 +1,34 @@
 #![cfg(test)]
 
+//use std::io::Write;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, Error};
 use crate::expand::derive;
+
+// #[test]
+// fn debuger() {
+//     let code_fragment = quote!{
+        
+//     };
+
+//     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+//     let output = derive(&input);
+
+//     match output {
+//         Ok(output) => {
+//             let text = output.to_string();
+//             _ = std::io::stdout().write_all(format!("\nOutput:\n\n{}\n\n", text).as_ref());
+//         },
+//         Err(err) => {
+//             let mut err_iter = err.into_iter();
+//             let error = err_iter.next();
+//             let message = error.expect("One error expected").to_string();
+//             _ = std::io::stdout().write_all(format!("\nError:\n\n{}\n\n", message).as_ref());
+//         }
+//     }
+// }
 
 #[test]
 fn missing_map_instructions() {
@@ -36,17 +61,17 @@ fn missing_map_instructions() {
 fn unrecognized_struct_instructions() {
     let test_data = vec![
         (quote! {
-            #[mapp(EntityDto)]
+            #[o2o(mapp(EntityDto))]
             struct Entity {}
         }, "mapp"),
         (quote! {
-            #[map(EntityDto)]
-            #[parent(EntityDto)]
+            #[o2o(map(EntityDto))]
+            #[o2o(parent(EntityDto))]
             struct Entity {}
         }, "parent"),
         (quote! {
-            #[map(EntityDto)]
-            #[child(EntityDto)]
+            #[o2o(map(EntityDto))]
+            #[o2o(child(EntityDto))]
             struct Entity {}
         }, "child"),
     ];
@@ -66,21 +91,21 @@ fn unrecognized_member_instructions() {
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[mapp(diff_field)]
+                #[o2o(mapp(diff_field))]
                 child: i32,
             }
         }, "mapp"),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[children(diff_field)]
+                #[o2o(children(diff_field))]
                 child: i32,
             }
         }, "children"),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[where_clause(diff_field)]
+                #[o2o(where_clause(diff_field))]
                 child: i32,
             }
         }, "where_clause"),
@@ -93,6 +118,36 @@ fn unrecognized_member_instructions() {
     
         assert_eq!(message, format!("Member level instruction '{}' is not supported.", err));
     }
+}
+
+#[test]
+fn unrecognized_struct_instructions_no_bark() {
+    let code_fragment = quote!{
+        #[from_owned(NamedStruct)]
+        #[unknown()]
+        struct NamedStructDto {}
+    };
+
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    assert!(output.is_ok());
+}
+
+#[test]
+fn unrecognized_member_instructions_no_bark() {
+    let code_fragment = quote!{
+        #[from_owned(NamedStruct)]
+        struct NamedStructDto {
+            #[unknown()]
+            field: i32,
+        }
+    };
+
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    assert!(output.is_ok());
 }
 
 #[test]

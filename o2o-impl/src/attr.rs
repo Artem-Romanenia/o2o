@@ -41,7 +41,8 @@ enum StructInstruction {
     Ghost(StructGhostAttr), 
     Where(WhereAttr),
     Children(ChildrenAttr),
-    PanicDebugInfo, 
+    PanicDebugInfo,
+    Unrecognized
 }
 
 enum MemberInstruction {
@@ -49,6 +50,7 @@ enum MemberInstruction {
     Ghost(GhostAttr),
     Child(FieldChildAttr), 
     Parent(ParentAttr), 
+    Unrecognized
 }
 
 pub(crate) struct TypePath {
@@ -224,14 +226,31 @@ impl Parse for StructGhostAttr{
 }
 
 pub(crate) struct GhostData {
+    pub child_path: Option<Punctuated<Member, Token![.]>>,
     pub ghost_ident: Member,
     pub action: Action,
 }
 
+impl GhostData {
+    pub(crate) fn get_child_path_str(&self) -> String {
+        self.child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect::<String>()
+    }
+}
+
 impl Parse for GhostData {
     fn parse(input: ParseStream) -> Result<Self> {
+        let child_path = if !peek_ghost_path(input) {
+            let child_path = Some(Punctuated::parse_separated_nonempty(input)?);
+            input.parse::<Token![@]>()?;
+            child_path
+        } else {
+            None
+        };
+        let ghost_ident = input.parse()?;
+        input.parse::<Token![:]>()?;
         Ok(GhostData {
-            ghost_ident: try_parse_ident(input)?,
+            child_path,
+            ghost_ident,
             action: Action::Closure(parse_braced_closure(input)?)
         })
     }
@@ -391,7 +410,7 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
                 let new_instrs: Punctuated<StructInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
                     let p: OptionalParenthesizedTokenStream = input.parse()?;
-                    parse_struct_instruction(&instr, p.content())
+                    parse_struct_instruction(&instr, p.content(), true)
                 })?;
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
@@ -399,7 +418,7 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
         } else {
             let instr = x.path.get_ident().unwrap();
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_struct_instruction(instr, p.content())?);
+            instrs.push(parse_struct_instruction(instr, p.content(), false)?);
         }
     }
     let mut ghost_attrs: Vec<StructGhostAttr> = vec![];
@@ -413,7 +432,8 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
             StructInstruction::Ghost(attr) => ghost_attrs.push(attr),
             StructInstruction::Where(attr) => where_attrs.push(attr),
             StructInstruction::Children(attr) => children_attrs.push(attr),
-            StructInstruction::PanicDebugInfo => panic_debug_info = true
+            StructInstruction::PanicDebugInfo => panic_debug_info = true,
+            StructInstruction::Unrecognized => (),
         };
     }
     Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs, panic_debug_info })
@@ -427,7 +447,7 @@ pub(crate) fn get_field_attrs(input: &[Attribute]) -> Result<FieldAttrs> {
                 let new_instrs: Punctuated<MemberInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
                     let p: OptionalParenthesizedTokenStream = input.parse()?;
-                    parse_member_instruction(&instr, p.content())
+                    parse_member_instruction(&instr, p.content(), true)
                 })?;
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
@@ -435,7 +455,7 @@ pub(crate) fn get_field_attrs(input: &[Attribute]) -> Result<FieldAttrs> {
         } else {
             let instr = x.path.get_ident().unwrap();
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_member_instruction(instr, p.content())?);
+            instrs.push(parse_member_instruction(instr, p.content(), false)?);
         }
     }
     let mut child_attrs: Vec<FieldChildAttr> = vec![];
@@ -447,13 +467,14 @@ pub(crate) fn get_field_attrs(input: &[Attribute]) -> Result<FieldAttrs> {
             MemberInstruction::Map(attr) => attrs.push(attr),
             MemberInstruction::Child(attr) => child_attrs.push(attr),
             MemberInstruction::Ghost(attr) => ghost_attrs.push(attr),
-            MemberInstruction::Parent(attr) => parent_attrs.push(attr)
+            MemberInstruction::Parent(attr) => parent_attrs.push(attr),
+            MemberInstruction::Unrecognized => ()
         };
     }
     Ok(FieldAttrs { child_attrs, parent_attrs, attrs, ghost_attrs })
 }
 
-fn parse_struct_instruction(instr: &Ident, input: TokenStream) -> Result<StructInstruction>
+fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Result<StructInstruction>
 {
     let instr_str = &instr.to_token_stream().to_string();
     match instr_str.as_ref() {
@@ -474,11 +495,12 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream) -> Result<StructI
         "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
         "panic_debug_info" => Ok(StructInstruction::PanicDebugInfo),
-        _ => Err(Error::new(instr.span(), format_args!("Struct level instruction '{}' is not supported.", instr)))
+        _ if bark => Err(Error::new(instr.span(), format_args!("Struct level instruction '{}' is not supported.", instr))),
+        _ => Ok(StructInstruction::Unrecognized),
     }
 }
 
-fn parse_member_instruction(instr: &Ident, input: TokenStream) -> Result<MemberInstruction> {
+fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Result<MemberInstruction> {
     let instr_str = &instr.to_string();
     match instr_str.as_ref() {
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
@@ -497,7 +519,8 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream) -> Result<MemberI
         "ghost" => Ok(MemberInstruction::Ghost(syn::parse2(input)?)),
         "child" => Ok(MemberInstruction::Child(syn::parse2(input)?)),
         "parent" => Ok(MemberInstruction::Parent(syn::parse2(input)?)),
-        _ => Err(Error::new(instr.span(), format_args!("Member level instruction '{}' is not supported.", instr)))
+        _ if bark => Err(Error::new(instr.span(), format_args!("Member level instruction '{}' is not supported.", instr))),
+        _ => Ok(MemberInstruction::Unrecognized)
     }
 }
 
@@ -533,13 +556,6 @@ fn try_parse_container_ident(input: ParseStream, can_be_empty: bool) -> Option<T
     None
 }
 
-fn try_parse_ident(input: ParseStream) -> Result<Member> {
-    let ident = input.parse::<Member>()?;
-    input.parse::<Token![:]>()?;
-
-    Ok(ident)
-}
-
 fn try_parse_optional_ident(input: ParseStream) -> Option<Member> {
     if (input.peek(Ident) || peek_index(input)) && input.peek2(Token![,]) {
         let ident = input.parse::<Member>().ok();
@@ -567,6 +583,10 @@ fn peek_container_path(input: ParseStream, can_be_empty: bool) -> bool {
         Ok(_) => (can_be_empty && fork.is_empty()) || fork.peek(Token![|]),
         Err(_) => false,
     }
+}
+
+fn peek_ghost_path(input: ParseStream) -> bool {
+    (input.peek(Ident) || peek_index(input)) && input.peek2(Token![:])
 }
 
 fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token![,]>> {
