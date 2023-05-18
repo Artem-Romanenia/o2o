@@ -28,10 +28,7 @@ impl<'a> Struct<'a> {
             ident: &node.ident,
             generics: &node.generics,
             fields,
-            named: match &data.fields {
-                Fields::Named(_) => true,
-                _ => false,
-            }
+            named: matches!(&data.fields, Fields::Named(_))
         })
     }
 }

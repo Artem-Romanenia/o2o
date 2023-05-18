@@ -166,7 +166,7 @@ fn struct_init_block_inner(
 ) -> TokenStream
 {
     let next = fields.peek();
-    if let None = next {
+    if next.is_none() {
         return quote!({})
     }
 
@@ -190,24 +190,14 @@ fn struct_init_block_inner(
         }
 
         if let Some(field_ctx) = field_ctx {
-            if !key.starts_with(&field_ctx.0.get_field_path_str(Some(field_ctx.2))) {
+            if !key.starts_with(field_ctx.0.get_field_path_str(Some(field_ctx.2))) {
                 break;
             }
         }
 
         let fragment = match f.attrs.child(ctx.container_ty) {
             Some(child_attr) => {
-                if let None = field_ctx {
-                    match ctx.kind {
-                        Kind::OwnedInto | Kind::RefInto => 
-                            render_child(fields, ctx, (child_attr, 0), struct_kind_hint),
-                        Kind::FromOwned | Kind::FromRef => 
-                            render_line(fields.next().unwrap().2, ctx, struct_kind_hint, idx),
-                        Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
-                            render_existing_child(fields, ctx, (child_attr, 0)),
-                    }
-                } else {
-                    let field_ctx = field_ctx.unwrap();
+                if let Some(field_ctx) = field_ctx {
                     if field_ctx.2 < child_attr.field_path.len() - 1 {
                         match ctx.kind {
                             Kind::OwnedInto | Kind::RefInto => 
@@ -218,6 +208,15 @@ fn struct_init_block_inner(
                                 render_existing_child(fields, ctx, (child_attr, field_ctx.2 + 1)),
                         }
                     } else { render_line(fields.next().unwrap().2, ctx, struct_kind_hint, idx) }
+                } else {
+                    match ctx.kind {
+                        Kind::OwnedInto | Kind::RefInto => 
+                            render_child(fields, ctx, (child_attr, 0), struct_kind_hint),
+                        Kind::FromOwned | Kind::FromRef => 
+                            render_line(fields.next().unwrap().2, ctx, struct_kind_hint, idx),
+                        Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
+                            render_existing_child(fields, ctx, (child_attr, 0)),
+                    }
                 }
             },
             None => render_line(fields.next().unwrap().2, ctx, struct_kind_hint, idx)
@@ -259,10 +258,9 @@ fn struct_post_init(ctx: &ImplContext) -> Option<TokenStream> {
         }
     });
 
-    if fragments.len() == 0 {
+    if fragments.is_empty() {
         return None
     }
-
     Some(quote!(#(#fragments)*))
 }
 
@@ -311,14 +309,8 @@ fn render_existing_child(
     let child_attr = field_ctx.0;
     let path = child_attr.get_field_path_str(Some(field_ctx.1));
     let children_attr = ctx.input.attrs.children_attr(ctx.container_ty);
-    let child_data = children_attr.and_then(|x| {
-        x.children.iter().find_map(|child_data| {
-            match child_data.check_match(path) {
-                true => Some(child_data),
-                false => None
-            }
-        })
-    });
+    let child_data = children_attr.and_then(|x| 
+        x.children.iter().find(|child_data| child_data.check_match(path)));
     struct_init_block_inner(fields, ctx, Some((field_ctx.0, child_data, field_ctx.1 )))
 }
 

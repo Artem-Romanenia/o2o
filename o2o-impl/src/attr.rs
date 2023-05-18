@@ -152,11 +152,11 @@ impl<'a> FieldAttrs {
 
     pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<ApplicableAttr> {
         self.ghost(container_ty)
-            .map(|x| ApplicableAttr::Ghost(x))
+            .map(ApplicableAttr::Ghost)
             .or_else(|| self.field_attr(kind, container_ty)
                 .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, container_ty) } else { None })
                 .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, container_ty) } else { None })
-                .map(|x| ApplicableAttr::Field(x)))
+                .map(ApplicableAttr::Field))
     }
 
     pub(crate) fn child(&'a self, ident: &TypePath) -> Option<&FieldChildAttr>{
@@ -364,10 +364,10 @@ impl Parse for FieldChildAttr{
         let field_path = child_path.clone();
         let mut field_path_str = vec![];
         child_path.iter().for_each(|x| {
-            if field_path_str.len() == 0 {
+            if field_path_str.is_empty() {
                 field_path_str.push(x.to_token_stream().to_string())
             } else {
-                field_path_str.push(format!("{}.{}", field_path_str.last().unwrap_or(&String::from("")), x.to_token_stream().to_string()))
+                field_path_str.push(format!("{}.{}", field_path_str.last().unwrap_or(&String::from("")), x.to_token_stream()))
             }
         });
         Ok(FieldChildAttr { 
@@ -558,10 +558,7 @@ fn try_parse_optional_ident(input: ParseStream) -> Option<Member> {
 
 fn peek_index(input: ParseStream) -> bool {
     let fork = input.fork();
-    match fork.parse::<syn::Index>() {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    fork.parse::<syn::Index>().is_ok()
 }
 
 fn peek_container_path(input: ParseStream, can_be_empty: bool) -> bool {
@@ -573,7 +570,7 @@ fn peek_container_path(input: ParseStream, can_be_empty: bool) -> bool {
 }
 
 fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token![,]>> {
-    Ok(input.parse_terminated(|x| {
+    input.parse_terminated(|x| {
         let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(x)?;
         x.parse::<Token![:]>()?;
         let ty = x.parse::<syn::Path>()?;
@@ -583,7 +580,7 @@ fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token!
             field_path: child_path.clone(),
             field_path_str: child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect(),
         })
-    })?)
+    })
 }
 
 fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
@@ -625,40 +622,22 @@ fn validate_closure(input: ParseStream) -> Result<()> {
 }
 
 fn appl_owned_into(instr: &str) -> bool {
-    match instr {
-        "owned_into" | "into" | "map_owned" | "map" => true,
-        _ => false
-    }
+    matches!(instr, "owned_into" | "into" | "map_owned" | "map")
 }
 fn appl_ref_into(instr: &str) -> bool {
-    match instr {
-        "ref_into" | "into" | "map_ref" | "map" => true,
-        _ => false
-    }
+    matches!(instr, "ref_into" | "into" | "map_ref" | "map")
 }
 fn appl_from_owned(instr: &str) -> bool {
-    match instr {
-        "from_owned" | "from" | "map_owned" | "map" => true,
-        _ => false
-    }
+    matches!(instr, "from_owned" | "from" | "map_owned" | "map")
 }
 fn appl_from_ref(instr: &str) -> bool {
-    match instr {
-        "from_ref" | "from" | "map_ref" | "map" => true,
-        _ => false
-    }
+    matches!(instr, "from_ref" | "from" | "map_ref" | "map")
 }
 
 fn appl_owned_into_existing(instr: &str) -> bool {
-    match instr {
-        "owned_into_existing" | "into_existing" => true,
-        _ => false
-    }
+    matches!(instr, "owned_into_existing" | "into_existing")
 }
 
 fn appl_ref_into_existing(instr: &str) -> bool {
-    match instr {
-        "ref_into_existing" | "into_existing" => true,
-        _ => false
-    }
+    matches!(instr, "ref_into_existing" | "into_existing")
 }

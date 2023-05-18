@@ -5,7 +5,7 @@ use syn::{Result, spanned::Spanned};
 use crate::{ast::{Struct, Field}, attr::{Kind, MapStructAttr, StructAttrs, FieldChildAttr, TypePath, ChildrenAttr, StructGhostAttr, WhereAttr}};
 
 pub(crate) fn validate(input: &Struct) -> Result<()> {
-    if input.attrs.attrs.len() == 0 {
+    if input.attrs.attrs.is_empty() {
         return Err(syn::Error::new(Span::call_site(), "At least one 'map'-like struct level instruction is expected."))
     }
 
@@ -40,7 +40,7 @@ fn validate_struct_attrs<'a, I>(attrs: I) -> Result<()>
     Ok(())
 }
 
-fn validate_ghost_attrs(ghost_attrs: &Vec<StructGhostAttr>, type_paths: &HashSet<&TypePath>) -> Result<()> {
+fn validate_ghost_attrs(ghost_attrs: &[StructGhostAttr], type_paths: &HashSet<&TypePath>) -> Result<()> {
     if ghost_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
         return Err(syn::Error::new(Span::call_site(), "There can be at most one default #[ghost(...)] instruction."))
     }
@@ -60,7 +60,7 @@ fn validate_ghost_attrs(ghost_attrs: &Vec<StructGhostAttr>, type_paths: &HashSet
     Ok(())
 }
 
-fn validate_children_attrs(children_attrs: &Vec<ChildrenAttr>, type_paths: &HashSet<&TypePath>) -> Result<()> {
+fn validate_children_attrs(children_attrs: &[ChildrenAttr], type_paths: &HashSet<&TypePath>) -> Result<()> {
     if children_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
         return Err(syn::Error::new(Span::call_site(), "There can be at most one default #[children(...)] instruction."))
     }
@@ -88,7 +88,7 @@ fn validate_children_attrs(children_attrs: &Vec<ChildrenAttr>, type_paths: &Hash
     Ok(())
 }
 
-fn validate_where_attrs(where_attrs: &Vec<WhereAttr>, type_paths: &HashSet<&TypePath>) -> Result<()> {
+fn validate_where_attrs(where_attrs: &[WhereAttr], type_paths: &HashSet<&TypePath>) -> Result<()> {
     if where_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
         return Err(syn::Error::new(Span::call_site(), "There can be at most one default #[where_clause(...)] instruction."))
     }
@@ -108,7 +108,7 @@ fn validate_where_attrs(where_attrs: &Vec<WhereAttr>, type_paths: &HashSet<&Type
     Ok(())
 }
 
-fn validate_fields<'a>(fields: &Vec<Field>, struct_attrs: &StructAttrs) -> Result<()> {
+fn validate_fields(fields: &[Field], struct_attrs: &StructAttrs) -> Result<()> {
     let into_type_paths = struct_attrs.iter_for_kind(&Kind::OwnedInto)
         .chain(struct_attrs.iter_for_kind(&Kind::RefInto))
         .map(|x| &x.ty)
@@ -138,7 +138,7 @@ fn validate_fields<'a>(fields: &Vec<Field>, struct_attrs: &StructAttrs) -> Resul
             match &ghost_attr.container_ty {
                 Some(tp) => {
                     if  from_type_paths.contains(tp)  {
-                        errors.insert(format!("Member level instruction #[ghost(...)] should provide default value for field '{}' for type {}", field.member.to_token_stream().to_string(), tp.path_str));
+                        errors.insert(format!("Member level instruction #[ghost(...)] should provide default value for field '{}' for type {}", field.member.to_token_stream(), tp.path_str));
                     }
                 },
                 None => {
@@ -151,7 +151,7 @@ fn validate_fields<'a>(fields: &Vec<Field>, struct_attrs: &StructAttrs) -> Resul
         }
     }
 
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         let errors: Vec<String> = errors.into_iter().collect();
         return Err(syn::Error::new(Span::call_site(), errors.join("\n")))
     }
