@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 description = "Macro definitions of 'o2o' crate"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/Artem-Romanenia/o2o"
 
 [lib]
 proc-macro = true
