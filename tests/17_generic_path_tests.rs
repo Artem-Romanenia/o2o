@@ -45,9 +45,9 @@ struct ChildDto {
     #[o2o(from(Child::<i32>| |x|x.child_int as i16))]
     #[o2o(into(Child::<i32>| |x|x.child_int as i32))]
     child_int: i16,
-    #[from(Child::<i32>| another_child_int as i8)]
+    #[from(Child::<i32>| @.another_child_int as i8)]
     #[into(Child::<i32>| another_child_int, |x|x.diff_another_child_int as i32)]
-    #[from(Child::<i16>| another_child_int as i8)]
+    #[from(Child::<i16>| @.another_child_int as i8)]
     #[into(Child::<i16>| another_child_int, |x|x.diff_another_child_int as i16)]
     diff_another_child_int: i8,
 }

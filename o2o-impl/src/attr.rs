@@ -398,8 +398,10 @@ impl Parse for FieldChildAttr{
 }
 
 pub(crate) enum Action {
-    InlineExpr(TokenStream),
+    InlineAtExpr(TokenStream),
+    InlineUmpExpr(TokenStream),
     Closure(TokenStream),
+    ParamlessClosure(TokenStream),
 }
 
 pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
@@ -603,16 +605,26 @@ fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token!
     })
 }
 
+// Superficialy parses o2o Actions, when they are guaranteed to be the last thing in the stream.
 fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
-    if input.peek(Token![|]) {
-        validate_closure(input)?;
-        return Ok(Some(Action::Closure(input.parse()?)))
-    } else if !input.is_empty() {
-        return Ok(Some(Action::InlineExpr(input.parse()?)))
+    if input.peek(Token![@]) {
+        input.parse::<Token![@]>()?;
+        return Ok(Some(Action::InlineAtExpr(input.parse()?)))
+    } else if input.peek(Token![~]) {
+        input.parse::<Token![~]>()?;
+        return Ok(Some(Action::InlineUmpExpr(input.parse()?)))
+    } else if input.peek(Token![|]) {
+        if input.peek2(Token![|]) {
+            return Ok(Some(Action::ParamlessClosure(input.parse()?)))
+        } else {
+            validate_closure(input)?;
+            return Ok(Some(Action::Closure(input.parse()?)))
+        }
     }
     Ok(None)
 }
 
+// Rudimentarily parses |x| { x.something } flavor of closure. To be used when closure is not in the end of the stream.
 fn parse_braced_closure(input: ParseStream) -> Result<TokenStream> {
     validate_closure(input)?;
 

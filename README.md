@@ -1,6 +1,39 @@
-## Object to Object mapper for Rust
+﻿## Object to Object mapper for Rust
 
-**o2o** can implement `std::convert::From<T>`, `std::convert::Into<T>`, and custom `o2o::traits::IntoExisting<T>` traits via procedural macro. It can be best explained through examples, so...
+**o2o** procedural macro is able to generate implementation of 6 kinds of traits:
+
+``` rust
+// #[from_owned()]
+impl std::convert::From<A> for B { ... }
+
+// #[from_ref()]
+impl std::convert::From<&A> for B { ... }
+
+// #[owned_into()]
+impl std::convert::Into<A> for B { ... }
+
+// #[ref_into()]
+impl std::convert::Into<A> for &B { ... }
+
+// #[owned_into_existing()]
+impl o2o::traits::IntoExisting<A> for B { ... }
+
+// #[ref_into_existing()]
+impl o2o::traits::IntoExisting<A> for &B { ... }
+```
+
+It also has shortcuts to configure multiple trait implementations with fewer lines of code:
+
+|                              | #[map()] | #[from()]  | #[into()] | #[map_owned()] | #[map_ref()] | #[into_existing()] |
+| ---------------------------- | -------- | ---------- | --------- | ---------------| ------------ | -------------------|
+| **#[from_owned()]**          | ✔️       | ✔️          | ❌        | ✔️             | ❌           | ❌                |
+| **#[from_ref()]**            | ✔️       | ✔️          | ❌        | ❌            | ✔️            | ❌                |
+| **#[owned_into()]**          | ✔️       | ❌         | ✔️         | ✔️             | ❌           | ❌                |
+| **#[ref_into()]**            | ✔️       | ❌         | ✔️         | ❌            | ✔️            | ❌                |
+| **#[owned_into_existing()]** | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
+| **#[ref_into_existing()]**   | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
+
+With that, let's look at some examples.
 
 ### Examples
 
@@ -15,34 +48,45 @@ struct Entity {
 }
 
 #[derive(o2o)]
-#[map(Entity)]
+#[map_owned(Entity)]
 struct EntityDto {
     some_int: i32,
     another_int: i16,
 }
 ```
+<details style="background-color: lightgray; border-radius: 6px">
+  <summary style="font-size: 10px">View generated code</summary>
 
-For the above code **o2o** will generate following trait impls:
+  ``` rust
+  impl std::convert::From<Entity> for EntityDto {
+      fn from(value : Entity) -> EntityDto {
+          EntityDto { 
+              some_int : value.some_int, 
+              another_int : value.another_int, 
+          }
+       }
+  }
 
-``` rust
-impl std::convert::From<Entity> for EntityDto { ... }
-impl std::convert::From<&Entity> for EntityDto { ... }
-impl std::convert::Into<Entity> for EntityDto { ... }
-impl std::convert::Into<Entity> for &EntityDto { ... }
-```
+  impl std::convert::Into<Entity> for EntityDto {
+      fn into(self) -> Entity {
+          Entity {
+              some_int : self.some_int,
+              another_int : self.another_int,
+          }
+      }
+  }
+  ```
+</details>
 
 With the above code you should be able to do this:
 
 ``` rust
 let entity = Entity { some_int: 123, another_int: 321 }
 let dto: EntityDto = entity.into();
-```
-and this:
-``` rust
+// and this:
 let dto = EntityDto { some_int: 123, another_int: 321 }
 let entity: Entity = dto.into();
 ```
-and a couple more things.
 
 #### Different field name
 
@@ -53,31 +97,100 @@ struct Entity {
 }
 
 #[derive(o2o)]
-#[map(Entity)]
+#[from_ref(Entity)]
+#[ref_into_existing(Entity)]
 struct EntityDto {
     some_int: i32,
     #[map(another_int)]
     different_int: i16,
 }
 ```
+<details style="background-color: lightgray; border-radius: 6px">
+  <summary style="font-size: 10px">View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<&Entity> for EntityDto {
+      fn from(value : & Entity) -> EntityDto {
+          EntityDto { 
+              some_int : value.some_int,
+              different_int : value.another_int,
+          }
+      }
+  }
+
+  impl o2o::traits::IntoExisting<Entity> for &EntityDto {
+      fn into_existing(self, other : &mut Entity) {
+          other.some_int = self.some_int; 
+          other.another_int = self.different_int;
+      }
+  }
+  ```
+</details>
 
 #### Different field type
 
 ``` rust
 struct Entity {
     some_int: i32,
-    value: i16,
+    val: i16,
+    str: String
 }
 
 #[derive(o2o)]
 #[map(Entity)]
 struct EntityDto {
     some_int: i32,
-    #[from(value.to_string())] //here `value` is a field of Entity struct
-    #[into(value.parse::<i16>().unwrap())] //here `value` is a field of EntityDto struct
-    value: String,
+    #[from(~.to_string())] // Tilde allows to append code at the end of the right side of field initialization for From<T> impls
+    #[into(~.parse::<i16>().unwrap())] // here it's the same but for Into<T> impls
+    val: String,
+    // Here Into and From are symmetric, so it has to be only specified once.
+    // Note that .clone() is only needed for borrowing impls, so we use #[map_ref()]
+    #[map_ref(~.clone())] 
+    str: String
 }
 ```
+<details style="background-color: lightgray; border-radius: 6px">
+  <summary style="font-size: 10px">View generated code</summary>
+
+  ``` rust
+  impl std :: convert :: From < Entity > for EntityDto {
+      fn from(value : Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int,
+              val: value.val.to_string(),
+              str: value.str, // no .clone() needed
+          }
+      }
+  }
+  impl std :: convert :: From < & Entity > for EntityDto {
+      fn from(value : & Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int,
+              val: value.val.to_string(),
+              str: value.str.clone(),
+          }
+      }
+  }
+  impl std::convert::Into<Entity> for EntityDto {
+      fn into(self) -> Entity {
+          Entity {
+              some_int: self.some_int,
+              val: self.val.parse::<i16>().unwrap(),
+              str: self.str, // no .clone() needed
+          }
+      }
+  }
+  impl std::convert::Into<Entity> for &EntityDto {
+      fn into(self) -> Entity {
+          Entity {
+              some_int: self.some_int,
+              val: self.val.parse::<i16>().unwrap(),
+              str: self.str.clone(),
+          }
+      }
+  }
+  ```
+</details>
 
 #### Nested structs
 
@@ -91,19 +204,41 @@ struct Child {
 }
 
 #[derive(o2o)]
-#[map_owned(Entity)]
+#[from_owned(Entity)]
 struct EntityDto {
     some_int: i32,
-    #[map(child.into())]
+    #[map(~.into())]
     child: ChildDto
 }
 
 #[derive(o2o)]
-#[map_owned(Child)]
+#[from_owned(Child)]
 struct ChildDto {
     child_int: i32,
 }
 ```
+<details style="background-color: lightgray; border-radius: 6px">
+  <summary style="font-size: 10px">View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<Entity> for EntityDto {
+      fn from(value : Entity) -> EntityDto { 
+          EntityDto { 
+              some_int: value.some_int, 
+              child: value.child.into(), 
+          }
+      }
+  }
+  
+  impl std::convert::From<Child> for ChildDto {
+      fn from(value : Child) -> ChildDto { 
+          ChildDto { 
+              child_int: value.child_int, 
+          }
+      }
+  }
+  ```
+</details>
 
 #### Nested collection
 
@@ -156,69 +291,6 @@ struct EmployeeDto {
 
     #[map(subordinates.iter().map(|p|Box::new(p.as_ref().into())).collect())]
     subordinates: Vec<Box<EmployeeDto>>
-}
-```
-
-### #[map()], #[map_owned()], #[from()], #[into()] etc. explained
-
-**o2o** is able to generate implementation of 6 kinds of traits:
-
-``` rust
-// #[from_owned()]
-impl std::convert::From<A> for B { ... }
-
-// #[from_ref()]
-impl std::convert::From<&A> for B { ... }
-
-// #[owned_into()]
-impl std::convert::Into<A> for B { ... }
-
-// #[ref_into()]
-impl std::convert::Into<A> for &B { ... }
-
-// #[owned_into_existing()]
-impl o2o::traits::IntoExisting<A> for B { ... }
-
-// #[ref_into_existing()]
-impl o2o::traits::IntoExisting<A> for &B { ... }
-```
-
-And it also has shortcuts for requiring multiple implementations with just one instruction:
-
-|                              | #[map()]           | #[from()]          | #[into()]          | #[map_owned()]     | #[map_ref()]       | #[into_existing()]     |
-| ---------------------------- | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ | ---------------------- |
-| **#[from_owned()]**          | :heavy_check_mark: | :heavy_check_mark: | :x:                | :heavy_check_mark: | :x:                | :x:                    |
-| **#[from_ref()]**            | :heavy_check_mark: | :heavy_check_mark: | :x:                | :x:                | :heavy_check_mark: | :x:                    |
-| **#[owned_into()]**          | :heavy_check_mark: | :x:                | :heavy_check_mark: | :heavy_check_mark: | :x:                | :x:                    |
-| **#[ref_into()]**            | :heavy_check_mark: | :x:                | :heavy_check_mark: | :x:                | :heavy_check_mark: | :x:                    |
-| **#[owned_into_existing()]** | :x:                | :x:                | :x:                | :x:                | :x:                | :heavy_check_mark:     |
-| **#[ref_into_existing()]**   | :x:                | :x:                | :x:                | :x:                | :x:                | :heavy_check_mark:     |
-
-So two following pieces of code are equivalent:
-
-```rust
-#[derive(o2o)]
-#[from_owned(Entity)]
-#[from_ref(Entity)]
-#[owned_into(Entity)]
-#[ref_into(Entity)]
-struct EntityDto {
-    some_int: i32,
-    #[from_owned(another_int)]
-    #[from_ref(another_int)]
-    #[owned_into(another_int)]
-    #[ref_into(another_int)]
-    different_int: i16,
-}
-```
-
-``` rust
-#[derive(o2o)]
-#[map(Entity)]
-struct EntityDto {
-    some_int: i32,
-    #[map(another_int)]
-    different_int: i16,
 }
 ```
 

@@ -1,34 +1,46 @@
 #![cfg(test)]
 
-//use std::io::Write;
+use std::io::Write;
 
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, Error};
 use crate::expand::derive;
 
-// #[test]
-// fn debuger() {
-//     let code_fragment = quote!{
-        
-//     };
+#[test]
+fn debuger() {
+    let code_fragment = quote!{
+        #[derive(o2o)]
+#[from(TupleEntityDto)]
+#[from(EntityDto)]
+#[into_existing(TupleEntityDto)]
+#[into_existing(EntityDto)]
+#[panic_debug_info]
+struct TupleBaseEntity(
+    #[parent]
+    TupleBase,
+    #[map(TupleEntityDto| 3)]
+    #[map(EntityDto| base_entity_int)]
+    i32
+);
+    };
 
-//     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
-//     let output = derive(&input);
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
 
-//     match output {
-//         Ok(output) => {
-//             let text = output.to_string();
-//             _ = std::io::stdout().write_all(format!("\nOutput:\n\n{}\n\n", text).as_ref());
-//         },
-//         Err(err) => {
-//             let mut err_iter = err.into_iter();
-//             let error = err_iter.next();
-//             let message = error.expect("One error expected").to_string();
-//             _ = std::io::stdout().write_all(format!("\nError:\n\n{}\n\n", message).as_ref());
-//         }
-//     }
-// }
+    match output {
+        Ok(output) => {
+            let text = output.to_string();
+            _ = std::io::stdout().write_all(format!("\nOutput:\n\n{}\n\n", text).as_ref());
+        },
+        Err(err) => {
+            let mut err_iter = err.into_iter();
+            let error = err_iter.next();
+            let message = error.expect("One error expected").to_string();
+            _ = std::io::stdout().write_all(format!("\nError:\n\n{}\n\n", message).as_ref());
+        }
+    }
+}
 
 #[test]
 fn missing_map_instructions() {

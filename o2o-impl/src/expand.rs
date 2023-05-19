@@ -329,19 +329,31 @@ fn render_line(
     idx: usize
 ) -> TokenStream {
     let attr = f.attrs.applicable_attr(&ctx.kind, ctx.container_ty);
-    let ch = match f.attrs.child(ctx.container_ty) {
-        Some(child_attr) => {
-            let ch = child_attr.field_path.to_token_stream();
-            quote!(#ch.)
-        },
-        None => TokenStream::new()
+    // let ch = match f.attrs.child(ctx.container_ty) {
+    //     Some(child_attr) => {
+    //         let ch = child_attr.field_path.to_token_stream();
+    //         quote!(#ch.)
+    //     },
+    //     None => TokenStream::new()
+    // };
+
+    let get_field_path = |x: &Member| {
+        match f.attrs.child(ctx.container_ty) {
+            Some(child_attr) => {
+                let ch = child_attr.field_path.to_token_stream();
+                quote!(#ch.#x)
+            },
+            None => x.to_token_stream()
+        }
     };
 
     match (&f.member, attr, &ctx.kind, hint, ctx.has_post_init) {
         (syn::Member::Named(ident), None, Kind::OwnedInto | Kind::RefInto, StructKindHint::Struct | StructKindHint::Unspecified, _) => 
             quote!(#ident: self.#ident,),
-        (syn::Member::Named(ident), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Struct | StructKindHint::Unspecified, _) =>
-            quote!(other.#ch #ident = self.#ident;),
+        (syn::Member::Named(ident), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Struct | StructKindHint::Unspecified, _) => {
+            let field_path = get_field_path(&f.member);
+            quote!(other.#field_path = self.#ident;)
+        },
         (syn::Member::Named(ident), None, Kind::OwnedInto | Kind::RefInto, StructKindHint::Tuple, _) => 
             quote!(self.#ident,),
         (syn::Member::Named(ident), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Tuple, _) => {
@@ -356,11 +368,13 @@ fn render_line(
                     quote!(#ident: value.into(),)
                 }
             } else {
-                quote!(#ident: value.#ch #ident,)
+                let field_path = get_field_path(&f.member);
+                quote!(#ident: value.#field_path,)
             },
         (syn::Member::Named(ident), None, Kind::FromOwned | Kind::FromRef, StructKindHint::Tuple, _) => {
             let index = Member::Unnamed(Index { index: f.idx as u32, span: Span::call_site() });
-            quote!(#ident: value.#ch #index,)
+            let field_path = get_field_path(&index);
+            quote!(#ident: value.#field_path,)
         },
         (syn::Member::Unnamed(index), None, Kind::OwnedInto | Kind::RefInto, StructKindHint::Tuple | StructKindHint::Unspecified, false) => 
             quote!(self.#index,),
@@ -372,7 +386,7 @@ fn render_line(
             let index2 = Member::Unnamed(Index { index: f.idx as u32, span: Span::call_site() });
             quote!(other.#index2 = self.#index;)
         }
-        (syn::Member::Unnamed(index), None, Kind::FromOwned | Kind::FromRef, StructKindHint::Tuple | StructKindHint::Unspecified, _) => 
+        (syn::Member::Unnamed(_), None, Kind::FromOwned | Kind::FromRef, StructKindHint::Tuple | StructKindHint::Unspecified, _) => 
             if f.attrs.has_parent_attr(ctx.container_ty) {
                 if ctx.kind == Kind::FromOwned {
                     quote!((&value).into(),)
@@ -380,7 +394,8 @@ fn render_line(
                     quote!(value.into(),)
                 }
             } else {
-                quote!(value.#ch #index,)
+                let field_path = get_field_path(&f.member);
+                quote!(value.#field_path,)
             },
         (syn::Member::Unnamed(_), None, _, StructKindHint::Struct, _) => {
             if f.attrs.has_parent_attr(ctx.container_ty) {
@@ -395,48 +410,48 @@ fn render_line(
         },
         (syn::Member::Named(ident), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Struct | StructKindHint::Unspecified, _) => {
             let field_name = attr.get_field_name_or(&f.member);
-            let right_side = attr.get_action_or(Some(ch), ctx, || quote!(self.#ident));
+            let right_side = attr.get_action_or(Some(f.member.to_token_stream()), ctx, || quote!(self.#ident));
             quote!(#field_name: #right_side,)
         },
         (syn::Member::Named(ident), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Struct | StructKindHint::Unspecified, _) => {
-            let field_name = attr.get_field_name_or(&f.member);
-            let right_side = attr.get_action_or(None, ctx, || quote!(self.#ident));
-            quote!(other.#ch #field_name = #right_side;)
+            let field_path = get_field_path(attr.get_field_name_or(&f.member));
+            let right_side = attr.get_action_or(Some(ident.to_token_stream()), ctx, || quote!(self.#ident));
+            quote!(other.#field_path = #right_side;)
         },
         (syn::Member::Named(ident), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Tuple, _) => {
-            let right_side = attr.get_action_or(Some(ch), ctx, || quote!(self.#ident));
+            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#ident));
             quote!(#right_side,)
         },
         (syn::Member::Named(ident), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Tuple, _) => {
-            let index = Member::Unnamed(Index { index: idx as u32, span: Span::call_site() });
-            let right_side = attr.get_action_or(None, ctx, || quote!(self.#ident));
-            quote!(other.#ch #index = #right_side;)
+            let field_path = get_field_path(&Member::Unnamed(Index { index: idx as u32, span: Span::call_site() }));
+            let right_side = attr.get_action_or(Some(ident.to_token_stream()), ctx, || quote!(self.#ident));
+            quote!(other.#field_path = #right_side;)
         },
         (syn::Member::Named(ident), Some(attr), Kind::FromOwned | Kind::FromRef, _, _) => {
-            let right_side = attr.get_stuff(ch, ctx);
+            let right_side = attr.get_stuff(get_field_path, ctx, || &f.member);
             quote!(#ident: #right_side,)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Tuple | StructKindHint::Unspecified, _) => {
-            let right_side = attr.get_action_or(Some(ch), ctx, || quote!(self.#index));
+            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
             quote!(#right_side,)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Tuple | StructKindHint::Unspecified, _) => {
-            let field_name = attr.get_field_name_or(&f.member);
-            let right_side = attr.get_action_or(None, ctx, || quote!(self.#index));
-            quote!(other.#ch #field_name = #right_side;)
+            let field_path = get_field_path(attr.get_field_name_or(&f.member));
+            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
+            quote!(other.#field_path = #right_side;)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Struct, _) => {
             let field_name = attr.get_ident();
-            let right_side = attr.get_action_or(Some(ch), ctx, || quote!(self.#index));
+            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
             quote!(#field_name: #right_side,)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Struct, _) => {
-            let field_name = attr.get_ident();
-            let right_side = attr.get_action_or(None, ctx, || quote!(self.#index));
-            quote!(other.#ch #field_name = #right_side;)
+            let field_path = get_field_path(attr.get_ident());
+            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
+            quote!(other.#field_path = #right_side;)
         },
         (syn::Member::Unnamed(_), Some(attr), Kind::FromOwned | Kind::FromRef, _, _) => {
-            let right_side = attr.get_stuff(ch, ctx);
+            let right_side = attr.get_stuff(get_field_path, ctx, || &f.member);
             quote!(#right_side,)
         }
     }
@@ -484,15 +499,21 @@ fn type_closure_param(input: &TokenStream, ctx: &ImplContext) -> TokenStream {
     cl
 }
 
-fn quote_action(action: &Action, ch: Option<TokenStream>, ctx: &ImplContext) -> TokenStream {
-    
+fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplContext) -> TokenStream {
     match action {
-        Action::InlineExpr(args) => {
+        Action::InlineAtExpr(args) => {
             let ident = match ctx.kind {
-                Kind::FromOwned | Kind::FromRef => quote!(value.#ch),
-                _ => quote!(self.),
+                Kind::FromOwned | Kind::FromRef => quote!(value),
+                _ => quote!(self),
             };
             quote!(#ident #args)
+        },
+        Action::InlineUmpExpr(args)  => {
+            let path = match ctx.kind {
+                Kind::FromOwned | Kind::FromRef => quote!(value.#field_path),
+                _ => quote!(self.#field_path),
+            };
+            quote!(#path #args)
         },
         Action::Closure(args) => {
             let ident = match ctx.kind {
@@ -505,6 +526,9 @@ fn quote_action(action: &Action, ch: Option<TokenStream>, ctx: &ImplContext) -> 
             } else {
                 quote!((#cl)(&#ident))
             }
+        },
+        Action::ParamlessClosure(args) => {
+            quote!((#args)())
         }
     }
 }
@@ -609,11 +633,11 @@ fn quote_into_existing_trait(ctx: &ImplContext, init: TokenStream, post_init: Op
 }
 
 impl<'a> ApplicableAttr<'a> {
-    fn get_ident(&self) -> TokenStream {
+    fn get_ident(&self) -> &'a Member {
         match self {
             ApplicableAttr::Field(field_attr) => {
                 match &field_attr.ident {
-                    Some(val) => val.to_token_stream(),
+                    Some(val) => val,
                     None => panic!("weird"),
                 }
             },
@@ -621,25 +645,23 @@ impl<'a> ApplicableAttr<'a> {
         }
     }
 
-    fn get_field_name_or(&self, field: &Member) -> TokenStream {
+    fn get_field_name_or(&'a self, field: &'a Member) -> &'a Member {
         match self {
             ApplicableAttr::Field(field_attr) => {
                 match &field_attr.ident {
-                    Some(val) => val.to_token_stream(),
-                    None => field.to_token_stream(),
+                    Some(val) => val,
+                    None => field,
                 }
             },
             ApplicableAttr::Ghost(_) => panic!("weird")
         }
     }
 
-    fn get_action_or<F>(&self, ch: Option<TokenStream>, ctx: &ImplContext, or: F) -> TokenStream
-        where F: Fn() -> TokenStream
-    {
+    fn get_action_or<F: Fn() -> TokenStream>(&self, field_path: Option<TokenStream>, ctx: &ImplContext, or: F) -> TokenStream {
         match self {
             ApplicableAttr::Field(field_attr) => {
                 match &field_attr.action {
-                    Some(val) => quote_action(val, ch, ctx),
+                    Some(val) => quote_action(val, field_path, ctx),
                     None => or()
                 }
             },
@@ -647,16 +669,19 @@ impl<'a> ApplicableAttr<'a> {
         }
     }
 
-    fn get_stuff(&self, ch: TokenStream, ctx: &ImplContext) -> TokenStream {
+    fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, field_path: F1, ctx: &ImplContext, or: F2) -> TokenStream {
         match self {
             ApplicableAttr::Field(field_attr) => {
                 match &field_attr.ident {
-                    Some(val) => quote!(value.#ch #val),
-                    None => quote_action(field_attr.action.as_ref().unwrap(), Some(ch), ctx),
+                    Some(val) => {
+                        let field_path = field_path(val);
+                        quote!(value.#field_path)
+                    },
+                    None => quote_action(field_attr.action.as_ref().unwrap(), Some(field_path(or())), ctx),
                 }
             },
             ApplicableAttr::Ghost(ghost_attr) => {
-                quote_action(ghost_attr.action.as_ref().unwrap(), Some(ch), ctx)
+                quote_action(ghost_attr.action.as_ref().unwrap(), None, ctx)
             }
         }
     }
