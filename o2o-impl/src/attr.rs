@@ -251,7 +251,7 @@ impl Parse for GhostData {
         Ok(GhostData {
             child_path,
             ghost_ident,
-            action: Action::Closure(parse_braced_closure(input)?)
+            action: parse_braced_closure(input)?
         })
     }
 }
@@ -625,25 +625,31 @@ fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
 }
 
 // Rudimentarily parses |x| { x.something } flavor of closure. To be used when closure is not in the end of the stream.
-fn parse_braced_closure(input: ParseStream) -> Result<TokenStream> {
-    validate_closure(input)?;
-
+fn parse_braced_closure(input: ParseStream) -> Result<Action> {
     let mut tokens = Vec::new();
+    let mut paramless = false;
     
     tokens.push(input.parse::<Token![|]>()?.to_token_stream());
     if input.peek(Ident) {
         tokens.push(input.parse::<Ident>()?.to_token_stream());
-    } else {
+    } else if input.peek(Token![_]) {
         tokens.push(input.parse::<Token![_]>()?.to_token_stream());
+    } else {
+        paramless = true;
     }
     tokens.push(input.parse::<Token![|]>()?.to_token_stream());
     let content;
     braced!(content in input);
     let content = content.parse::<TokenStream>()?;
-
     tokens.push(quote!({#content}));
 
-    Ok(TokenStream::from_iter(tokens.into_iter()))
+    let token_stream = TokenStream::from_iter(tokens);
+
+    let cl = match paramless {
+        true => Action::ParamlessClosure(token_stream),
+        false => Action::Closure(token_stream)
+    };
+    Ok(cl)
 }
 
 fn validate_closure(input: ParseStream) -> Result<()> {

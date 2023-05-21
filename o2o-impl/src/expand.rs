@@ -672,12 +672,14 @@ impl<'a> ApplicableAttr<'a> {
     fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, field_path: F1, ctx: &ImplContext, or: F2) -> TokenStream {
         match self {
             ApplicableAttr::Field(field_attr) => {
-                match &field_attr.ident {
-                    Some(val) => {
-                        let field_path = field_path(val);
+                match (&field_attr.ident, &field_attr.action) {
+                    (Some(ident), Some(action)) => quote_action(action, Some(field_path(&ident)), ctx),
+                    (Some(ident), None) => {
+                        let field_path = field_path(&ident);
                         quote!(value.#field_path)
                     },
-                    None => quote_action(field_attr.action.as_ref().unwrap(), Some(field_path(or())), ctx),
+                    (None, Some(action)) => quote_action(action, Some(field_path(or())), ctx),
+                    _ => panic!("weird")
                 }
             },
             ApplicableAttr::Ghost(ghost_attr) => {
