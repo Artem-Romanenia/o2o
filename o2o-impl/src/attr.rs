@@ -427,7 +427,7 @@ impl Parse for AsAttr {
 
 pub(crate) enum Action {
     InlineAtExpr(TokenStream),
-    InlineUmpExpr(TokenStream),
+    InlineTildeExpr(TokenStream),
     Closure(TokenStream),
     ParamlessClosure(TokenStream),
 }
@@ -646,7 +646,7 @@ fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
         return Ok(Some(Action::InlineAtExpr(input.parse()?)))
     } else if input.peek(Token![~]) {
         input.parse::<Token![~]>()?;
-        return Ok(Some(Action::InlineUmpExpr(input.parse()?)))
+        return Ok(Some(Action::InlineTildeExpr(input.parse()?)))
     } else if input.peek(Token![|]) {
         if input.peek2(Token![|]) {
             return Ok(Some(Action::ParamlessClosure(input.parse()?)))
@@ -700,7 +700,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         attr: MapFieldAttr { 
             container_ty: attr.container_ty.clone(), 
             ident: attr.ident.clone(), 
-            action: Some(Action::InlineUmpExpr(quote!(as #this_ty)))
+            action: Some(Action::InlineTildeExpr(quote!(as #this_ty)))
         }, 
         applicable_to: [false, false, true, true, false, false]
     });
@@ -708,7 +708,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         attr: MapFieldAttr { 
             container_ty: attr.container_ty, 
             ident: attr.ident, 
-            action: Some(Action::InlineUmpExpr(quote!(as #that_ty)))
+            action: Some(Action::InlineTildeExpr(quote!(as #that_ty)))
         }, 
         applicable_to: [true, true, false, false, true, true]
     });

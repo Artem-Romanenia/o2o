@@ -500,7 +500,7 @@ fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplCont
             };
             quote!(#ident #args)
         },
-        Action::InlineUmpExpr(args)  => {
+        Action::InlineTildeExpr(args)  => {
             let path = match ctx.kind {
                 Kind::FromOwned | Kind::FromRef => quote!(value.#field_path),
                 _ => quote!(self.#field_path),
