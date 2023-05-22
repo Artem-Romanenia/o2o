@@ -14,11 +14,11 @@ struct Entity {
     parent_int: i32,
     #[parent(EntityDto)]
     #[parent(TupleEntityDto)]
-    #[map_ref(EntityModel| base.clone())]
+    #[map_ref(EntityModel| ~.clone())]
     base: BaseEntity,
     #[parent(EntityDto)]
     #[parent(TupleEntityDto)]
-    #[map_ref(EntityModel| child.clone())]
+    #[map_ref(EntityModel| ~.clone())]
     child: Child,
 }
 
@@ -49,8 +49,8 @@ struct Base {
     #[map(EntityDto| base_int)]
     #[map(TupleEntityDto| 1)]
     base_int_2: i32,
-    #[from(TupleEntityDto| 2 as i32)]
-    #[into(TupleEntityDto| 2, another_base_int as i16)]
+    #[from(TupleEntityDto| @.2 as i32)]
+    #[into(TupleEntityDto| 2, ~ as i16)]
     another_base_int: i32,
 }
 
@@ -62,8 +62,8 @@ struct Base {
 struct Child {
     #[map(TupleEntityDto| 4)]
     child_int: i32,
-    #[from(TupleEntityDto| 5 as i32)]
-    #[into(TupleEntityDto| 5, another_child_int as i16)]
+    #[from(TupleEntityDto| @.5 as i32)]
+    #[into(TupleEntityDto| 5, ~ as i16)]
     another_child_int: i32,
 }
 
@@ -114,8 +114,8 @@ struct TupleBase(
     #[map(EntityDto| base_int)]
     i32, 
     #[map(TupleEntityDto| 2)]
-    #[from(EntityDto| another_base_int as i16)]
-    #[into(EntityDto| another_base_int, 1 as i32)]
+    #[from(EntityDto| @.another_base_int as i16)]
+    #[into(EntityDto| another_base_int, ~ as i32)]
     i16
 );
 
@@ -129,8 +129,8 @@ struct TupleChild(
     #[map(EntityDto| child_int)]
     i32, 
     #[map(TupleEntityDto| 5)]
-    #[from(EntityDto| another_child_int as i16)] 
-    #[into(EntityDto| another_child_int, 1 as i32)]
+    #[from(EntityDto| @.another_child_int as i16)] 
+    #[into(EntityDto| another_child_int, ~ as i32)]
     i16
 );
 

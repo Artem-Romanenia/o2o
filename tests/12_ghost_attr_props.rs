@@ -48,7 +48,7 @@ struct EntityDto {
     another_int: i32,
     #[o2o(ghost(|x| x.some_int))]
     ghost_int: i32,
-    #[o2o(ghost(another_int as i16))]
+    #[o2o(ghost(@.another_int as i16))]
     ghost_int_2: i16,
     #[o2o(ghost(|_| 456.0))]
     ghost_float: f32,
@@ -60,9 +60,9 @@ struct EntityDto {
 struct TupleEntityDto(
     i32, 
     i16,
-    #[ghost(0)]
+    #[ghost(@.0)]
     i32,
-    #[ghost(1 as i16)]
+    #[ghost(@.1 as i16)]
     i16, 
     #[ghost(|_| 456.0)]
     f32

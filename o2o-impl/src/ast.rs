@@ -51,7 +51,7 @@ impl<'a> Field {
         span: Span,
     ) -> Result<Self> {
         Ok(Field {
-            attrs: attr::get_field_attrs(&node.attrs)?,
+            attrs: attr::get_field_attrs(node)?,
             idx: i,
             member: node.ident.clone().map(Member::Named).unwrap_or_else(|| {
                 Member::Unnamed(Index {

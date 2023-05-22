@@ -28,10 +28,10 @@ struct Child {
 )]
 struct ParentDto {
     #[o2o(
-        from_owned(Parent| child.into()),
-        owned_into(Parent| child, diff_child.into()),
-        from_owned(ParentModel| child_diff.into()),
-        owned_into(ParentModel| child_diff, diff_child.into()),
+        from_owned(Parent| @.child.into()),
+        owned_into(Parent| child, ~.into()),
+        from_owned(ParentModel| @.child_diff.into()),
+        owned_into(ParentModel| child_diff, @.diff_child.into()),
     )]
     diff_child: ChildDto,
     parent_int: i32,
@@ -40,11 +40,11 @@ struct ParentDto {
 #[derive(o2o)]
 #[map(Child)]
 struct ChildDto {
-    #[from(child_int as i16)]
-    #[into(child_int as i32)]
+    #[from(~ as i16)]
+    #[into(~ as i32)]
     child_int: i16,
-    #[from(another_child_int as i8)]
-    #[into(another_child_int, diff_another_child_int as i32)]
+    #[from(@.another_child_int as i8)]
+    #[into(another_child_int, ~ as i32)]
     diff_another_child_int: i8,
 }
 

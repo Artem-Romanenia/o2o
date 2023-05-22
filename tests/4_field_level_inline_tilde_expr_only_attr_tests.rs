@@ -32,14 +32,14 @@ struct NamedStructModel {
 struct NamedStructDto {
     some_int: i32,
     #[o2o(
-        from(NamedStruct| another_int as i16),
-        into(NamedStruct| another_int as i32),
-        from(NamedStructModel| another_int as i16),
-        into(NamedStructModel| another_int as i8),
+        from(NamedStruct| ~ as i16),
+        into(NamedStruct| ~ as i32),
+        from(NamedStructModel| ~ as i16),
+        into(NamedStructModel| ~ as i8),
     )]
     another_int: i16,
-    #[o2o(from(some_float as f64))]
-    #[o2o(into(some_float as f32))]
+    #[o2o(from(~ as f64))]
+    #[o2o(into(~ as f32))]
     some_float: f64,
 }
 
@@ -56,7 +56,7 @@ struct Child {
 #[derive(o2o)]
 #[map_owned(Parent)]
 struct ParentDto {
-    #[map_owned(child.into())]
+    #[map_owned(~.into())]
     child: ChildDto,
     parent_int: i32,
 }
@@ -67,14 +67,6 @@ struct ChildDto {
     child_int: i32,
     #[map(another_child_int)]
     diff_another_child_int: i32,
-}
-
-#[derive(o2o)]
-#[from(Parent)]
-struct ParentDto2 {
-    parent_int: i32,
-    #[from(child.child_int)] child_int: i32,
-    #[from(child.another_child_int)] another_child_int: i32,
 }
 
 struct Person {
@@ -90,9 +82,9 @@ struct Pet {
 #[derive(o2o)]
 #[map(Person)]
 struct PersonDto {
-    #[map(name.clone())]
+    #[map(~.clone())]
     name: String,
-    #[map(pets.iter().map(|p|p.into()).collect())]
+    #[map(~.iter().map(|p|p.into()).collect())]
     pets: Vec<PetDto>,
 }
 
@@ -100,7 +92,7 @@ struct PersonDto {
 #[map(Pet)]
 struct PetDto {
     age: i8,
-    #[map(nickname.clone())]
+    #[map(~.clone())]
     nickname: String,
 }
 
@@ -154,40 +146,6 @@ fn named2unnamed_ref() {
     assert_eq!(named.some_int, dto.0);
     assert_eq!(named.another_int, dto.1);
     assert_eq!(named.some_float, dto.2);
-}
-
-#[test]
-fn named2named_uneven() {
-    let p = Parent {
-        parent_int: 123,
-        child: Child { 
-            child_int: 321, 
-            another_child_int: 456, 
-        },
-    };
-
-    let dto: ParentDto2 = p.into();
-
-    assert_eq!(123, dto.parent_int);
-    assert_eq!(321, dto.child_int);
-    assert_eq!(456, dto.another_child_int);
-}
-
-#[test]
-fn named2named_uneven_ref() {
-    let parent = &Parent {
-        parent_int: 123,
-        child: Child { 
-            child_int: 321, 
-            another_child_int: 456, 
-        },
-    };
-
-    let dto: ParentDto2 = parent.into();
-
-    assert_eq!(parent.parent_int, dto.parent_int);
-    assert_eq!(parent.child.child_int, dto.child_int);
-    assert_eq!(parent.child.another_child_int, dto.another_child_int);
 }
 
 #[test]

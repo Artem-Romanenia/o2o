@@ -15,11 +15,11 @@ struct UnnamedStructModel(i16, i8, f32);
     into_existing(UnnamedStructModel as ()),
 )]
 struct NamedStruct {
-    #[from(UnnamedStructModel| 0 as i32)]
-    #[into(UnnamedStructModel| some_int as i16)]
+    #[from(UnnamedStructModel| @.0 as i32)]
+    #[into(UnnamedStructModel| ~ as i16)]
     some_int: i32,
-    #[from(UnnamedStructModel| 1 as i32)]
-    #[into(UnnamedStructModel| another_int as i8)]
+    #[from(UnnamedStructModel| @.1 as i32)]
+    #[into(UnnamedStructModel| ~ as i8)]
     another_int: i32,
     some_float: f32,
 }
@@ -46,13 +46,13 @@ struct NamedStructModel {
 struct UnnamedStruct(
     #[o2o(
         map(NamedStructDto| some_int),
-        from(NamedStructModel| some_int as i32),
-        into(NamedStructModel| some_int, 0 as i16),
+        from(NamedStructModel| @.some_int as i32),
+        into(NamedStructModel| some_int, ~ as i16),
     )]
     i32, 
     #[o2o(map(NamedStructDto| another_int))]
-    #[o2o(from(NamedStructModel| another_int as i32))]
-    #[o2o(into(NamedStructModel| another_int, 1 as i8))]
+    #[o2o(from(NamedStructModel| @.another_int as i32))]
+    #[o2o(into(NamedStructModel| another_int, ~ as i8))]
     i32, 
     #[o2o(map(some_float))]
     f32

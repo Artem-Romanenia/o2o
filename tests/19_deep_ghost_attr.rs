@@ -30,7 +30,7 @@ struct CarDto {
     number_of_seats: i16,
 
     #[child(vehicle.machine)]
-    #[map(brand.clone())]
+    #[map(~.clone())]
     brand: String,
 
     #[child(vehicle.machine)]

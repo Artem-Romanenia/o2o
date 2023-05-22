@@ -33,8 +33,8 @@ struct TupleEntityModel(i32, i16, i32, i16, f32);
 )]
 struct Entity {
     some_int: i32,
-    #[from(TupleEntityModel| 1 as i32)]
-    #[into(TupleEntityModel| another_int as i16)]
+    #[from(TupleEntityModel| @.1 as i32)]
+    #[into(TupleEntityModel| ~ as i16)]
     another_int: i32,
 }
 
@@ -57,8 +57,8 @@ struct Entity {
 struct TupleEntity (
     #[map(EntityModel| some_int)]
     i32, 
-    #[into(EntityModel| another_int, 1 as i32)]
-    #[from(EntityModel| another_int as i16)]
+    #[into(EntityModel| another_int, ~ as i32)]
+    #[from(EntityModel| @.another_int as i16)]
     i16
 );
 
@@ -70,14 +70,14 @@ struct TupleEntity (
 struct EntityDto {
     #[map(TupleEntity| 0)]
     some_int: i32,
-    #[into(TupleEntity| another_int as i16)]
-    #[from(TupleEntity| 1 as i32)]
+    #[into(TupleEntity| ~ as i16)]
+    #[from(TupleEntity| @.1 as i32)]
     another_int: i32,
-    #[ghost(Entity| some_int)]
-    #[ghost(TupleEntity| 0)]
+    #[ghost(Entity| @.some_int)]
+    #[ghost(TupleEntity| @.0)]
     ghost_int: i32,
-    #[ghost(Entity| another_int as i16)]
-    #[ghost(TupleEntity| 1)]
+    #[ghost(Entity| @.another_int as i16)]
+    #[ghost(TupleEntity| @.1)]
     ghost_int_2: i16,
     #[ghost(|_| 456.0)]
     ghost_float: f32,
@@ -91,16 +91,16 @@ struct EntityDto {
 struct TupleEntityDto(
     #[map(Entity| some_int)]
     i32, 
-    #[into(Entity| another_int, 1 as i32)]
-    #[from(Entity| another_int as i16)]
+    #[into(Entity| another_int, @.1 as i32)]
+    #[from(Entity| @.another_int as i16)]
     i16,
     #[o2o(
-        ghost(TupleEntity| 0),
-        ghost(Entity| some_int),
+        ghost(TupleEntity| @.0),
+        ghost(Entity| @.some_int),
     )]
     i32,
-    #[ghost(TupleEntity| 1)]
-    #[ghost(Entity| another_int as i16)]
+    #[ghost(TupleEntity| @.1)]
+    #[ghost(Entity| @.another_int as i16)]
     i16, 
     #[ghost(|_| 456.0)]
     f32
