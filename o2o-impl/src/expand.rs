@@ -329,14 +329,6 @@ fn render_line(
     idx: usize
 ) -> TokenStream {
     let attr = f.attrs.applicable_attr(&ctx.kind, ctx.container_ty);
-    // let ch = match f.attrs.child(ctx.container_ty) {
-    //     Some(child_attr) => {
-    //         let ch = child_attr.field_path.to_token_stream();
-    //         quote!(#ch.)
-    //     },
-    //     None => TokenStream::new()
-    // };
-
     let get_field_path = |x: &Member| {
         match f.attrs.child(ctx.container_ty) {
             Some(child_attr) => {
@@ -673,9 +665,9 @@ impl<'a> ApplicableAttr<'a> {
         match self {
             ApplicableAttr::Field(field_attr) => {
                 match (&field_attr.ident, &field_attr.action) {
-                    (Some(ident), Some(action)) => quote_action(action, Some(field_path(&ident)), ctx),
+                    (Some(ident), Some(action)) => quote_action(action, Some(field_path(ident)), ctx),
                     (Some(ident), None) => {
-                        let field_path = field_path(&ident);
+                        let field_path = field_path(ident);
                         quote!(value.#field_path)
                     },
                     (None, Some(action)) => quote_action(action, Some(field_path(or())), ctx),
