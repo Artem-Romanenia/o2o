@@ -17,7 +17,7 @@ struct TupleEntityModel(i32, i16, i32, i16, f32);
 #[derive(o2o)]
 #[map(EntityModel)]
 #[into_existing(EntityModel)]
-#[ghost(ghost_int: |x| { x.some_int }, ghost_int_2: |x| { x.another_int as i16 }, ghost_float: |_| { 456.0 })]
+#[ghost(ghost_int: |x| { x.some_int }, ghost_int_2: |x| { x.another_int as i16 }, ghost_float: || { 456.0 })]
 struct Entity {
     some_int: i32,
     another_int: i32,
@@ -50,7 +50,7 @@ struct EntityDto {
     ghost_int: i32,
     #[o2o(ghost(@.another_int as i16))]
     ghost_int_2: i16,
-    #[o2o(ghost(|_| 456.0))]
+    #[o2o(ghost(|| 456.0))]
     ghost_float: f32,
 }
 

@@ -161,8 +161,8 @@ fn validate_fields(fields: &[Field], struct_attrs: &StructAttrs) -> Result<()> {
 
 fn check_child_errors(child_attr: &FieldChildAttr, struct_attrs: &StructAttrs, tp: &TypePath, errors: &mut HashSet<String>) {
     let children_attr = struct_attrs.children_attr(tp);
-    for (idx, _level) in child_attr.field_path.iter().enumerate() {
-        let path = child_attr.get_field_path_str(Some(idx));
+    for (idx, _level) in child_attr.child_path.child_path.iter().enumerate() {
+        let path = child_attr.get_child_path_str(Some(idx));
             match children_attr {
                 Some(children_attr) => {
                     if !children_attr.children.iter().any(|x| x.check_match(path)) {

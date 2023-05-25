@@ -227,27 +227,45 @@ impl Parse for StructGhostAttr{
     }
 }
 
+pub(crate) struct ChildPath {
+    pub child_path: Punctuated<Member, Token![.]>,
+    pub child_path_str: Vec<String>,
+}
+
+impl ChildPath {
+    pub(crate) fn get_child_path_str(&self, depth: Option<usize>) -> &str {
+        match depth {
+            None => self.child_path_str.last().map(|x| x.as_str()).unwrap_or(""),
+            Some(depth) => &self.child_path_str[depth],
+        }
+    }
+}
+
 pub(crate) struct GhostData {
-    pub child_path: Option<Punctuated<Member, Token![.]>>,
+    pub child_path: Option<ChildPath>,
     pub ghost_ident: Member,
     pub action: Action,
 }
 
 impl GhostData {
-    pub(crate) fn get_child_path_str(&self) -> String {
-        self.child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect::<String>()
+    pub(crate) fn get_child_path_str(&self, depth: Option<usize>) -> &str {
+        self.child_path.as_ref().map(|x| x.get_child_path_str(depth)).unwrap_or("")
     }
 }
 
 impl Parse for GhostData {
     fn parse(input: ParseStream) -> Result<Self> {
         let child_path = if !peek_ghost_path(input) {
-            let child_path = Some(Punctuated::parse_separated_nonempty(input)?);
+            let child_path = Some(Punctuated::parse_separated_nonempty(input)?).map(|child_path| {
+                let child_path_str = build_child_path_str(&child_path);
+                ChildPath { child_path, child_path_str }
+            });
             input.parse::<Token![@]>()?;
             child_path
         } else {
             None
         };
+        let child_path = child_path;
         let ghost_ident = input.parse()?;
         input.parse::<Token![:]>()?;
         Ok(GhostData {
@@ -365,16 +383,12 @@ pub(crate) enum ApplicableAttr<'a> {
 
 pub(crate) struct FieldChildAttr {
     pub container_ty: Option<TypePath>,
-    pub field_path: Punctuated<Member, Token![.]>,
-    field_path_str: Vec<String>,
+    pub child_path: ChildPath,
 }
 
 impl FieldChildAttr {
-    pub(crate) fn get_field_path_str(&self, depth: Option<usize>) -> &str {
-        match depth {
-            None => &self.field_path_str[self.field_path_str.len() - 1],
-            Some(depth) => &self.field_path_str[depth],
-        }
+    pub(crate) fn get_child_path_str(&self, depth: Option<usize>) -> &str {
+        self.child_path.get_child_path_str(depth)
     }
 }
 
@@ -382,19 +396,13 @@ impl Parse for FieldChildAttr{
     fn parse(input: ParseStream) -> Result<Self> {
         let container_ty = try_parse_container_ident(input, false);
         let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(input)?;
-        let field_path = child_path.clone();
-        let mut field_path_str = vec![];
-        child_path.iter().for_each(|x| {
-            if field_path_str.is_empty() {
-                field_path_str.push(x.to_token_stream().to_string())
-            } else {
-                field_path_str.push(format!("{}.{}", field_path_str.last().unwrap_or(&String::from("")), x.to_token_stream()))
-            }
-        });
+        let child_path_str = build_child_path_str(&child_path);
         Ok(FieldChildAttr { 
             container_ty,
-            field_path,
-            field_path_str,
+            child_path: ChildPath { 
+                child_path,
+                child_path_str,
+            }
         })
     }
 }
@@ -733,4 +741,16 @@ fn appl_owned_into_existing(instr: &str) -> bool {
 
 fn appl_ref_into_existing(instr: &str) -> bool {
     matches!(instr, "ref_into_existing" | "into_existing")
+}
+
+fn build_child_path_str(child_path: &Punctuated<Member, Token![.]>) -> Vec<String> {
+    let mut child_path_str = vec![];
+    child_path.iter().for_each(|x: &Member| {
+        if child_path_str.is_empty() {
+            child_path_str.push(x.to_token_stream().to_string())
+        } else {
+            child_path_str.push(format!("{}.{}", child_path_str.last().unwrap_or(&String::from("")), x.to_token_stream()))
+        }
+    });
+    child_path_str
 }
