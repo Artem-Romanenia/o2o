@@ -18,10 +18,15 @@ struct TupleEntityModel(i32, i16, i32, i16, f32);
 #[o2o(
     map(EntityModel),
     into_existing(EntityModel),
-    ghost(EntityModel| 
+    ghost_owned(EntityModel| 
         ghost_int: |x| { x.some_int }, 
         ghost_int_2: |x| { x.another_int as i16 }, 
-        ghost_float: || {  456.0 }
+        ghost_float: || { 456.0 }
+    ),
+    ghost_ref(EntityModel| 
+        ghost_int: |x| { x.some_int }, 
+        ghost_int_2: |x| { x.another_int as i16 }, 
+        ghost_float: || { 4567.0 }
     ),
     map(TupleEntityModel as ()),
     into_existing(TupleEntityModel as ()),
@@ -102,7 +107,8 @@ struct TupleEntityDto(
     #[ghost(TupleEntity| @.1)]
     #[ghost(Entity| @.another_int as i16)]
     i16, 
-    #[ghost(|| 456.0)]
+    #[o2o(ghost_owned(|| 456.0))]
+    #[o2o(ghost_ref(|| 4567.0))]
     f32
 );
 
@@ -199,7 +205,7 @@ fn named2named_ref_2() {
     assert_eq!(named.another_int, model.another_int);
     assert_eq!(named.some_int, model.ghost_int);
     assert_eq!(named.another_int as i16, model.ghost_int_2);
-    assert_eq!(456.0, model.ghost_float);
+    assert_eq!(4567.0, model.ghost_float);
 }
 
 #[test]
@@ -311,7 +317,7 @@ fn unnamed2unnamed_ref() {
     assert_eq!(entity.1, dto.1);
     assert_eq!(entity.0, dto.2);
     assert_eq!(entity.1 as i16, dto.3);
-    assert_eq!(456.0, dto.4);
+    assert_eq!(4567.0, dto.4);
 }
 
 #[test]
@@ -439,7 +445,7 @@ fn named2unnamed_ref() {
     assert_eq!(named.another_int as i16, dto.1);
     assert_eq!(named.some_int, dto.2);
     assert_eq!(named.another_int as i16, dto.3);
-    assert_eq!(456.0, dto.4);
+    assert_eq!(4567.0, dto.4);
 }
 
 #[test]
@@ -666,7 +672,7 @@ fn existing_named2named_ref() {
     assert_eq!(named.another_int, model.another_int);
     assert_eq!(named.some_int, model.ghost_int);
     assert_eq!(named.another_int as i16, model.ghost_int_2);
-    assert_eq!(456.0, model.ghost_float);
+    assert_eq!(4567.0, model.ghost_float);
 }
 
 #[test]

@@ -162,7 +162,7 @@ fn struct_init_block<'a>(ctx: &'a ImplContext) -> TokenStream {
         })
         .collect();
     let ghosts = ctx.input.attrs.ghost_attrs.iter()
-        .flat_map(|x| &x.ghost_data)
+        .flat_map(|x| &x.attr.ghost_data)
         .filter(|x| unique_paths.insert(x.get_child_path_str(None)))
         .map(|x| {
             let path: &str = x.get_child_path_str(None);
@@ -211,7 +211,7 @@ fn struct_init_block_inner(
         match field_data {
             FieldData::Field(f) => {
                 if ctx.kind != Kind::FromOwned && ctx.kind != Kind::FromRef 
-                    && (f.attrs.ghost(ctx.container_ty).is_some() || f.attrs.has_parent_attr(ctx.container_ty)) 
+                    && (f.attrs.ghost(ctx.container_ty, &ctx.kind).is_some() || f.attrs.has_parent_attr(ctx.container_ty)) 
                 {
                     fields.next();
                     continue;
@@ -239,7 +239,7 @@ fn struct_init_block_inner(
     }
 
     if ctx.kind != Kind::FromOwned && ctx.kind != Kind::FromRef {
-        if let Some(ghost_attr) = ctx.input.attrs.ghost_attr(ctx.container_ty) {
+        if let Some(ghost_attr) = ctx.input.attrs.ghost_attr(ctx.container_ty, &ctx.kind) {
             ghost_attr.ghost_data.iter().for_each(|x| {
                 match (&x.child_path, field_ctx) {
                     (Some(_), Some(field_ctx)) => {

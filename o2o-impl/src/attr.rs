@@ -47,7 +47,7 @@ enum StructInstruction {
 
 enum MemberInstruction {
     Map(FieldAttr),
-    Ghost(GhostAttr),
+    Ghost(FieldGhostAttr),
     Child(FieldChildAttr),
     Parent(ParentAttr),
     As(AsAttr),
@@ -119,14 +119,14 @@ pub(crate) struct StructAttrs {
 }
 
 impl<'a> StructAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &MapStructAttr> {
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &StructAttrCore> {
         self.attrs.iter().filter(move |x| x.applicable_to[kind]).map(|x| &x.attr)
     }
 
-    pub(crate) fn ghost_attr(&'a self, container_ty: &'a TypePath) -> Option<&StructGhostAttr> {
+    pub(crate) fn ghost_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&StructGhostAttrCore> {
         self.ghost_attrs.iter()
-            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.ghost_attrs.iter().find(|x| x.container_ty.is_none()))
+            .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
     pub(crate) fn where_attr(&'a self, container_ty: &TypePath) -> Option<&WhereAttr>{
@@ -146,16 +146,16 @@ pub(crate) struct FieldAttrs {
     pub attrs: Vec<FieldAttr>,
     pub child_attrs: Vec<FieldChildAttr>,
     pub parent_attrs: Vec<ParentAttr>,
-    pub ghost_attrs: Vec<GhostAttr>,
+    pub ghost_attrs: Vec<FieldGhostAttr>,
 }
 
 impl<'a> FieldAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &MapFieldAttr> {
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &FieldAttrCore> {
         self.attrs.iter().filter(move |x| x.applicable_to[kind]).map(|x| &x.attr)
     }
 
     pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<ApplicableAttr> {
-        self.ghost(container_ty)
+        self.ghost(container_ty, kind)
             .map(ApplicableAttr::Ghost)
             .or_else(|| self.field_attr(kind, container_ty)
                 .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, container_ty) } else { None })
@@ -169,10 +169,10 @@ impl<'a> FieldAttrs {
             .or_else(|| self.child_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn ghost(&'a self, ident: &TypePath) -> Option<&GhostAttr>{
+    pub(crate) fn ghost(&'a self, ident: &TypePath, kind: &'a Kind) -> Option<&FieldGhostAttrCore>{
         self.ghost_attrs.iter()
-            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
-            .or_else(|| self.ghost_attrs.iter().find(|x| x.container_ty.is_none()))
+            .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == ident)
+            .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
     pub(crate) fn has_parent_attr(&'a self, ident: &TypePath) -> bool {
@@ -180,7 +180,7 @@ impl<'a> FieldAttrs {
             .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == ident)
     }
 
-    pub(crate) fn field_attr(&'a self, kind: &'a Kind, ident: &TypePath) -> Option<&MapFieldAttr>{
+    pub(crate) fn field_attr(&'a self, kind: &'a Kind, ident: &TypePath) -> Option<&FieldAttrCore>{
         self.iter_for_kind(kind)
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
             .or_else(|| self.iter_for_kind(kind).find(|x| x.container_ty.is_none()))
@@ -195,18 +195,18 @@ pub(crate) enum StructKindHint {
 }
 
 pub(crate) struct StructAttr {
-    pub attr: MapStructAttr,
+    pub attr: StructAttrCore,
     pub applicable_to: ApplicableTo,
 }
 
-pub(crate) struct MapStructAttr {
+pub(crate) struct StructAttrCore {
     pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
 }
 
-impl Parse  for MapStructAttr {
+impl Parse  for StructAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(MapStructAttr { 
+        Ok(StructAttrCore { 
             ty: input.parse::<syn::Path>()?.into(),
             struct_kind_hint: try_parse_struct_kind_hint(input)?,
         })
@@ -214,16 +214,33 @@ impl Parse  for MapStructAttr {
 }
 
 pub(crate) struct StructGhostAttr {
+    pub attr: StructGhostAttrCore,
+    pub applicable_to: ApplicableTo,
+}
+
+pub(crate) struct StructGhostAttrCore {
     pub container_ty: Option<TypePath>,
     pub ghost_data: Punctuated<GhostData, Token![,]>,
 }
 
-impl Parse for StructGhostAttr{
+impl Parse for StructGhostAttrCore{
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(StructGhostAttr { 
+        Ok(StructGhostAttrCore { 
             container_ty: try_parse_container_ident(input, false),
             ghost_data: Punctuated::parse_separated_nonempty(input)?,
         })
+    }
+}
+
+pub(crate) struct GhostData {
+    pub child_path: Option<ChildPath>,
+    pub ghost_ident: Member,
+    pub action: Action,
+}
+
+impl GhostData {
+    pub(crate) fn get_child_path_str(&self, depth: Option<usize>) -> &str {
+        self.child_path.as_ref().map(|x| x.get_child_path_str(depth)).unwrap_or("")
     }
 }
 
@@ -238,18 +255,6 @@ impl ChildPath {
             None => self.child_path_str.last().map(|x| x.as_str()).unwrap_or(""),
             Some(depth) => &self.child_path_str[depth],
         }
-    }
-}
-
-pub(crate) struct GhostData {
-    pub child_path: Option<ChildPath>,
-    pub ghost_ident: Member,
-    pub action: Action,
-}
-
-impl GhostData {
-    pub(crate) fn get_child_path_str(&self, depth: Option<usize>) -> &str {
-        self.child_path.as_ref().map(|x| x.get_child_path_str(depth)).unwrap_or("")
     }
 }
 
@@ -330,19 +335,19 @@ impl Hash for ChildData {
 }
 
 pub(crate) struct FieldAttr  {
-    pub attr: MapFieldAttr,
+    pub attr: FieldAttrCore,
     applicable_to: ApplicableTo,
 }
 
-pub(crate) struct MapFieldAttr {
+pub(crate) struct FieldAttrCore {
     pub container_ty: Option<TypePath>,
     pub ident: Option<Member>,
     pub action: Option<Action>,
 }
 
-impl Parse for MapFieldAttr {
+impl Parse for FieldAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(MapFieldAttr {
+        Ok(FieldAttrCore {
             container_ty: try_parse_container_ident(input, false),
             ident: try_parse_optional_ident(input),
             action: try_parse_action(input)?,
@@ -362,14 +367,18 @@ impl Parse for ParentAttr {
     }
 }
 
-pub(crate) struct GhostAttr {
+pub(crate) struct FieldGhostAttr {
+    pub attr: FieldGhostAttrCore,
+    pub applicable_to: ApplicableTo,
+}
+pub(crate) struct FieldGhostAttrCore {
     pub container_ty: Option<TypePath>,
     pub action: Option<Action>,
 }
 
-impl Parse for GhostAttr {
+impl Parse for FieldGhostAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(GhostAttr { 
+        Ok(FieldGhostAttrCore { 
             container_ty: try_parse_container_ident(input, true),
             action: try_parse_action(input)?,
         })
@@ -377,8 +386,8 @@ impl Parse for GhostAttr {
 }
 
 pub(crate) enum ApplicableAttr<'a> {
-    Field(&'a MapFieldAttr),
-    Ghost(&'a GhostAttr),
+    Field(&'a FieldAttrCore),
+    Ghost(&'a FieldGhostAttrCore),
 }
 
 pub(crate) struct FieldChildAttr {
@@ -497,7 +506,7 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
         }
     }
     let mut child_attrs: Vec<FieldChildAttr> = vec![];
-    let mut ghost_attrs: Vec<GhostAttr> = vec![];
+    let mut ghost_attrs: Vec<FieldGhostAttr> = vec![];
     let mut attrs: Vec<FieldAttr> = vec![];
     let mut parent_attrs: Vec<ParentAttr> = vec![];
     for instr in  instrs {
@@ -530,7 +539,17 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
                     appl_ref_into_existing(instr_str)
                 ]
             })),
-        "ghost" => Ok(StructInstruction::Ghost(syn::parse2(input)?)),
+        "ghost" | "ghost_ref" | "ghost_owned" => Ok(StructInstruction::Ghost(StructGhostAttr {
+            attr: syn::parse2(input)?,
+            applicable_to: [
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str),
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str),
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str)
+            ]
+        })),
         "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
         "panic_debug_info" => Ok(StructInstruction::PanicDebugInfo),
@@ -555,7 +574,17 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
                     appl_ref_into_existing(instr_str)
                 ]
             })),
-        "ghost" => Ok(MemberInstruction::Ghost(syn::parse2(input)?)),
+        "ghost" | "ghost_ref" | "ghost_owned" => Ok(MemberInstruction::Ghost(FieldGhostAttr {
+            attr: syn::parse2(input)?,
+            applicable_to: [
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str),
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str),
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str)
+            ]
+        })),
         "child" => Ok(MemberInstruction::Child(syn::parse2(input)?)),
         "parent" => Ok(MemberInstruction::Parent(syn::parse2(input)?)),
         "as_type" => Ok(MemberInstruction::As(syn::parse2(input)?)),
@@ -705,7 +734,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
     let this_ty = input.ty.to_token_stream();
     let that_ty = attr.tokens;
     attrs.push(FieldAttr { 
-        attr: MapFieldAttr { 
+        attr: FieldAttrCore { 
             container_ty: attr.container_ty.clone(), 
             ident: attr.ident.clone(), 
             action: Some(Action::InlineTildeExpr(quote!(as #this_ty)))
@@ -713,7 +742,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         applicable_to: [false, false, true, true, false, false]
     });
     attrs.push(FieldAttr { 
-        attr: MapFieldAttr { 
+        attr: FieldAttrCore { 
             container_ty: attr.container_ty, 
             ident: attr.ident, 
             action: Some(Action::InlineTildeExpr(quote!(as #that_ty)))
@@ -741,6 +770,14 @@ fn appl_owned_into_existing(instr: &str) -> bool {
 
 fn appl_ref_into_existing(instr: &str) -> bool {
     matches!(instr, "ref_into_existing" | "into_existing")
+}
+
+fn appl_ghost_owned(instr: &str) -> bool {
+    matches!(instr, "ghost" | "ghost_owned")
+}
+
+fn appl_ghost_ref(instr: &str) -> bool {
+    matches!(instr, "ghost" | "ghost_ref")
 }
 
 fn build_child_path_str(child_path: &Punctuated<Member, Token![.]>) -> Vec<String> {
