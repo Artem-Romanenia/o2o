@@ -1,4 +1,7 @@
-﻿## Object to Object mapper for Rust
+﻿Object to Object mapper for Rust
+================================
+[<img alt="github.com" src="https://github.com/Artem-Romanenia/o2o/workflows/Build/badge.svg" height="25">](https://github.com/Artem-Romanenia/o2o/)
+[<img alt="crates.io" src="https://img.shields.io/crates/v/o2o.svg?style=for-the-badge&color=2f4d28&labelColor=f9f7ec&logo=rust&logoColor=black" height="25">](https://crates.io/crates/o2o)
 
 **o2o** procedural macro is able to generate implementation of 6 kinds of traits:
 
