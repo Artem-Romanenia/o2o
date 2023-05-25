@@ -38,26 +38,26 @@ struct CarDto {
 }
 
 #[derive(Default)]
-pub struct EntityBase {
+pub struct Base {
     pub id: u32,
     pub name: String,
 }
 
 #[derive(Default)]
 pub struct League {
-    pub base: EntityBase,
+    pub base: Base,
 }
 
 #[derive(Default)]
 pub struct Division {
-    pub base: EntityBase,
+    pub base: Base,
     pub league_id: u32,
     pub league: League,
 }
 
 #[derive(Default)]
 pub struct Team {
-    pub base: EntityBase,
+    pub base: Base,
     pub division_id: u32,
     pub division: Division,
 }
@@ -66,15 +66,23 @@ pub struct Team {
 #[o2o(
     map(Team),
     into_existing(Team),
-    children(base: EntityBase, division: Division, division.base: EntityBase, division.league: League, division.league.base: EntityBase),
-    ghost( 
-        division_id: |x| { x.division.id },
-        division.base@id: |x| { x.division.id },
-        division.base@name: |x| { x.division.name.clone() },
-        division@league_id: |x| {  x.league.id },
-        division.league.base@id: |x| {  x.league.id },
-        division.league.base@name: |x| {  x.league.name.clone() }
+    children(base: Base, division: Division, division.base: Base, division.league: League, division.league.base: Base),
+    ghost_owned( 
+        division_id: { @.division.id },
+        division.base@id: { @.division.id },
+        division.base@name: { @.division.name },
+        division@league_id: { @.league.id },
+        division.league.base@id: { @.league.id },
+        division.league.base@name: { @.league.name }
     ),
+    ghost_ref( 
+        division_id: { @.division.id },
+        division.base@id: { @.division.id },
+        division.base@name: { @.division.name.clone() },
+        division@league_id: { @.league.id },
+        division.league.base@id: { @.league.id },
+        division.league.base@name: { @.league.name.clone() }
+    )
 )]
 pub struct TeamDto {
     #[child(base)]
@@ -92,7 +100,7 @@ pub struct TeamDto {
 }
 
 #[derive(o2o)]
-#[from(EntityBase)]
+#[from(Base)]
 pub struct LeagueDto {
     id: u32,
     #[from(~.clone())]
@@ -100,7 +108,7 @@ pub struct LeagueDto {
 }
 
 #[derive(o2o)]
-#[from(EntityBase)]
+#[from(Base)]
 pub struct DivisionDto {
     id: u32,
     #[from(~.clone())]
@@ -228,19 +236,19 @@ fn existing_named2named_reverse() {
 #[test]
 fn named2named_2() {
     let team = Team {
-        base: EntityBase {
+        base: Base {
             id: 123, 
             name: "Test".into()
         },
         division_id: 456,
         division: Division { 
-            base: EntityBase { 
+            base: Base { 
                 id: 456, 
                 name: "TestDivision".into()
             }, 
             league_id: 789, 
             league: League { 
-                base: EntityBase { 
+                base: Base { 
                     id: 789, 
                     name: "TestLeague".into()
                 }
@@ -288,19 +296,19 @@ fn named2named_reverse_2() {
 #[test]
 fn named2named_ref_2() {
     let team = &Team {
-        base: EntityBase {
+        base: Base {
             id: 123, 
             name: "Test".into()
         },
         division_id: 456,
         division: Division { 
-            base: EntityBase { 
+            base: Base { 
                 id: 456, 
                 name: "TestDivision".into()
             }, 
             league_id: 789, 
             league: League { 
-                base: EntityBase { 
+                base: Base { 
                     id: 789, 
                     name: "TestLeague".into()
                 }

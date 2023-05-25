@@ -276,7 +276,7 @@ impl Parse for GhostData {
         Ok(GhostData {
             child_path,
             ghost_ident,
-            action: parse_braced_closure(input)?
+            action: parse_braced_action(input)?
         })
     }
 }
@@ -696,29 +696,42 @@ fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
 }
 
 // Rudimentarily parses |x| { x.something } flavor of closure. To be used when closure is not in the end of the stream.
-fn parse_braced_closure(input: ParseStream) -> Result<Action> {
+fn parse_braced_action(input: ParseStream) -> Result<Action> {
     let mut tokens = Vec::new();
     let mut paramless = false;
+    let inline = !input.peek(Token![|]);
     
-    tokens.push(input.parse::<Token![|]>()?.to_token_stream());
-    if input.peek(Ident) {
-        tokens.push(input.parse::<Ident>()?.to_token_stream());
-    } else if input.peek(Token![_]) {
-        tokens.push(input.parse::<Token![_]>()?.to_token_stream());
-    } else {
-        paramless = true;
+    if !inline {
+        tokens.push(input.parse::<Token![|]>()?.to_token_stream());
+        if input.peek(Ident) {
+            tokens.push(input.parse::<Ident>()?.to_token_stream());
+        } else if input.peek(Token![_]) {
+            tokens.push(input.parse::<Token![_]>()?.to_token_stream());
+        } else {
+            paramless = true;
+        }
+        tokens.push(input.parse::<Token![|]>()?.to_token_stream());
     }
-    tokens.push(input.parse::<Token![|]>()?.to_token_stream());
+    
     let content;
     braced!(content in input);
-    let content = content.parse::<TokenStream>()?;
-    tokens.push(quote!({#content}));
+
+    if inline {
+        content.parse::<Token![@]>()?;
+        tokens.push(content.parse::<TokenStream>()?);
+    } else {
+        let content = content.parse::<TokenStream>()?;
+        tokens.push(quote!({#content}));
+    }
+
+    
 
     let token_stream = TokenStream::from_iter(tokens);
 
-    let cl = match paramless {
-        true => Action::ParamlessClosure(token_stream),
-        false => Action::Closure(token_stream)
+    let cl = match (inline, paramless) {
+        (true, _) => Action::InlineAtExpr(token_stream),
+        (false, true) => Action::ParamlessClosure(token_stream),
+        (false, false) => Action::Closure(token_stream)
     };
     Ok(cl)
 }
