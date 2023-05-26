@@ -51,6 +51,8 @@ enum MemberInstruction {
     Child(FieldChildAttr),
     Parent(ParentAttr),
     As(AsAttr),
+    Repeat(RepeatFor),
+    StopRepeat,
     Unrecognized
 }
 
@@ -142,11 +144,61 @@ impl<'a> StructAttrs {
     }
 }
 
+type RepeatFor = [bool; 4];
+struct RepeatForWrap(RepeatFor);
+
+enum AttrType {
+    Attr,
+    Child,
+    Parent,
+    Ghost
+}
+
+impl Index<&AttrType> for RepeatFor {
+    type Output = bool;
+
+    fn index(&self, index: &AttrType) -> &Self::Output {
+        match index {
+            AttrType::Attr => &self[0],
+            AttrType::Child => &self[1],
+            AttrType::Parent => &self[2],
+            AttrType::Ghost => &self[3],
+        }
+    }
+}
+
+impl Parse for RepeatForWrap {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let types: Punctuated<Ident, Token![,]>  = Punctuated::parse_terminated(input)?;
+        if types.is_empty() {
+            return Ok(RepeatForWrap([true,  true, true, true]))
+        }
+
+        let mut repeat: RepeatFor = [false, false, false, false];
+
+        for ty in types {
+            let str = ty.to_token_stream().to_string();
+            match str.as_str() {
+                "map" => repeat[0] = true,
+                "child" => repeat[1] = true,
+                "parent" => repeat[2] = true,
+                "ghost" => repeat[3] = true,
+                _ => return Err(Error::new(ty.span(), format!("#[repeat] of instruction type '{}' is not supported. Supported types are: 'map', 'child', 'parent', 'ghost'", str))),
+            };
+        }
+
+        Ok(RepeatForWrap(repeat))
+    }
+}
+
+#[derive(Clone)]
 pub(crate) struct FieldAttrs {
     pub attrs: Vec<FieldAttr>,
     pub child_attrs: Vec<FieldChildAttr>,
     pub parent_attrs: Vec<ParentAttr>,
     pub ghost_attrs: Vec<FieldGhostAttr>,
+    pub repeat: Option<RepeatFor>,
+    pub stop_repeat: bool,
 }
 
 impl<'a> FieldAttrs {
@@ -185,6 +237,23 @@ impl<'a> FieldAttrs {
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
             .or_else(|| self.iter_for_kind(kind).find(|x| x.container_ty.is_none()))
     }
+
+    pub(crate) fn merge(&'a mut self, other: Self) {
+        if let Some(repeat) =  other.repeat  {
+            if repeat[&AttrType::Attr] {
+                self.attrs.extend(other.attrs);
+            }
+            if repeat[&AttrType::Child] {
+                self.child_attrs.extend(other.child_attrs);
+            }
+            if repeat[&AttrType::Parent] {
+                self.parent_attrs.extend(other.parent_attrs);
+            }
+            if repeat[&AttrType::Ghost] {
+                self.ghost_attrs.extend(other.ghost_attrs);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -204,7 +273,7 @@ pub(crate) struct StructAttrCore {
     pub struct_kind_hint: StructKindHint,
 }
 
-impl Parse  for StructAttrCore {
+impl Parse for StructAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(StructAttrCore { 
             ty: input.parse::<syn::Path>()?.into(),
@@ -244,6 +313,7 @@ impl GhostData {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct ChildPath {
     pub child_path: Punctuated<Member, Token![.]>,
     pub child_path_str: Vec<String>,
@@ -334,11 +404,13 @@ impl Hash for ChildData {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct FieldAttr  {
     pub attr: FieldAttrCore,
     applicable_to: ApplicableTo,
 }
 
+#[derive(Clone)]
 pub(crate) struct FieldAttrCore {
     pub container_ty: Option<TypePath>,
     pub ident: Option<Member>,
@@ -355,6 +427,7 @@ impl Parse for FieldAttrCore {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct ParentAttr {
     pub container_ty: Option<TypePath>,
 }
@@ -367,10 +440,13 @@ impl Parse for ParentAttr {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct FieldGhostAttr {
     pub attr: FieldGhostAttrCore,
     pub applicable_to: ApplicableTo,
 }
+
+#[derive(Clone)]
 pub(crate) struct FieldGhostAttrCore {
     pub container_ty: Option<TypePath>,
     pub action: Option<Action>,
@@ -390,6 +466,7 @@ pub(crate) enum ApplicableAttr<'a> {
     Ghost(&'a FieldGhostAttrCore),
 }
 
+#[derive(Clone)]
 pub(crate) struct FieldChildAttr {
     pub container_ty: Option<TypePath>,
     pub child_path: ChildPath,
@@ -442,6 +519,7 @@ impl Parse for AsAttr {
     }
 }
 
+#[derive(Clone)]
 pub(crate) enum Action {
     InlineAtExpr(TokenStream),
     InlineTildeExpr(TokenStream),
@@ -509,6 +587,8 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
     let mut ghost_attrs: Vec<FieldGhostAttr> = vec![];
     let mut attrs: Vec<FieldAttr> = vec![];
     let mut parent_attrs: Vec<ParentAttr> = vec![];
+    let mut repeat = None;
+    let mut stop_repeat = false;
     for instr in  instrs {
         match instr {
             MemberInstruction::Map(attr) => attrs.push(attr),
@@ -516,10 +596,12 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
             MemberInstruction::Ghost(attr) => ghost_attrs.push(attr),
             MemberInstruction::Parent(attr) => parent_attrs.push(attr),
             MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
+            MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
+            MemberInstruction::StopRepeat => stop_repeat = true,
             MemberInstruction::Unrecognized => ()
         };
     }
-    Ok(FieldAttrs { child_attrs, parent_attrs, attrs, ghost_attrs })
+    Ok(FieldAttrs { child_attrs, parent_attrs, attrs, ghost_attrs, repeat, stop_repeat })
 }
 
 fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Result<StructInstruction>
@@ -588,6 +670,11 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
         "child" => Ok(MemberInstruction::Child(syn::parse2(input)?)),
         "parent" => Ok(MemberInstruction::Parent(syn::parse2(input)?)),
         "as_type" => Ok(MemberInstruction::As(syn::parse2(input)?)),
+        "repeat" => {
+            let repeat: RepeatForWrap = syn::parse2(input)?;
+            Ok(MemberInstruction::Repeat(repeat.0))
+        },
+        "stop_repeat" => Ok(MemberInstruction::StopRepeat),
         _ if bark => Err(Error::new(instr.span(), format_args!("Member level instruction '{}' is not supported.", instr))),
         _ => Ok(MemberInstruction::Unrecognized)
     }

@@ -38,10 +38,30 @@ impl<'a> Field {
         fields: &'a Fields,
         span: Span,
     ) -> Result<Vec<Self>> {
+        let mut attrs_to_repeat = None;
+
         fields
             .iter()
             .enumerate()
-            .map(|(i, field)| Field::from_syn(i, field, span))
+            .map(|(i, field)| {
+                let mut field = Field::from_syn(i, field, span)?;
+
+                if field.attrs.stop_repeat {
+                    attrs_to_repeat =  None;
+                }
+
+                if field.attrs.repeat.is_some() {
+                    if attrs_to_repeat.is_some() && !field.attrs.stop_repeat {
+                        panic!("Previous #[repeat] instruction must be terminated with #[stop_repeat]")
+                    }
+
+                    attrs_to_repeat = Some(field.attrs.clone());
+                } else if let Some(attrs_to_repeat) = &attrs_to_repeat {
+                    field.attrs.merge(attrs_to_repeat.clone());
+                }
+
+                Ok(field)
+            })
             .collect()
     }
 
