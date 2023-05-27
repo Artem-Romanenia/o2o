@@ -134,10 +134,6 @@ fn struct_impl(input: Struct) -> TokenStream {
         #(#ref_into_existing_impls)*
     };
 
-    if input.attrs.panic_debug_info {
-        panic!("{}", result);
-    }
-
     result
 }
 

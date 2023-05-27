@@ -41,7 +41,6 @@ enum StructInstruction {
     Ghost(StructGhostAttr), 
     Where(WhereAttr),
     Children(ChildrenAttr),
-    PanicDebugInfo,
     Unrecognized
 }
 
@@ -117,7 +116,6 @@ pub(crate) struct StructAttrs {
     pub ghost_attrs: Vec<StructGhostAttr>,
     pub where_attrs: Vec<WhereAttr>,
     pub children_attrs: Vec<ChildrenAttr>,
-    pub panic_debug_info: bool,
 }
 
 impl<'a> StructAttrs {
@@ -550,18 +548,16 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
     let mut where_attrs: Vec<WhereAttr> = vec![];
     let mut children_attrs: Vec<ChildrenAttr> = vec![];
     let mut attrs: Vec<StructAttr> = vec![];
-    let mut panic_debug_info = false;
     for instr in  instrs {
         match instr {
             StructInstruction::Map(attr) => attrs.push(attr),
             StructInstruction::Ghost(attr) => ghost_attrs.push(attr),
             StructInstruction::Where(attr) => where_attrs.push(attr),
             StructInstruction::Children(attr) => children_attrs.push(attr),
-            StructInstruction::PanicDebugInfo => panic_debug_info = true,
             StructInstruction::Unrecognized => (),
         };
     }
-    Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs, panic_debug_info })
+    Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs })
 }
 
 pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
@@ -634,7 +630,6 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
         })),
         "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
-        "panic_debug_info" => Ok(StructInstruction::PanicDebugInfo),
         _ if bark => Err(Error::new(instr.span(), format_args!("Struct level instruction '{}' is not supported.", instr))),
         _ => Ok(StructInstruction::Unrecognized),
     }

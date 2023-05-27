@@ -38,7 +38,7 @@ It also has shortcuts to configure multiple trait implementations with fewer lin
 
 With that, let's look at some examples.
 
-### Examples
+## Examples
 
 #### Simplest Case
 
@@ -57,24 +57,24 @@ struct EntityDto {
     another_int: i16,
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+From here on, generated code is produced by [rust-analyzer: Expand macro recursively](https://rust-analyzer.github.io/manual.html#expand-macro-recursively) command
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<Entity> for EntityDto {
-      fn from(value : Entity) -> EntityDto {
-          EntityDto { 
-              some_int : value.some_int, 
-              another_int : value.another_int, 
+      fn from(value: Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int,
+              another_int: value.another_int,
           }
-       }
+      }
   }
-
   impl std::convert::Into<Entity> for EntityDto {
       fn into(self) -> Entity {
           Entity {
-              some_int : self.some_int,
-              another_int : self.another_int,
+              some_int: self.some_int,
+              another_int: self.another_int,
           }
       }
   }
@@ -108,22 +108,21 @@ struct EntityDto {
     different_int: i16,
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<&Entity> for EntityDto {
-      fn from(value : & Entity) -> EntityDto {
-          EntityDto { 
-              some_int : value.some_int,
-              different_int : value.another_int,
+      fn from(value: &Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int,
+              different_int: value.another_int,
           }
       }
   }
-
   impl o2o::traits::IntoExisting<Entity> for &EntityDto {
-      fn into_existing(self, other : &mut Entity) {
-          other.some_int = self.some_int; 
+      fn into_existing(self, other: &mut Entity) {
+          other.some_int = self.some_int;
           other.another_int = self.different_int;
       }
   }
@@ -152,21 +151,21 @@ struct EntityDto {
     str: String
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
-  impl std :: convert :: From < Entity > for EntityDto {
-      fn from(value : Entity) -> EntityDto {
+  impl std::convert::From<Entity> for EntityDto {
+      fn from(value: Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
               val: value.val.to_string(),
-              str: value.str, // no .clone() needed
+              str: value.str, // no .clone()
           }
       }
   }
-  impl std :: convert :: From < & Entity > for EntityDto {
-      fn from(value : & Entity) -> EntityDto {
+  impl std::convert::From<&Entity> for EntityDto {
+      fn from(value: &Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
               val: value.val.to_string(),
@@ -179,7 +178,7 @@ struct EntityDto {
           Entity {
               some_int: self.some_int,
               val: self.val.parse::<i16>().unwrap(),
-              str: self.str, // no .clone() needed
+              str: self.str, // no .clone()
           }
       }
   }
@@ -220,23 +219,23 @@ struct ChildDto {
     child_int: i32,
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<Entity> for EntityDto {
-      fn from(value : Entity) -> EntityDto { 
-          EntityDto { 
-              some_int: value.some_int, 
-              child: value.child.into(), 
+      fn from(value: Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int,
+              child: value.child.into(),
           }
       }
   }
   
   impl std::convert::From<Child> for ChildDto {
-      fn from(value : Child) -> ChildDto { 
-          ChildDto { 
-              child_int: value.child_int, 
+      fn from(value: Child) -> ChildDto {
+          ChildDto {
+              child_int: value.child_int,
           }
       }
   }
@@ -271,34 +270,38 @@ struct ChildDto {
     child_int: i32,
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<Entity> for EntityDto {
-      fn from(value : Entity) -> EntityDto {
+      fn from(value: Entity) -> EntityDto {
           EntityDto {
-              some_int: value.some_int, 
-              children_vec: value.children.iter().map(|p|p.into()).collect(),
+              some_int: value.some_int,
+              children_vec: value.children.iter().map(|p| p.into()).collect(),
           }
       }
-  } 
+  }
   impl std::convert::Into<Entity> for EntityDto {
       fn into(self) -> Entity {
           Entity {
-              some_int: self.some_int, 
-              children: self.children_vec.iter().map(| p | p.into()).collect(),
+              some_int: self.some_int,
+              children: self.children_vec.iter().map(|p| p.into()).collect(),
           }
       }
   }
   impl std::convert::From<&Child> for ChildDto {
-      fn from(value : & Child) -> ChildDto { 
-          ChildDto { child_int : value.child_int, } 
+      fn from(value: &Child) -> ChildDto {
+          ChildDto {
+              child_int: value.child_int,
+          }
       }
-  } 
+  }
   impl std::convert::Into<Child> for &ChildDto {
-      fn into(self) -> Child { 
-          Child { child_int : self.child_int, }
+      fn into(self) -> Child {
+          Child {
+              child_int: self.child_int,
+          }
       }
   }
   ```
@@ -329,26 +332,26 @@ struct PersonDto {
 }
 enum ZodiacSign {}
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<Person> for PersonDto {
-      fn from(value : Person) -> PersonDto {
+      fn from(value: Person) -> PersonDto {
           PersonDto {
-              id: value.id, 
-              full_name: value.full_name, 
+              id: value.id,
+              full_name: value.full_name,
               age: value.age,
-              zodiac_sign: (|| None) (),
+              zodiac_sign: (|| None)(),
           }
       }
   }
   impl std::convert::Into<Person> for PersonDto {
-      fn into(self) -> Person { 
+      fn into(self) -> Person {
           Person {
               id: self.id,
               full_name: self.full_name,
-              age: self.age, 
+              age: self.age,
           }
       }
   }
@@ -374,26 +377,26 @@ struct PersonDto {
 }
 enum ZodiacSign {}
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<PersonDto> for Person {
-      fn from(value : PersonDto) -> Person {
+      fn from(value: PersonDto) -> Person {
           Person {
               id: value.id,
               full_name: value.full_name,
               age: value.age,
           }
       }
-  } 
+  }
   impl std::convert::Into<PersonDto> for Person {
       fn into(self) -> PersonDto {
           PersonDto {
               id: self.id,
               full_name: self.full_name,
               age: self.age,
-              zodiac_sign: (| | { None }) (),
+              zodiac_sign: (|| None)(),
           }
       }
   }
@@ -448,12 +451,12 @@ impl EmployeeDto {
     }
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<Employee> for EmployeeDto {
-      fn from(value : Employee) -> EmployeeDto {
+      fn from(value: Employee) -> EmployeeDto {
           EmployeeDto {
               employee_id: value.id,
               full_name: value.get_full_name(),
@@ -461,13 +464,13 @@ impl EmployeeDto {
               subordinates: value.subordinates.iter().map(|p| Box::new(p.as_ref().into())).collect(),
           }
       }
-  } 
+  }
   impl std::convert::From<&Employee> for EmployeeDto {
-      fn from(value : & Employee) -> EmployeeDto {
+      fn from(value: &Employee) -> EmployeeDto {
           EmployeeDto {
               employee_id: value.id,
               full_name: value.get_full_name(),
-              reports_to: (|x: &Employee | Box::new(x.subordinate_of.as_ref().into()))(value),
+              reports_to: (|x: &Employee| Box::new(x.subordinate_of.as_ref().into()))(value),
               subordinates: value.subordinates.iter().map(|p| Box::new(p.as_ref().into())).collect(),
           }
       }
@@ -475,22 +478,22 @@ impl EmployeeDto {
   impl std::convert::Into<Employee> for EmployeeDto {
       fn into(self) -> Employee {
           Employee {
-              id : self.employee_id,
-              subordinate_of: (|x: &EmployeeDto | Box::new(x.reports_to.as_ref().into()))(& self),
-              subordinates: self.subordinates.iter().map(|p| Box::new(p.as_ref().into())).collect(), 
-              first_name: (|x: &EmployeeDto | { x.get_first_name() })(&self),
-              last_name: (|x: &EmployeeDto | { x.get_last_name() })(&self),
+              id: self.employee_id,
+              subordinate_of: (|x: &EmployeeDto| Box::new(x.reports_to.as_ref().into()))(&self),
+              subordinates: self.subordinates.iter().map(|p| Box::new(p.as_ref().into())).collect(),
+              first_name: (|x: &EmployeeDto| x.get_first_name())(&self),
+              last_name: (|x: &EmployeeDto| x.get_last_name())(&self),
           }
       }
   }
   impl std::convert::Into<Employee> for &EmployeeDto {
       fn into(self) -> Employee {
           Employee {
-              id : self.employee_id,
-              subordinate_of: (|x : &EmployeeDto | Box::new(x.reports_to.as_ref().into()))(self),
+              id: self.employee_id,
+              subordinate_of: (|x: &EmployeeDto| Box::new(x.reports_to.as_ref().into()))(self),
               subordinates: self.subordinates.iter().map(|p| Box::new(p.as_ref().into())).collect(),
-              first_name: (|x: &EmployeeDto | { x.get_first_name() })(self),
-              last_name : (|x: &EmployeeDto | { x.get_last_name() })(self),
+              first_name: (|x: &EmployeeDto| x.get_first_name())(self),
+              last_name: (|x: &EmployeeDto| x.get_last_name())(self),
           }
       }
   }
@@ -516,7 +519,7 @@ struct Machine {
 
 #[derive(o2o)]
 #[from_owned(Car)]
-#[into_existing(Car)]
+#[ref_into_existing(Car)]
 struct CarDto {
     number_of_doors: i8,
 
@@ -531,8 +534,8 @@ struct CarDto {
     year: i16
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<Car> for CarDto {
@@ -540,7 +543,7 @@ struct CarDto {
           CarDto {
               number_of_doors: value.number_of_doors,
               number_of_seats: value.vehicle.number_of_seats,
-              brand: value.vehicle.machine.brand, 
+              brand: value.vehicle.machine.brand,
               year: value.vehicle.machine.year,
           }
       }
@@ -575,8 +578,8 @@ struct CarDto {
     year: i16
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::Into<Car> for CarDto {
@@ -584,7 +587,7 @@ struct CarDto {
           Car {
               number_of_doors: self.number_of_doors,
               vehicle: Vehicle {
-                  number_of_seats: self.number_of_seats, 
+                  number_of_seats: self.number_of_seats,
                   machine: Machine {
                       brand: self.brand,
                       year: self.year,
@@ -631,27 +634,28 @@ struct CarDto {
     year: i16
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::Into<CarDto> for Car {
       fn into(self) -> CarDto {
           let mut obj = CarDto {
-              number_of_doors: self.number_of_doors, 
-              .. Default::default() 
+              number_of_doors: self.number_of_doors,
+              ..Default::default()
           };
-          self.vehicle.into_existing(& mut obj) ; obj
+          self.vehicle.into_existing(&mut obj);
+          obj
       }
   }
-  impl o2o :: traits :: IntoExisting < CarDto > for Vehicle {
-      fn into_existing(self, other : & mut CarDto) {
+  impl o2o::traits::IntoExisting<CarDto> for Vehicle {
+      fn into_existing(self, other: &mut CarDto) {
           other.number_of_seats = self.number_of_seats;
           self.machine.into_existing(other);
       }
   }
-  impl o2o :: traits :: IntoExisting < CarDto > for Machine {
-      fn into_existing(self, other : & mut CarDto) {
+  impl o2o::traits::IntoExisting<CarDto> for Machine {
+      fn into_existing(self, other: &mut CarDto) {
           other.brand = self.brand;
           other.year = self.year;
       }
@@ -668,18 +672,18 @@ struct TupleEntity(i32, String);
 #[map_ref(TupleEntity)]
 struct TupleEntityDto(i32, #[map_ref(~.clone())] String);
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
-  impl std :: convert :: From < & TupleEntity > for TupleEntityDto {
-      fn from(value : & TupleEntity) -> TupleEntityDto {
-          TupleEntityDto(value.0, value.1.clone(),)
+  impl std::convert::From<&TupleEntity> for TupleEntityDto {
+      fn from(value: &TupleEntity) -> TupleEntityDto {
+          TupleEntityDto(value.0, value.1.clone())
       }
   }
-  impl std :: convert :: Into < TupleEntity > for & TupleEntityDto {
+  impl std::convert::Into<TupleEntity> for &TupleEntityDto {
       fn into(self) -> TupleEntity {
-          TupleEntity(self.0, self.1.clone(),)
+          TupleEntity(self.0, self.1.clone())
       }
   }
   ```
@@ -699,13 +703,13 @@ struct EntityDto {
     some_str: String
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
   impl std::convert::From<&TupleEntity> for EntityDto {
-      fn from(value: & TupleEntity) -> EntityDto {
-          EntityDto { 
+      fn from(value: &TupleEntity) -> EntityDto {
+          EntityDto {
               some_int: value.0,
               some_str: value.1.clone(),
           }
@@ -714,7 +718,7 @@ struct EntityDto {
   impl std::convert::Into<TupleEntity> for &EntityDto {
       fn into(self) -> TupleEntity {
           TupleEntity {
-              0 : self.some_int,
+              0: self.some_int,
               1: self.some_str.clone(),
           }
       }
@@ -736,20 +740,20 @@ struct EntityDto{
     some_str: String
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
-  impl std :: convert :: From < EntityDto > for TupleEntity {
-      fn from(value : EntityDto) -> TupleEntity {
-          TupleEntity(value.some_int, value.some_str,)
+  impl std::convert::From<EntityDto> for TupleEntity {
+      fn from(value: EntityDto) -> TupleEntity {
+          TupleEntity(value.some_int, value.some_str)
       }
   }
-  impl std :: convert :: Into < EntityDto > for TupleEntity {
-      fn into(self) -> EntityDto { 
+  impl std::convert::Into<EntityDto> for TupleEntity {
+      fn into(self) -> EntityDto {
           EntityDto {
-              some_int : self.0,
-              some_str : self.1,
+              some_int: self.0,
+              some_str: self.1,
           }
       }
   }
@@ -771,20 +775,20 @@ struct EntityDto {
     something: f32
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
-  impl std::convert::From<Entity::<f32>> for EntityDto {
-      fn from(value: Entity::<f32>) -> EntityDto {
+  impl std::convert::From<Entity<f32>> for EntityDto {
+      fn from(value: Entity<f32>) -> EntityDto {
           EntityDto {
-              some_int: value.some_int, 
+              some_int: value.some_int,
               something: value.something,
           }
       }
   }
-  impl std::convert::Into<Entity::<f32>> for EntityDto {
-      fn into(self) -> Entity::<f32> {
+  impl std::convert::Into<Entity<f32>> for EntityDto {
+      fn into(self) -> Entity<f32> {
           Entity::<f32> {
               some_int: self.some_int,
               something: self.something,
@@ -811,20 +815,20 @@ struct ChildDto<T> {
     stuff: T,
 }
 ```
-<details style="background-color: lightgray; border-radius: 6px">
-  <summary style="font-size: 10px">View generated code</summary>
+<details>
+  <summary>View generated code</summary>
 
   ``` rust
-  impl <T> std::convert::From<Child::<T>> for ChildDto<T> where T: Clone {
-      fn from(value: Child::<T>) -> ChildDto<T> {
+  impl<T> std::convert::From<Child<T>> for ChildDto<T> where T: Clone, {
+      fn from(value: Child<T>) -> ChildDto<T> {
           ChildDto {
               child_int: value.child_int,
               stuff: value.something.clone(),
           }
       }
   }
-  impl <T> std::convert::Into<Child::<T>> for ChildDto <T> where T: Clone {
-      fn into(self) -> Child::<T> {
+  impl<T> std::convert::Into<Child<T>> for ChildDto<T> where T: Clone, {
+      fn into(self) -> Child<T> {
           Child::<T> {
               child_int: self.child_int,
               something: self.stuff.clone(),
@@ -836,19 +840,264 @@ struct ChildDto<T> {
 
 ### Mapping to multiple structs
 
-to be documented...
+``` rust
+struct Person {
+    full_name: String,
+    age: i32,
+    country: String,
+}
+
+struct PersonModel {
+    full_name: String,
+    age: i32,
+    place_of_birth: String,
+}
+
+#[derive(o2o)]
+#[ref_into(Person)]
+#[ref_into(PersonModel)]
+struct PersonDto {
+    // 'Default' member level instruction applies to all types
+    #[into(full_name, ~.clone())]
+    name: String,
+    age: i32,
+    // 'Dedicated' member level instruction applies to a specific type only
+    #[into(Person| country, ~.clone())]
+    #[into(PersonModel| ~.clone())]
+    place_of_birth: String,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::Into<Person> for &PersonDto {
+      fn into(self) -> Person {
+          Person {
+              full_name: self.name.clone(),
+              age: self.age,
+              country: self.place_of_birth.clone(),
+          }
+      }
+  }
+  impl std::convert::Into<PersonModel> for &PersonDto {
+      fn into(self) -> PersonModel {
+          PersonModel {
+              full_name: self.name.clone(),
+              age: self.age,
+              place_of_birth: self.place_of_birth.clone(),
+          }
+      }
+  }
+  ```
+</details>
 
 ### Avoiding proc macro attribute name collisions (alternative instruction syntax)
 
-to be documented...
+**o2o** proc macro declares a lot of attributes, some of which have pretty broad meaning (e.g. from, into, map, child, parent etc.), so if you have to use it with some other proc macro, there is a chance that these attributes can collide and it would not be clear to what proc macro they should apply.
+For this scenario, **o2o** supports two alternative syntaxes (syntacies?):
 
-### Additional o2o shortcuts available via #[o2o(...)] syntax
+Below, all three variants of **o2o** proc macro application will produce the same generated code:
+``` rust
+struct Entity {
+    some_int: i32,
+    val: i16,
+    str: String
+}
+// =====================================================================
+#[derive(o2o)]
+#[map(Entity)]
+struct EntityDto {
+    some_int: i32,
+    #[from(~.to_string())]
+    #[into(~.parse::<i16>().unwrap())]
+    val: String,
+    #[map_ref(~.clone())] 
+    str: String
+}
+// =====================================================================
+#[derive(o2o)]
+#[o2o(map(Entity))]
+struct EntityDto {
+    some_int: i32,
+    #[o2o(from(~.to_string()))]
+    #[o2o(into(~.parse::<i16>().unwrap()))]
+    val: String,
+    #[o2o(map_ref(~.clone()))] 
+    str: String
+}
+// =====================================================================
+#[derive(o2o)]
+#[o2o(map(Entity))]
+struct EntityDto {
+    some_int: i32,
+    #[o2o(
+        from(~.to_string()),
+        into(~.parse::<i16>().unwrap()),
+    )]
+    val: String,
+    #[o2o(map_ref(~.clone()))] 
+    str: String
+}
+// =====================================================================
+```
 
-to be documented...
+This syntax applies to all supported struct and member level instructions.
 
-### #[panic_debug_info] instruction
+### Additional o2o instruction available via #[o2o(...)] syntax
 
-to be documented...
+#### Primitive type conversions
+
+``` rust
+struct Entity {
+    some_int: i32,
+    some_float: f32
+}
+
+#[derive(o2o)]
+#[o2o(map_ref(Entity))]
+struct EntityDto {
+    #[o2o(as_type(i32))]
+    some_int: i16,
+    #[o2o(as_type(some_float, f32))]
+    another_int: i16
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<&Entity> for EntityDto {
+      fn from(value: &Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int as i16,
+              another_int: value.some_float as i16,
+          }
+      }
+  }
+  impl std::convert::Into<Entity> for &EntityDto {
+      fn into(self) -> Entity {
+          Entity {
+              some_int: self.some_int as i32,
+              some_float: self.another_int as f32,
+          }
+      }
+  }
+  ```
+</details>
+
+This will work with all types that support 'as' conversion.
+
+#### Repeat instructions
+
+```rust
+struct Car {
+    number_of_doors: i8,
+    vehicle: Vehicle
+}
+struct Vehicle {
+    number_of_seats: i16,
+    can_fly: bool,
+    needs_driver: bool,
+    horsepower: i32,
+    top_speed: f32,
+    machine: Machine,
+}
+struct Machine {
+    id: i32,
+    brand: String,
+    year: i16,
+    weight: f32,
+    length: f32,
+    width: f32,
+    height: f32,
+}
+
+#[derive(o2o)]
+#[map_ref(Car)]
+#[children(vehicle: Vehicle, vehicle.machine: Machine)]
+#[ghost(vehicle.machine@id: || { 321 })]
+struct CarDto {
+    number_of_doors: i8,
+
+    // #[o2o(repeat)] will repeat all instructions for this member to the following members, 
+    // until there is a #[o2o(stop_repeat)] or the members run out.
+    #[o2o(repeat)] #[child(vehicle)]
+    number_of_seats: i16,
+    can_fly: bool,
+    needs_driver: bool,
+    horsepower: i32,
+    top_speed: f32,
+    #[o2o(stop_repeat)]
+
+    // You can also specify what specific types of instructions to repeat
+    // (supported values are 'map', 'child', 'parent', 'ghost')
+    #[o2o(repeat(child))] #[child(vehicle.machine)]
+    #[map(~.clone())]
+    brand: String,
+    year: i16,
+    weight: f32,
+    length: f32,
+    width: f32,
+    height: f32,
+    #[o2o(stop_repeat)]
+
+    #[o2o(repeat)] #[ghost(|| {123})]
+    useless_param: i32,
+    useless_param_2: i32,
+    useless_param_3: i32,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<&Car> for CarDto {
+      fn from(value: &Car) -> CarDto {
+          CarDto {
+              number_of_doors: value.number_of_doors,
+              number_of_seats: value.vehicle.number_of_seats,
+              can_fly: value.vehicle.can_fly,
+              needs_driver: value.vehicle.needs_driver,
+              horsepower: value.vehicle.horsepower,
+              top_speed: value.vehicle.top_speed,
+              brand: value.vehicle.machine.brand.clone(),
+              year: value.vehicle.machine.year,
+              weight: value.vehicle.machine.weight,
+              length: value.vehicle.machine.length,
+              width: value.vehicle.machine.width,
+              height: value.vehicle.machine.height,
+              useless_param: (|| 123)(),
+              useless_param_2: (|| 123)(),
+              useless_param_3: (|| 123)(),
+          }
+      }
+  }
+  impl std::convert::Into<Car> for &CarDto {
+      fn into(self) -> Car {
+          Car {
+              number_of_doors: self.number_of_doors,
+              vehicle: Vehicle {
+                  number_of_seats: self.number_of_seats,
+                  can_fly: self.can_fly,
+                  needs_driver: self.needs_driver,
+                  horsepower: self.horsepower,
+                  top_speed: self.top_speed,
+                  machine: Machine {
+                      brand: self.brand.clone(),
+                      year: self.year,
+                      weight: self.weight,
+                      length: self.length,
+                      width: self.width,
+                      height: self.height,
+                      id: (|| 321)(),
+                  },
+              },
+          }
+      }
+  }
+  ```
+</details>
 
 ### Contributions
 

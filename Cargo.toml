@@ -1,6 +1,6 @@
 [package]
 name = "o2o"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 categories = ["rust-patterns"]
@@ -10,8 +10,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Artem-Romanenia/o2o"
 
 [dependencies]
-o2o-impl = { version = "0.2.1", path = "o2o-impl" }
-o2o-macros = { version = "0.2.1", path = "o2o-macros" }
+o2o-impl = { version = "0.2.2", path = "o2o-impl" }
+o2o-macros = { version = "0.2.2", path = "o2o-macros" }
 proc-macro2 = "1.0.51"
 syn = "1.0.109"
 quote = "1.0.23"
