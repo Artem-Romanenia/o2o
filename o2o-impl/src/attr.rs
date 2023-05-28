@@ -521,6 +521,7 @@ impl Parse for AsAttr {
 pub(crate) enum Action {
     InlineAtExpr(TokenStream),
     InlineTildeExpr(TokenStream),
+    InlineExpr(TokenStream),
     Closure(TokenStream),
     ParamlessClosure(TokenStream),
 }
@@ -760,7 +761,9 @@ fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token!
 
 // Superficialy parses o2o Actions, when they are guaranteed to be the last thing in the stream.
 fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
-    if input.peek(Token![@]) {
+    if input.is_empty() {
+        Ok(None)
+    } else if input.peek(Token![@]) {
         input.parse::<Token![@]>()?;
         return Ok(Some(Action::InlineAtExpr(input.parse()?)))
     } else if input.peek(Token![~]) {
@@ -773,8 +776,11 @@ fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
             validate_closure(input)?;
             return Ok(Some(Action::Closure(input.parse()?)))
         }
+    } else {
+        let content;
+        braced!(content in input);
+        return Ok(Some(Action::InlineExpr(content.parse()?)))
     }
-    Ok(None)
 }
 
 // Rudimentarily parses |x| { x.something } flavor of closure. To be used when closure is not in the end of the stream.
@@ -799,19 +805,23 @@ fn parse_braced_action(input: ParseStream) -> Result<Action> {
     braced!(content in input);
 
     if inline {
-        content.parse::<Token![@]>()?;
+        if content.peek(Token![@]) {
+            content.parse::<Token![@]>()?;
+        } else {
+            paramless = true;
+        }
+        
         tokens.push(content.parse::<TokenStream>()?);
     } else {
         let content = content.parse::<TokenStream>()?;
         tokens.push(quote!({#content}));
     }
 
-    
-
     let token_stream = TokenStream::from_iter(tokens);
 
     let cl = match (inline, paramless) {
-        (true, _) => Action::InlineAtExpr(token_stream),
+        (true, true) => Action::InlineExpr(token_stream),
+        (true, false) => Action::InlineAtExpr(token_stream),
         (false, true) => Action::ParamlessClosure(token_stream),
         (false, false) => Action::Closure(token_stream)
     };

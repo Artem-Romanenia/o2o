@@ -30,7 +30,7 @@ struct Machine {
 #[map(Car)]
 #[into_existing(Car)]
 #[children(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghost(vehicle.machine@id: || { 321 })]
+#[ghost(vehicle.machine@id: { 321 })]
 struct CarDto {
     number_of_doors: i8,
 
@@ -52,7 +52,7 @@ struct CarDto {
     height: f32,
     #[o2o(stop_repeat)]
 
-    #[o2o(repeat(ghost))] #[ghost(|| {123})]
+    #[o2o(repeat(ghost))] #[ghost({123})]
     useless_param: i32,
     useless_param_2: i32,
     useless_param_3: i32,

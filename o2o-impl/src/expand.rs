@@ -553,6 +553,7 @@ fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplCont
             };
             quote!(#path #args)
         },
+        Action::InlineExpr(args) => args.clone(),
         Action::Closure(args) => {
             let ident = match ctx.kind {
                 Kind::FromOwned | Kind::FromRef => quote!(value),

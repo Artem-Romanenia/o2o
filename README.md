@@ -3,6 +3,38 @@
 [<img alt="github.com" src="https://github.com/Artem-Romanenia/o2o/workflows/Build/badge.svg" height="25">](https://github.com/Artem-Romanenia/o2o/)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/o2o.svg?style=for-the-badge&color=2f4d28&labelColor=f9f7ec&logo=rust&logoColor=black" height="25">](https://crates.io/crates/o2o)
 
+## Content
+
+- [Object to Object mapper for Rust](#object-to-object-mapper-for-rust)
+  - [Content](#content)
+  - [Brief description](#brief-description)
+  - [Examples](#examples)
+    - [Simplest Case](#simplest-case)
+    - [Different field name](#different-field-name)
+    - [Different field type](#different-field-type)
+    - [Nested structs](#nested-structs)
+    - [Nested collection](#nested-collection)
+    - [Assymetric fields (skipping and providing default values)](#assymetric-fields-skipping-and-providing-default-values)
+  - [Expressions](#expressions)
+    - [Expressions for struct level instructions](#expressions-for-struct-level-instructions)
+    - [Expressions for member level instructions](#expressions-for-member-level-instructions)
+  - [More rexamples](#more-rexamples)
+    - [Slightly complex example](#slightly-complex-example)
+    - [Flatened children](#flatened-children)
+    - [Tuple structs](#tuple-structs)
+    - [Struct kind hints](#struct-kind-hints)
+    - [Generics](#generics)
+    - [Where clauses](#where-clauses)
+    - [Mapping to multiple structs](#mapping-to-multiple-structs)
+    - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
+    - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
+      - [Primitive type conversions](#primitive-type-conversions)
+      - [Repeat instructions](#repeat-instructions)
+    - [Contributions](#contributions)
+      - [License](#license)
+
+## Brief description
+
 **o2o** procedural macro is able to generate implementation of 6 kinds of traits:
 
 ``` rust
@@ -40,7 +72,7 @@ With that, let's look at some examples.
 
 ## Examples
 
-#### Simplest Case
+### Simplest Case
 
 ``` rust
 use o2o::o2o;
@@ -91,7 +123,7 @@ let dto = EntityDto { some_int: 123, another_int: 321 }
 let entity: Entity = dto.into();
 ```
 
-#### Different field name
+### Different field name
 
 ``` rust
 struct Entity {
@@ -129,7 +161,7 @@ struct EntityDto {
   ```
 </details>
 
-#### Different field type
+### Different field type
 
 ``` rust
 struct Entity {
@@ -194,7 +226,7 @@ struct EntityDto {
   ```
 </details>
 
-#### Nested structs
+### Nested structs
 
 ``` rust
 struct Entity {
@@ -242,7 +274,7 @@ struct ChildDto {
   ```
 </details>
 
-#### Nested collection
+### Nested collection
 
 ``` rust
 struct Entity {
@@ -307,7 +339,7 @@ struct ChildDto {
   ```
 </details>
 
-#### Assymetric fields (skipping and providing default values)
+### Assymetric fields (skipping and providing default values)
 
 **o2o** is able to handle scenarios when either of the structs has a field that the other struct doesn't have.
 
@@ -403,7 +435,51 @@ enum ZodiacSign {}
   ```
 </details>
 
-#### Slightly complex example
+## Expressions
+
+### Expressions for struct level instructions
+
+```rust
+#[ghost(field: { None })]
+
+// field: None,
+
+#[ghost(field: || { None })]
+
+// field: (|| None)(),
+
+#[ghost(field: { @.get_value() })]
+
+// field: self.get_value(),
+
+#[ghost(field: |x| { x.get_value() })]
+
+// field: (|x: &Type| x.get_value())(&self),
+```
+
+### Expressions for member level instructions
+
+```rust
+#[map({ None })]
+
+// field: None,
+
+#[map(~.clone())]
+
+// field: value.field.clone(),
+
+#[map(@.get_value())]
+
+// field: value.get_value(),
+
+#[map(|x| x.get_value())]
+
+// field: (|x: &Type| x.get_value())(&value),
+```
+
+## More rexamples
+
+### Slightly complex example
 
 ``` rust
 struct Employee {
@@ -482,7 +558,7 @@ impl EmployeeDto {
               subordinate_of: (|x: &EmployeeDto| Box::new(x.reports_to.as_ref().into()))(&self),
               subordinates: self.subordinates.iter().map(|p| Box::new(p.as_ref().into())).collect(),
               first_name: (|x: &EmployeeDto| x.get_first_name())(&self),
-              last_name: (|x: &EmployeeDto| x.get_last_name())(&self),
+              last_name: self.get_last_name(),
           }
       }
   }
@@ -493,14 +569,14 @@ impl EmployeeDto {
               subordinate_of: (|x: &EmployeeDto| Box::new(x.reports_to.as_ref().into()))(self),
               subordinates: self.subordinates.iter().map(|p| Box::new(p.as_ref().into())).collect(),
               first_name: (|x: &EmployeeDto| x.get_first_name())(self),
-              last_name: (|x: &EmployeeDto| x.get_last_name())(self),
+              last_name: self.get_last_name(),
           }
       }
   }
   ```
 </details>
 
-#### Flatened children
+### Flatened children
 
 When the instructions are put on the side that contains flatened properties, conversion `From<T>` and `IntoExisting<T>` only requires usage of a member level `#[child(...)]` instruction, which accepts a path to the unflatened field (*without* the field name itself).
 ``` rust
@@ -663,7 +739,7 @@ struct CarDto {
   ```
 </details>
 
-#### Tuple structs
+### Tuple structs
 
 ``` rust
 struct TupleEntity(i32, String);
@@ -726,7 +802,7 @@ struct EntityDto {
   ```
 </details>
 
-#### Struct kind hints
+### Struct kind hints
 
 By default, **o2o** will suppose that the struct on the other side is the same kind of struct that the original one is. In order to convert between named and tuple structs when you need to place instructions on a tuple side, you`ll need to use Struct Kind Hint:
 
@@ -760,7 +836,7 @@ struct EntityDto{
   ```
 </details>
 
-#### Generics
+### Generics
 
 ``` rust
 struct Entity<T> {
@@ -798,7 +874,7 @@ struct EntityDto {
   ```
 </details>
 
-#### Where clauses
+### Where clauses
 
 ``` rust
 struct Child<T> {
@@ -944,7 +1020,7 @@ struct EntityDto {
 
 This syntax applies to all supported struct and member level instructions.
 
-### Additional o2o instruction available via #[o2o(...)] syntax
+### Additional o2o instruction available via `#[o2o(...)]` syntax
 
 #### Primitive type conversions
 

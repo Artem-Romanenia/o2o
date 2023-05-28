@@ -21,7 +21,7 @@ struct TupleEntityModel(i32, i16, i32, i16, f32);
     ghost_owned(EntityModel| 
         ghost_int: |x| { x.some_int }, 
         ghost_int_2: |x| { x.another_int as i16 }, 
-        ghost_float: || { 456.0 }
+        ghost_float: { 456.0 }
     ),
     ghost_ref(EntityModel| 
         ghost_int: |x| { x.some_int }, 
@@ -50,7 +50,7 @@ struct Entity {
 #[ghost(TupleEntityModel| 
     2: |x| { x.0 }, 
     3: |x| { x.1 as i16 }, 
-    4: |_| { 456.0 }
+    4: { 456.0 }
 )]
 #[map(EntityModel as {})]
 #[into_existing(EntityModel as {})]
@@ -84,7 +84,7 @@ struct EntityDto {
     #[ghost(Entity| @.another_int as i16)]
     #[ghost(TupleEntity| @.1)]
     ghost_int_2: i16,
-    #[ghost(|_| 456.0)]
+    #[ghost({456.0})]
     ghost_float: f32,
 }
 
@@ -108,7 +108,7 @@ struct TupleEntityDto(
     #[ghost(Entity| @.another_int as i16)]
     i16, 
     #[o2o(ghost_owned(|| 456.0))]
-    #[o2o(ghost_ref(|| 4567.0))]
+    #[o2o(ghost_ref({4567.0}))]
     f32
 );
 
