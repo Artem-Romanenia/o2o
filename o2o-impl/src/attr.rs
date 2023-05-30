@@ -52,7 +52,8 @@ enum MemberInstruction {
     As(AsAttr),
     Repeat(RepeatFor),
     StopRepeat,
-    Unrecognized
+    Unrecognized,
+    Wrapper(WrapperAttr),
 }
 
 #[derive(Clone)]
@@ -213,26 +214,26 @@ impl<'a> FieldAttrs {
                 .map(ApplicableAttr::Field))
     }
 
-    pub(crate) fn child(&'a self, ident: &TypePath) -> Option<&FieldChildAttr>{
+    pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&FieldChildAttr>{
         self.child_attrs.iter()
-            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.child_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn ghost(&'a self, ident: &TypePath, kind: &'a Kind) -> Option<&FieldGhostAttrCore>{
+    pub(crate) fn ghost(&'a self, container_ty: &TypePath, kind: &'a Kind) -> Option<&FieldGhostAttrCore>{
         self.ghost_attrs.iter()
-            .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == ident)
+            .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
-    pub(crate) fn has_parent_attr(&'a self, ident: &TypePath) -> bool {
+    pub(crate) fn has_parent_attr(&'a self, container_ty: &TypePath) -> bool {
         self.parent_attrs.iter()
-            .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == ident)
+            .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
     }
 
-    pub(crate) fn field_attr(&'a self, kind: &'a Kind, ident: &TypePath) -> Option<&FieldAttrCore>{
+    pub(crate) fn field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&FieldAttrCore>{
         self.iter_for_kind(kind)
-            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == ident)
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.iter_for_kind(kind).find(|x| x.container_ty.is_none()))
     }
 
@@ -413,6 +414,7 @@ pub(crate) struct FieldAttrCore {
     pub container_ty: Option<TypePath>,
     pub ident: Option<Member>,
     pub action: Option<Action>,
+    pub wrapper: bool,
 }
 
 impl Parse for FieldAttrCore {
@@ -421,6 +423,7 @@ impl Parse for FieldAttrCore {
             container_ty: try_parse_container_ident(input, false),
             ident: try_parse_optional_ident(input),
             action: try_parse_action(input)?,
+            wrapper: false
         })
     }
 }
@@ -517,6 +520,21 @@ impl Parse for AsAttr {
     }
 }
 
+struct WrapperAttr {
+    container_ty: Option<TypePath>,
+    pub action: Option<TokenStream>,
+
+}
+
+impl Parse for WrapperAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(WrapperAttr { 
+            container_ty: try_parse_container_ident(input, false),
+            action: try_parse_wrapper_action(input)?
+        })
+    }
+}
+
 #[derive(Clone)]
 pub(crate) enum Action {
     InlineAtExpr(TokenStream),
@@ -595,6 +613,7 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
             MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
+            MemberInstruction::Wrapper(attr) => add_wrapper_attrs(attr, &mut attrs),
             MemberInstruction::Unrecognized => ()
         };
     }
@@ -671,6 +690,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
             Ok(MemberInstruction::Repeat(repeat.0))
         },
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
+        "wrapper" => Ok(MemberInstruction::Wrapper(syn::parse2(input)?)),
         _ if bark => Err(Error::new(instr.span(), format_args!("Member level instruction '{}' is not supported.", instr))),
         _ => Ok(MemberInstruction::Unrecognized)
     }
@@ -828,6 +848,15 @@ fn parse_braced_action(input: ParseStream) -> Result<Action> {
     Ok(cl)
 }
 
+fn try_parse_wrapper_action(input: ParseStream) -> Result<Option<TokenStream>> {
+    if input.is_empty() {
+        Ok(None)
+    } else {
+        input.parse::<Token![~]>()?;
+        Ok(Some(input.parse()?))
+    }
+}
+
 fn validate_closure(input: ParseStream) -> Result<()> {
     if !input.peek(Token![|]) || (!input.peek2(Ident) && !input.peek2(Token![_])) || !input.peek3(Token![|]) {
         return Err(input.error("A closure is expected here"))
@@ -842,7 +871,8 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         attr: FieldAttrCore { 
             container_ty: attr.container_ty.clone(), 
             ident: attr.ident.clone(), 
-            action: Some(Action::InlineTildeExpr(quote!(as #this_ty)))
+            action: Some(Action::InlineTildeExpr(quote!(as #this_ty))),
+            wrapper: false,
         }, 
         applicable_to: [false, false, true, true, false, false]
     });
@@ -850,10 +880,53 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         attr: FieldAttrCore { 
             container_ty: attr.container_ty, 
             ident: attr.ident, 
-            action: Some(Action::InlineTildeExpr(quote!(as #that_ty)))
+            action: Some(Action::InlineTildeExpr(quote!(as #that_ty))),
+            wrapper: false
         }, 
         applicable_to: [true, true, false, false, true, true]
     });
+}
+
+fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>) {
+    attrs.push(FieldAttr { 
+        attr: FieldAttrCore { 
+            container_ty: attr.container_ty.clone(), 
+            ident: None, 
+            action: Some(Action::InlineAtExpr(TokenStream::new())),
+            wrapper: true,
+        }, 
+        applicable_to: [false, false, true, attr.action.is_none(), false, false]
+    });
+    attrs.push(FieldAttr { 
+        attr: FieldAttrCore { 
+            container_ty: attr.container_ty.clone(), 
+            ident: None, 
+            action: None,
+            wrapper: true,
+        }, 
+        applicable_to: [true, attr.action.is_none(), false, false, false, false]
+    });
+
+    if let Some(action) = attr.action {
+        attrs.push(FieldAttr { 
+            attr: FieldAttrCore { 
+                container_ty: attr.container_ty.clone(), 
+                ident: None, 
+                action: Some(Action::InlineAtExpr(action.clone())),
+                wrapper: true,
+            }, 
+            applicable_to: [false, false, false, true, false, false]
+        });
+        attrs.push(FieldAttr { 
+            attr: FieldAttrCore { 
+                container_ty: attr.container_ty, 
+                ident: None, 
+                action: Some(Action::InlineTildeExpr(action)),
+                wrapper: true,
+            }, 
+            applicable_to: [false, true, false, false, false, false]
+        });
+    }
 }
 
 fn appl_owned_into(instr: &str) -> bool {

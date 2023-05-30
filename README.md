@@ -1,41 +1,57 @@
-﻿Object to Object mapper for Rust
+﻿Object to Object mapper for Rust<!-- omit from toc --> 
 ================================
 [<img alt="github.com" src="https://github.com/Artem-Romanenia/o2o/workflows/Build/badge.svg" height="25">](https://github.com/Artem-Romanenia/o2o/)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/o2o.svg?style=for-the-badge&color=2f4d28&labelColor=f9f7ec&logo=rust&logoColor=black" height="25">](https://crates.io/crates/o2o)
 
-## Content
+## Content<!-- omit from toc --> 
 
-- [Object to Object mapper for Rust](#object-to-object-mapper-for-rust)
-  - [Content](#content)
-  - [Brief description](#brief-description)
-  - [Examples](#examples)
-    - [Simplest Case](#simplest-case)
-    - [Different field name](#different-field-name)
-    - [Different field type](#different-field-type)
-    - [Nested structs](#nested-structs)
-    - [Nested collection](#nested-collection)
-    - [Assymetric fields (skipping and providing default values)](#assymetric-fields-skipping-and-providing-default-values)
-  - [Expressions](#expressions)
-    - [Expressions for struct level instructions](#expressions-for-struct-level-instructions)
-    - [Expressions for member level instructions](#expressions-for-member-level-instructions)
-  - [More rexamples](#more-rexamples)
-    - [Slightly complex example](#slightly-complex-example)
-    - [Flatened children](#flatened-children)
-    - [Tuple structs](#tuple-structs)
-    - [Struct kind hints](#struct-kind-hints)
-    - [Generics](#generics)
-    - [Where clauses](#where-clauses)
-    - [Mapping to multiple structs](#mapping-to-multiple-structs)
-    - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
-    - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
-      - [Primitive type conversions](#primitive-type-conversions)
-      - [Repeat instructions](#repeat-instructions)
-    - [Contributions](#contributions)
-      - [License](#license)
+- [Quick pitch](#quick-pitch)
+- [Brief description](#brief-description)
+- [Examples](#examples)
+  - [Simplest Case](#simplest-case)
+  - [Different field name](#different-field-name)
+  - [Different field type](#different-field-type)
+  - [Nested structs](#nested-structs)
+  - [Nested collection](#nested-collection)
+  - [Assymetric fields (skipping and providing default values)](#assymetric-fields-skipping-and-providing-default-values)
+- [Expressions](#expressions)
+  - [Expressions for struct level instructions](#expressions-for-struct-level-instructions)
+  - [Expressions for member level instructions](#expressions-for-member-level-instructions)
+- [More examples](#more-examples)
+  - [Slightly complex example](#slightly-complex-example)
+  - [Flatened children](#flatened-children)
+  - [Tuple structs](#tuple-structs)
+  - [Struct kind hints](#struct-kind-hints)
+  - [Generics](#generics)
+  - [Where clauses](#where-clauses)
+  - [Mapping to multiple structs](#mapping-to-multiple-structs)
+  - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
+  - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
+    - [Primitive type conversions](#primitive-type-conversions)
+    - [Repeat instructions](#repeat-instructions)
+    - [Wrapper structs and `#[o2o(wrapper)]` instruction](#wrapper-structs-and-o2owrapper-instruction)
+  - [Contributions](#contributions)
+    - [License](#license)
+
+## Quick pitch
+
+```rust
+impl From<Person> for PersonDto {
+    fn from(value: Person) -> PersonDto {
+        PersonDto {
+            id: value.id,
+            name: value.name,
+            age: value.age,
+        }
+    }
+}
+```
+
+Writing code like above is not the most exciting or rewarding part of working with Rust. If you're Ok with letting procedural macro write it for you, welcome to the rest of this page.
 
 ## Brief description
 
-**o2o** procedural macro is able to generate implementation of 6 kinds of traits:
+**o2o** procedural macro is able to generate implementation of 6 kinds of traits (currently for structs only):
 
 ``` rust
 // #[from_owned()]
@@ -77,16 +93,18 @@ With that, let's look at some examples.
 ``` rust
 use o2o::o2o;
 
-struct Entity {
-    some_int: i32,
-    another_int: i16,
+struct Person {
+    id: u32,
+    name: String,
+    age: u8
 }
 
 #[derive(o2o)]
-#[map_owned(Entity)]
-struct EntityDto {
-    some_int: i32,
-    another_int: i16,
+#[map_owned(Person)]
+struct PersonDto {
+    id: u32,
+    name: String,
+    age: u8
 }
 ```
 From here on, generated code is produced by [rust-analyzer: Expand macro recursively](https://rust-analyzer.github.io/manual.html#expand-macro-recursively) command
@@ -94,19 +112,21 @@ From here on, generated code is produced by [rust-analyzer: Expand macro recursi
   <summary>View generated code</summary>
 
   ``` rust
-  impl std::convert::From<Entity> for EntityDto {
-      fn from(value: Entity) -> EntityDto {
-          EntityDto {
-              some_int: value.some_int,
-              another_int: value.another_int,
+  impl std::convert::From<Person> for PersonDto {
+      fn from(value: Person) -> PersonDto {
+          PersonDto {
+              id: value.id,
+              name: value.name,
+              age: value.age,
           }
       }
   }
-  impl std::convert::Into<Entity> for EntityDto {
-      fn into(self) -> Entity {
-          Entity {
-              some_int: self.some_int,
-              another_int: self.another_int,
+  impl std::convert::Into<Person> for PersonDto {
+      fn into(self) -> Person {
+          Person {
+              id: self.id,
+              name: self.name,
+              age: self.age,
           }
       }
   }
@@ -116,11 +136,11 @@ From here on, generated code is produced by [rust-analyzer: Expand macro recursi
 With the above code you should be able to do this:
 
 ``` rust
-let entity = Entity { some_int: 123, another_int: 321 }
-let dto: EntityDto = entity.into();
+let person = Person { id: 123, name: "John".into(), age: 42 };
+let dto: PersonDto = person.into();
 // and this:
-let dto = EntityDto { some_int: 123, another_int: 321 }
-let entity: Entity = dto.into();
+let dto = PersonDto { id: 123, name: "John".into(), age: 42 };
+let person: Person = dto.into();
 ```
 
 ### Different field name
@@ -477,7 +497,7 @@ enum ZodiacSign {}
 // field: (|x: &Type| x.get_value())(&value),
 ```
 
-## More rexamples
+## More examples
 
 ### Slightly complex example
 
@@ -1170,6 +1190,70 @@ struct CarDto {
                   },
               },
           }
+      }
+  }
+  ```
+</details>
+
+#### Wrapper structs and `#[o2o(wrapper)]` instruction
+
+```rust
+#[derive(o2o)]
+#[map_owned(Vec<u8>)]
+struct PayloadWrapper {
+    #[o2o(wrapper)]
+    payload: Vec<u8>,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<Vec<u8>> for PayloadWrapper {
+      fn from(value: Vec<u8>) -> PayloadWrapper {
+          PayloadWrapper { payload: value }
+      }
+  }
+  impl std::convert::Into<Vec<u8>> for PayloadWrapper {
+      fn into(self) -> Vec<u8> {
+          self.payload
+      }
+  }
+  ```
+</details>
+
+If you need to 'ref' implementation, you may need to provide an inline expression:
+
+```rust
+#[derive(o2o)]
+#[map(String)]
+struct StringWrapper {
+    #[o2o(wrapper(~.clone()))]
+    str: String
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<String> for StringWrapper {
+      fn from(value: String) -> StringWrapper {
+          StringWrapper { str: value }
+      }
+  }
+  impl std::convert::From<&String> for StringWrapper {
+      fn from(value: &String) -> StringWrapper {
+          StringWrapper { str: value.clone() }
+      }
+  }
+  impl std::convert::Into<String> for StringWrapper {
+      fn into(self) -> String {
+          self.str
+      }
+  }
+  impl std::convert::Into<String> for &StringWrapper {
+      fn into(self) -> String {
+          self.str.clone()
       }
   }
   ```

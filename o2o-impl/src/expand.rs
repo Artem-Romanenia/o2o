@@ -71,10 +71,23 @@ fn struct_impl(input: Struct) -> TokenStream {
             container_ty: &struct_attr.ty,
             has_post_init: false,
         };
-        let post_init = struct_post_init(&ctx);
-        ctx.has_post_init = post_init.is_some();
-        let init = struct_init_block(&ctx);
-        quote_into_trait(&ctx, init, post_init)
+
+        let wrapped_field = input.fields.iter().find(|f| {
+            f.attrs.field_attr(&Kind::OwnedInto, &struct_attr.ty).filter(|&g| g.wrapper).is_some()
+        });
+
+        match wrapped_field {
+            Some(wrapped_field) => {
+                let f = &wrapped_field.member;
+                quote_into_trait(&ctx, quote!(self.#f), None, true)
+            },
+            None => {
+                let post_init = struct_post_init(&ctx);
+                ctx.has_post_init = post_init.is_some();
+                let init = struct_init_block(&ctx);
+                quote_into_trait(&ctx, init, post_init, false)
+            }
+        }
     });
 
     let ref_into_impls = input.attrs.iter_for_kind(&Kind::RefInto).map(|struct_attr| {
@@ -87,10 +100,29 @@ fn struct_impl(input: Struct) -> TokenStream {
             container_ty: &struct_attr.ty,
             has_post_init: false,
         };
-        let post_init = struct_post_init(&ctx);
-        ctx.has_post_init = post_init.is_some();
-        let init = struct_init_block(&ctx);
-        quote_into_trait(&ctx, init, post_init)
+
+        let wrapped_field = input.fields.iter().find_map(|f| {
+            f.attrs.field_attr(&Kind::RefInto, &struct_attr.ty)
+                .filter(|&g| g.wrapper)
+                .map(|x| (f, &x.action))
+        });
+
+        match wrapped_field {
+            Some((wrapped_field, action)) => {
+                let f = &wrapped_field.member;
+                let field_path = match action {
+                    Some(action) =>  quote_action(action, Some(f.to_token_stream()), &ctx),
+                    None => quote!(self.#f)
+                };
+                quote_into_trait(&ctx, field_path, None, true)
+            },
+            None => {
+                let post_init = struct_post_init(&ctx);
+                ctx.has_post_init = post_init.is_some();
+                let init = struct_init_block(&ctx);
+                quote_into_trait(&ctx, init, post_init, false)
+            }
+        }
     });
 
     let owned_into_existing_impls = input.attrs.iter_for_kind(&Kind::OwnedIntoExisting).map(|struct_attr| {
@@ -597,7 +629,7 @@ fn quote_from_trait(ctx: &ImplContext, init: TokenStream) -> TokenStream {
     }
 }
 
-fn quote_into_trait(ctx: &ImplContext, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+fn quote_into_trait(ctx: &ImplContext, init: TokenStream, post_init: Option<TokenStream>, wrapped: bool) -> TokenStream {
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let gens = ctx.input.generics.to_token_stream();
@@ -632,6 +664,13 @@ fn quote_into_trait(ctx: &ImplContext, init: TokenStream, post_init: Option<Toke
                     let mut obj = #dst #init;
                     #post_init
                     obj
+                }
+            }
+        },
+        (_, _, None) if wrapped => quote! {
+            impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
+                fn into(self) -> #dst {
+                    #init
                 }
             }
         },
