@@ -19,35 +19,41 @@ fn derive_simple_benchmark(c: &mut Criterion) {
 
 fn derive_complex_benchmark(c: &mut Criterion) {
     let tokens = quote! {
-        #[map(Entity| base: BaseEntity, base.base: Base, child: Child)]
-        #[map(TupleEntity as ()| 1: TupleBaseEntity as (), 1 .0: TupleBase as (), 2: TupleChild as ())]
-        #[into_existing(Entity)]
-        #[into_existing(TupleEntity as ())]
-        struct EntityDto {
-            #[map(TupleEntity| 0)]
-            parent_int: i32,
+        #[map(Entity as {})]
+        #[map(TupleEntity)]
+        #[into_existing(Entity as {})]
+        #[into_existing(TupleEntity)]
+        #[children(Entity| base: BaseEntity as {}, base.base: Base as {}, child: Child as {})]
+        #[children(TupleEntity| 1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
+        struct TupleEntityDto (
+            #[map(Entity| parent_int)]
+            i32,
+            #[o2o(child(Entity| base.base))]
+            #[o2o(child(TupleEntity| 1 .0))]
+            #[o2o(map(Entity| base_int_2))]
+            #[o2o(map(TupleEntity| 0))]
+            i32,
             #[child(Entity| base.base)]
             #[child(TupleEntity| 1 .0)]
-            #[map(Entity| base_int_2)]
-            #[map(TupleEntity| 0)] 
-            base_int: i32,
-            #[child(Entity| base.base)]
-            #[child(TupleEntity| 1 .0)]
+            #[map(Entity| another_base_int)]
             #[map(TupleEntity| 1)] 
-            another_base_int: i32,
+            i32,
             #[child(Entity| base)]
             #[child(TupleEntity| 1)]
-            #[map(TupleEntity| 1)] 
-            base_entity_int: i32,
+            #[map(Entity| base_entity_int)]
+            #[map(TupleEntity| 1)]
+            i32,
             #[child(Entity| child)]
             #[child(TupleEntity| 2)]
-            #[map(TupleEntity| 0)] 
-            child_int: i32,
+            #[map(Entity| child_int)]
+            #[map(TupleEntity| 0)]
+            i32,
             #[child(Entity| child)]
             #[child(TupleEntity| 2)]
-            #[map(TupleEntity| 1)] 
-            another_child_int: i32,
-        }
+            #[map(Entity| another_child_int)]
+            #[map(TupleEntity| 1)]
+            i32,
+        );
     };
 
     let input: DeriveInput = syn::parse2(tokens).unwrap();
