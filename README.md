@@ -30,6 +30,7 @@
     - [Primitive type conversions](#primitive-type-conversions)
     - [Repeat instructions](#repeat-instructions)
     - [Wrapper structs and `#[o2o(wrapper)]` instruction](#wrapper-structs-and-o2owrapper-instruction)
+    - [Wrapped structs and `#[o2o(wrapped)]` instruction](#wrapped-structs-and-o2owrapped-instruction)
   - [Contributions](#contributions)
     - [License](#license)
 
@@ -1222,7 +1223,7 @@ struct PayloadWrapper {
   ```
 </details>
 
-If you need to 'ref' implementation, you may need to provide an inline expression:
+If you need 'ref' implementation, you may need to provide an inline expression:
 
 ```rust
 #[derive(o2o)]
@@ -1259,9 +1260,78 @@ struct StringWrapper {
   ```
 </details>
 
+#### Wrapped structs and `#[o2o(wrapped)]` instruction
+
+```rust
+#[derive(o2o)]
+#[map_owned(StuffWrapper as {})]
+#[o2o(wrapped(payload))]
+struct Stuff(i32);
+
+struct StuffWrapper {
+    payload: Stuff,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<StuffWrapper> for Stuff {
+      fn from(value: StuffWrapper) -> Stuff {
+          value.payload
+      }
+  }
+  impl std::convert::Into<StuffWrapper> for Stuff {
+      fn into(self) -> StuffWrapper {
+          StuffWrapper { payload: self }
+      }
+  }
+  ```
+</details>
+
+'Ref' implementation
+
+```rust
+#[derive(Clone, o2o)]
+#[map(StuffWrapper as ())]
+#[o2o(wrapped(0, ~.clone()))]
+struct Stuff {
+    thing: i32
+}
+
+struct StuffWrapper(Stuff);
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<StuffWrapper> for Stuff {
+      fn from(value: StuffWrapper) -> Stuff {
+          value.0
+      }
+  }
+  impl std::convert::From<&StuffWrapper> for Stuff {
+      fn from(value: &StuffWrapper) -> Stuff {
+          value.0.clone()
+      }
+  }
+  impl std::convert::Into<StuffWrapper> for Stuff {
+      fn into(self) -> StuffWrapper {
+          StuffWrapper(self)
+      }
+  }
+  impl std::convert::Into<StuffWrapper> for &Stuff {
+      fn into(self) -> StuffWrapper {
+          StuffWrapper(self.clone())
+      }
+  }
+  ```
+</details>
+
+
 ### Contributions
 
-All issues, questions, pull requests  are extremely welcome.
+All issues, questions, pull requests are extremely welcome.
 
 #### License
 

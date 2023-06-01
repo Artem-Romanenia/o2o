@@ -1,6 +1,6 @@
 use std::{slice::Iter, iter::Peekable, collections::HashSet};
 
-use crate::{ast::{Struct, Field}, attr::{Action, ChildData, Kind, StructKindHint, ApplicableAttr, TypePath, GhostData, ChildPath}, validate::validate};
+use crate::{ast::{Struct, Field}, attr::{Action, ChildData, Kind, StructKindHint, ApplicableAttr, TypePath, GhostData, ChildPath, WrappedAttr, FieldAttrs, WrapperAttr}, validate::validate};
 use proc_macro2::{TokenStream, Ident, Span};
 use syn::{DeriveInput, Result, Error, Data, parse::ParseStream, Token, Member, Index};
 use quote::{quote, ToTokens};
@@ -43,8 +43,14 @@ fn struct_impl(input: Struct) -> TokenStream {
             container_ty: &struct_attr.ty,
             has_post_init: false,
         };
-        let init = struct_init_block(&ctx);
-        quote_from_trait(&ctx, init)
+
+        if let Some(wrapped_attr) = input.attrs.wrapped_attr(ctx.container_ty) {
+            let f = &wrapped_attr.ident;
+            quote_from_trait(&ctx, quote!(value.#f), true)
+        } else {
+             let init = struct_init_block(&ctx);
+             quote_from_trait(&ctx, init, false)
+        }
     });
 
     let from_ref_impls = input.attrs.iter_for_kind(&Kind::FromRef).map(|struct_attr| {
@@ -57,8 +63,18 @@ fn struct_impl(input: Struct) -> TokenStream {
             container_ty: &struct_attr.ty,
             has_post_init: false,
         };
-        let init = struct_init_block(&ctx);
-        quote_from_trait(&ctx, init)
+
+        if let Some(wrapped_attr) = input.attrs.wrapped_attr(ctx.container_ty) {
+            let f = &wrapped_attr.ident;
+            let field_path = match &wrapped_attr.action {
+                Some(action) =>  quote_action(&Action::InlineTildeExpr(action.clone()), Some(f.to_token_stream()), &ctx),
+                None => quote!(value.#f)
+            };
+            quote_from_trait(&ctx, field_path, true)
+        } else {
+             let init = struct_init_block(&ctx);
+             quote_from_trait(&ctx, init, false)
+        }
     });
 
     let owned_into_impls = input.attrs.iter_for_kind(&Kind::OwnedInto).map(|struct_attr| {
@@ -72,21 +88,16 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
 
-        let wrapped_field = input.fields.iter().find(|f| {
-            f.attrs.field_attr(&Kind::OwnedInto, &struct_attr.ty).filter(|&g| g.wrapper).is_some()
-        });
+        let wrapped_field = input.fields.iter().find(|f| f.attrs.field_attr(&Kind::OwnedInto, &struct_attr.ty).filter(|&g| g.wrapper).is_some());
 
-        match wrapped_field {
-            Some(wrapped_field) => {
-                let f = &wrapped_field.member;
-                quote_into_trait(&ctx, quote!(self.#f), None, true)
-            },
-            None => {
-                let post_init = struct_post_init(&ctx);
-                ctx.has_post_init = post_init.is_some();
-                let init = struct_init_block(&ctx);
-                quote_into_trait(&ctx, init, post_init, false)
-            }
+        if let Some(wrapped_field) = wrapped_field {
+            let f = &wrapped_field.member;
+            quote_into_trait(&ctx, quote!(self.#f), None, true)
+        } else {
+            let post_init = struct_post_init(&ctx);
+            ctx.has_post_init = post_init.is_some();
+            let init = struct_init_block(&ctx);
+            quote_into_trait(&ctx, init, post_init, false)
         }
     });
 
@@ -101,27 +112,24 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
 
-        let wrapped_field = input.fields.iter().find_map(|f| {
+        let wrapped_field = input.fields.iter().find_map(|f|
             f.attrs.field_attr(&Kind::RefInto, &struct_attr.ty)
                 .filter(|&g| g.wrapper)
                 .map(|x| (f, &x.action))
-        });
+        );
 
-        match wrapped_field {
-            Some((wrapped_field, action)) => {
-                let f = &wrapped_field.member;
-                let field_path = match action {
-                    Some(action) =>  quote_action(action, Some(f.to_token_stream()), &ctx),
-                    None => quote!(self.#f)
-                };
-                quote_into_trait(&ctx, field_path, None, true)
-            },
-            None => {
-                let post_init = struct_post_init(&ctx);
-                ctx.has_post_init = post_init.is_some();
-                let init = struct_init_block(&ctx);
-                quote_into_trait(&ctx, init, post_init, false)
-            }
+        if let Some((wrapped_field, action)) = wrapped_field {
+            let f = &wrapped_field.member;
+            let field_path = match action {
+                Some(action) =>  quote_action(action, Some(f.to_token_stream()), &ctx),
+                None => quote!(self.#f)
+            };
+            quote_into_trait(&ctx, field_path, None, true)
+        } else {
+            let post_init = struct_post_init(&ctx);
+            ctx.has_post_init = post_init.is_some();
+            let init = struct_init_block(&ctx);
+            quote_into_trait(&ctx, init, post_init, false)
         }
     });
 
@@ -175,36 +183,47 @@ fn struct_init_block<'a>(ctx: &'a ImplContext) -> TokenStream {
     let mut unique_paths = HashSet::<&str>::new();
 
     let mut make_tuple = |path, stuff: FieldData<'a>| {
-            if path != current_path {
-                group_counter += 1;
-                current_path = path;
-            }
-            (group_counter, path, stuff)
+        if path != current_path {
+            group_counter += 1;
+            current_path = path;
+        }
+        (group_counter, path, stuff)
     };
 
-    let mut sorted_fields: Vec<(usize, &str, FieldData)> = ctx.input.fields.iter()
+    let mut fields: Vec<(usize, &str, FieldData)> = vec![];
+
+    let wrapped_field = ctx.input.attrs.wrapped_attr(ctx.container_ty);
+
+    if let Some(wrapped_field) = wrapped_field {
+        let child_path = wrapped_field.child_path.as_ref().map(|x| x.get_child_path_str(None)).unwrap_or("");
+        fields.push(make_tuple(child_path, FieldData::WrappedData(wrapped_field)))
+    } else {
+        fields.extend(ctx.input.fields.iter()
         .map(|x| {
             let path = x.attrs.child(ctx.container_ty).map(|x| x.get_child_path_str(None)).unwrap_or("");
             unique_paths.insert(path);
             make_tuple(path, FieldData::Field(x))
         })
-        .collect();
-    let ghosts = ctx.input.attrs.ghost_attrs.iter()
+        .collect::<Vec<(usize, &str, FieldData)>>());
+    }
+    
+    fields.extend(ctx.input.attrs.ghost_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
         .filter(|x| unique_paths.insert(x.get_child_path_str(None)))
         .map(|x| {
             let path: &str = x.get_child_path_str(None);
             make_tuple(path, FieldData::GhostData(x))
-        });
-    sorted_fields.extend(ghosts);
-    sorted_fields.sort_by(|(ga, a, _), (gb, b, _)| ga.cmp(gb).then(a.cmp(b)));
+        }));
 
-    struct_init_block_inner(&mut sorted_fields.iter().peekable(), ctx, None)
+    fields.sort_by(|(ga, a, _), (gb, b, _)| ga.cmp(gb).then(a.cmp(b)));
+
+    struct_init_block_inner(&mut fields.iter().peekable(), ctx, None)
 }
 
 enum FieldData<'a> {
     Field(&'a Field),
-    GhostData(&'a GhostData)
+    GhostData(&'a GhostData),
+    WrappedData(&'a WrappedAttr)
 }
 
 fn struct_init_block_inner(
@@ -260,6 +279,28 @@ fn struct_init_block_inner(
                 let child_path = &ghost_data.child_path.as_ref().unwrap();
                 let fragment = render_child_fragment(child_path, fields, ctx, field_ctx, struct_kind_hint, TokenStream::new);
 
+                fragments.push(fragment);
+                idx += 1;
+            }
+            FieldData::WrappedData(wrapped_attr) => {
+                let mut attrs = vec![];
+                crate::attr::add_wrapper_attrs(WrapperAttr {
+                    container_ty: wrapped_attr.container_ty.clone(),
+                    action: wrapped_attr.action.clone()
+                }, &mut attrs, ctx.kind == Kind::OwnedInto || ctx.kind == Kind::RefInto);
+                let f = Field {
+                    member: wrapped_attr.ident.clone(),
+                    attrs: FieldAttrs{ attrs, ..Default::default() },
+                    idx: 0
+                };
+                let fragment = match &wrapped_attr.child_path {
+                    Some(child_path) => 
+                        render_child_fragment(child_path, fields, ctx, field_ctx, struct_kind_hint, || render_line(&f, ctx, struct_kind_hint, idx)),
+                    None => {
+                        fields.next();
+                        render_line(&f, ctx, struct_kind_hint, idx)
+                    }
+                };
                 fragments.push(fragment);
                 idx += 1;
             }
@@ -604,7 +645,7 @@ fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplCont
     }
 }
 
-fn quote_from_trait(ctx: &ImplContext, init: TokenStream) -> TokenStream {
+fn quote_from_trait(ctx: &ImplContext, init: TokenStream, wrapped: bool) -> TokenStream {
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let gens = ctx.input.generics.to_token_stream();
@@ -620,10 +661,20 @@ fn quote_from_trait(ctx: &ImplContext, init: TokenStream) -> TokenStream {
     } else {
         TokenStream::new()
     };
-    quote! {
-        impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
-            fn from(value: #r #src) -> #dst #gens {
-                #dst #init
+    if wrapped {
+        quote! {
+            impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
+                fn from(value: #r #src) -> #dst #gens {
+                    #init
+                }
+            }
+        }
+    } else {
+        quote! {
+            impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
+                fn from(value: #r #src) -> #dst #gens {
+                    #dst #init
+                }
             }
         }
     }

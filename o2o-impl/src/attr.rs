@@ -41,6 +41,7 @@ enum StructInstruction {
     Ghost(StructGhostAttr), 
     Where(WhereAttr),
     Children(ChildrenAttr),
+    Wrapped(WrappedAttr),
     Unrecognized
 }
 
@@ -52,8 +53,9 @@ enum MemberInstruction {
     As(AsAttr),
     Repeat(RepeatFor),
     StopRepeat,
-    Unrecognized,
     Wrapper(WrapperAttr),
+    Unrecognized,
+    
 }
 
 #[derive(Clone)]
@@ -117,6 +119,7 @@ pub(crate) struct StructAttrs {
     pub ghost_attrs: Vec<StructGhostAttr>,
     pub where_attrs: Vec<WhereAttr>,
     pub children_attrs: Vec<ChildrenAttr>,
+    pub wrapped_attrs: Vec<WrappedAttr>,
 }
 
 impl<'a> StructAttrs {
@@ -140,6 +143,12 @@ impl<'a> StructAttrs {
         self.children_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.children_attrs.iter().find(|x| x.container_ty.is_none()))
+    }
+
+    pub(crate) fn wrapped_attr(&'a self, container_ty: &TypePath) -> Option<&WrappedAttr>{
+        self.wrapped_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.wrapped_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 }
 
@@ -190,7 +199,7 @@ impl Parse for RepeatForWrap {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(crate) struct FieldAttrs {
     pub attrs: Vec<FieldAttr>,
     pub child_attrs: Vec<FieldChildAttr>,
@@ -329,7 +338,7 @@ impl ChildPath {
 
 impl Parse for GhostData {
     fn parse(input: ParseStream) -> Result<Self> {
-        let child_path = if !peek_ghost_path(input) {
+        let child_path = if !peek_ghost_field_name(input) {
             let child_path = Some(Punctuated::parse_separated_nonempty(input)?).map(|child_path| {
                 let child_path_str = build_child_path_str(&child_path);
                 ChildPath { child_path, child_path_str }
@@ -339,7 +348,6 @@ impl Parse for GhostData {
         } else {
             None
         };
-        let child_path = child_path;
         let ghost_ident = input.parse()?;
         input.parse::<Token![:]>()?;
         Ok(GhostData {
@@ -400,6 +408,35 @@ impl Eq for ChildData {}
 impl Hash for ChildData {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.field_path_str.hash(state)
+    }
+}
+
+pub(crate) struct WrappedAttr {
+    pub container_ty: Option<TypePath>,
+    pub child_path: Option<ChildPath>,
+    pub ident: Member,
+    pub action: Option<TokenStream>,
+}
+
+impl Parse for WrappedAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let container_ty = try_parse_container_ident(input, false);
+        let child_path = if !peek_wrapped_field_name(input) {
+            let child_path = Some(Punctuated::parse_separated_nonempty(input)?).map(|child_path| {
+                let child_path_str = build_child_path_str(&child_path);
+                ChildPath { child_path, child_path_str }
+            });
+            input.parse::<Token![@]>()?;
+            child_path
+        } else {
+            None
+        };
+        Ok(WrappedAttr {
+            container_ty,
+            child_path,
+            ident: try_parse_optional_ident(input).ok_or(input.error("Member path is expected here."))?,
+            action: try_parse_wrapper_action(input)?
+        })
     }
 }
 
@@ -520,8 +557,8 @@ impl Parse for AsAttr {
     }
 }
 
-struct WrapperAttr {
-    container_ty: Option<TypePath>,
+pub(crate) struct WrapperAttr {
+    pub container_ty: Option<TypePath>,
     pub action: Option<TokenStream>,
 
 }
@@ -563,20 +600,23 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
             instrs.push(parse_struct_instruction(instr, p.content(), false)?);
         }
     }
+    let mut attrs: Vec<StructAttr> = vec![];
     let mut ghost_attrs: Vec<StructGhostAttr> = vec![];
     let mut where_attrs: Vec<WhereAttr> = vec![];
     let mut children_attrs: Vec<ChildrenAttr> = vec![];
-    let mut attrs: Vec<StructAttr> = vec![];
+    let mut wrapped_attrs: Vec<WrappedAttr> = vec![];
+    
     for instr in  instrs {
         match instr {
             StructInstruction::Map(attr) => attrs.push(attr),
             StructInstruction::Ghost(attr) => ghost_attrs.push(attr),
             StructInstruction::Where(attr) => where_attrs.push(attr),
             StructInstruction::Children(attr) => children_attrs.push(attr),
+            StructInstruction::Wrapped(attr) => wrapped_attrs.push(attr),
             StructInstruction::Unrecognized => (),
         };
     }
-    Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs })
+    Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs, wrapped_attrs })
 }
 
 pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
@@ -613,7 +653,7 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
             MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
-            MemberInstruction::Wrapper(attr) => add_wrapper_attrs(attr, &mut attrs),
+            MemberInstruction::Wrapper(attr) => add_wrapper_attrs(attr, &mut attrs, false),
             MemberInstruction::Unrecognized => ()
         };
     }
@@ -650,6 +690,7 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
         })),
         "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
+        "wrapped" => Ok(StructInstruction::Wrapped(syn::parse2(input)?)),
         _ if bark => Err(Error::new(instr.span(), format_args!("Struct level instruction '{}' is not supported.", instr))),
         _ => Ok(StructInstruction::Unrecognized),
     }
@@ -717,8 +758,8 @@ fn try_parse_struct_kind_hint(input: ParseStream) -> Result<StructKindHint> {
     Err(input.error("Only '()' and '{}' are supported struct kind hints."))
 }
 
-fn try_parse_container_ident(input: ParseStream, can_be_empty: bool) -> Option<TypePath> {
-    if peek_container_path(input, can_be_empty) {
+fn try_parse_container_ident(input: ParseStream, can_be_empty_after: bool) -> Option<TypePath> {
+    if peek_container_path(input, can_be_empty_after) {
         let ident = input.parse::<syn::Path>();
         if input.peek(Token![|]) {
             input.parse::<Token![|]>().unwrap();
@@ -761,8 +802,16 @@ fn peek_container_path(input: ParseStream, can_be_empty: bool) -> bool {
     }
 }
 
-fn peek_ghost_path(input: ParseStream) -> bool {
+fn peek_ghost_field_name(input: ParseStream) -> bool {
     peek_member(input) && input.peek2(Token![:])
+}
+
+fn peek_wrapped_field_name(input: ParseStream) -> bool {
+    let fork = input.fork();
+    match fork.parse::<Member>() {
+        Ok(_) => fork.is_empty() || fork.peek(Token![,]),
+        Err(_) => false,
+    }
 }
 
 fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token![,]>> {
@@ -887,7 +936,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
     });
 }
 
-fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>) {
+pub(crate) fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>, inverse: bool) {
     attrs.push(FieldAttr { 
         attr: FieldAttrCore { 
             container_ty: attr.container_ty.clone(), 
@@ -895,7 +944,7 @@ fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>) {
             action: Some(Action::InlineAtExpr(TokenStream::new())),
             wrapper: true,
         }, 
-        applicable_to: [false, false, true, attr.action.is_none(), false, false]
+        applicable_to: [false ^ inverse, attr.action.is_none() & inverse, true ^ inverse, attr.action.is_none() & !inverse, false, false]
     });
     attrs.push(FieldAttr { 
         attr: FieldAttrCore { 
@@ -904,7 +953,7 @@ fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>) {
             action: None,
             wrapper: true,
         }, 
-        applicable_to: [true, attr.action.is_none(), false, false, false, false]
+        applicable_to: [true ^ inverse, attr.action.is_none() & !inverse, false ^ inverse, attr.action.is_none() & inverse, false, false]
     });
 
     if let Some(action) = attr.action {
@@ -915,7 +964,7 @@ fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>) {
                 action: Some(Action::InlineAtExpr(action.clone())),
                 wrapper: true,
             }, 
-            applicable_to: [false, false, false, true, false, false]
+            applicable_to: [false, false ^ inverse, false, true ^ inverse, false, false]
         });
         attrs.push(FieldAttr { 
             attr: FieldAttrCore { 
@@ -924,7 +973,7 @@ fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>) {
                 action: Some(Action::InlineTildeExpr(action)),
                 wrapper: true,
             }, 
-            applicable_to: [false, true, false, false, false, false]
+            applicable_to: [false, true ^ inverse, false, false ^ inverse, false, false]
         });
     }
 }
