@@ -21,9 +21,11 @@
   - [Slightly complex example](#slightly-complex-example)
   - [Flatened children](#flatened-children)
   - [Tuple structs](#tuple-structs)
+  - [Tuples](#tuples)
   - [Struct kind hints](#struct-kind-hints)
   - [Generics](#generics)
   - [Where clauses](#where-clauses)
+  - [Define helper variables](#define-helper-variables)
   - [Mapping to multiple structs](#mapping-to-multiple-structs)
   - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
@@ -823,6 +825,38 @@ struct EntityDto {
   ```
 </details>
 
+### Tuples
+
+```rust
+#[derive(o2o)]
+#[map_ref((i32, String))]
+pub struct Entity{
+    #[map(0)]
+    int: i32,
+    #[map(1, ~.clone())]
+    string: String,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<&(i32, String)> for Entity {
+      fn from(value: &(i32, String)) -> Entity {
+          Entity {
+              int: value.0,
+              string: value.1.clone(),
+          }
+      }
+  }
+  impl std::convert::Into<(i32, String)> for &Entity {
+      fn into(self) -> (i32, String) {
+          (self.int, self.string.clone())
+      }
+  }
+  ```
+</details>
+
 ### Struct kind hints
 
 By default, **o2o** will suppose that the struct on the other side is the same kind of struct that the original one is. In order to convert between named and tuple structs when you need to place instructions on a tuple side, you`ll need to use Struct Kind Hint:
@@ -929,6 +963,53 @@ struct ChildDto<T> {
           Child::<T> {
               child_int: self.child_int,
               something: self.stuff.clone(),
+          }
+      }
+  }
+  ```
+</details>
+
+### Define helper variables
+
+```rust
+struct Person {
+    age: i8,
+    first_name: String,
+    last_name: String
+}
+
+#[derive(o2o)]
+#[from_owned(Person| first_name: {@.first_name}, last_name: {@.last_name})]
+#[owned_into(Person| first: {"John"}, last: {"Doe"})]
+#[ghost(first_name: {first.into()}, last_name: {last.into()})]
+struct PersonDto {
+    age: i8,
+    #[ghost({format!("{} {}", first_name, last_name)})]
+    full_name: String
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::From<Person> for PersonDto {
+      fn from(value: Person) -> PersonDto {
+          let first_name = value.first_name;
+          let last_name = value.last_name;
+          PersonDto {
+              age: value.age,
+              full_name: format!("{} {}", first_name, last_name),
+          }
+      }
+  }
+  impl std::convert::Into<Person> for PersonDto {
+      fn into(self) -> Person {
+          let first = "John";
+          let last = "Doe";
+          Person {
+              age: self.age,
+              first_name: first.into(),
+              last_name: last.into(),
           }
       }
   }
