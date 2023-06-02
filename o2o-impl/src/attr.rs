@@ -62,7 +62,8 @@ enum MemberInstruction {
 pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
-    pub path_str: String
+    pub path_str: String,
+    pub nameless: bool,
 }
 
 impl From<syn::Path> for TypePath {
@@ -70,7 +71,19 @@ impl From<syn::Path> for TypePath {
         TypePath {
             span: value.span(),
             path: value.to_token_stream(),
-            path_str: value.to_token_stream().to_string()
+            path_str: value.to_token_stream().to_string(),
+            nameless: false
+        }
+    }
+}
+
+impl From<TokenStream> for TypePath {
+    fn from(value: TokenStream) -> Self {
+        TypePath {
+            span: value.span(),
+            path_str: value.to_string(),
+            path: value,
+            nameless: true
         }
     }
 }
@@ -279,13 +292,43 @@ pub(crate) struct StructAttr {
 pub(crate) struct StructAttrCore {
     pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
+    pub init_data: Option<Punctuated<InitData, Token![,]>>
 }
 
 impl Parse for StructAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(StructAttrCore { 
-            ty: input.parse::<syn::Path>()?.into(),
-            struct_kind_hint: try_parse_struct_kind_hint(input)?,
+        let ty: TypePath = if input.peek(Paren) {
+            let content;
+            parenthesized!(content in input);
+            let content_stream = content.parse::<TokenStream>()?;
+            quote!((#content_stream)).into()
+        } else {
+            input.parse::<syn::Path>()?.into()
+        };
+        let struct_kind_hint = if ty.nameless { StructKindHint::Tuple } else { try_parse_struct_kind_hint(input)? };
+        let init_data: Option<Punctuated<InitData, Token![,]>> = if input.peek(Token![|]) {
+            input.parse::<Token![|]>()?;
+            Some(Punctuated::parse_separated_nonempty(input)?)
+        } else {
+            None
+        };
+
+        Ok(StructAttrCore { ty, struct_kind_hint, init_data })
+    }
+}
+
+pub(crate) struct InitData {
+    pub ident: Ident,
+    _colon: Token![:],
+    pub action: Action,
+}
+
+impl Parse for InitData {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(InitData {
+            ident: input.parse()?,
+            _colon: input.parse()?,
+            action: parse_braced_action(input)?
         })
     }
 }
@@ -584,7 +627,9 @@ pub(crate) enum Action {
 pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
     let mut instrs: Vec<StructInstruction> = vec![];
     for x in input.iter() {
-        if x.path.is_ident("o2o") {
+        if x.path.is_ident("doc"){
+            continue;
+        } else if x.path.is_ident("o2o") {
             x.parse_args_with(|input: ParseStream| {
                 let new_instrs: Punctuated<StructInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
@@ -622,7 +667,9 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
 pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
     for x in input.attrs.iter() {
-        if x.path.is_ident("o2o") {
+        if x.path.is_ident("doc"){
+            continue;
+        } else if x.path.is_ident("o2o") {
             x.parse_args_with(|input: ParseStream| {
                 let new_instrs: Punctuated<MemberInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;

@@ -18,12 +18,14 @@ struct NamedStructModel {
 
 struct UnnamedStructModel(i32, i32);
 
+/// Test proper #[doc = ...] handling
 #[derive(o2o)]
 #[map(NamedStruct)]
 #[map(NamedStructModel)]
 #[into_existing(NamedStruct)]
 #[into_existing(NamedStructModel)]
 struct NamedStructDto {
+    /// Test proper #[doc = ...] handling
     some_int: i32,
     another_int: i32,
 }
