@@ -112,9 +112,11 @@ impl Kind {
     pub fn is_ref(self) -> bool {
         self == Kind::FromRef || self == Kind::RefInto || self == Kind::RefIntoExisting
     }
-
     pub fn is_from(self) -> bool {
         self == Kind::FromOwned || self == Kind::FromRef
+    }
+    pub fn is_into_existing(self) -> bool {
+        self == Kind::OwnedIntoExisting || self == Kind::RefIntoExisting
     }
 }
 
@@ -285,7 +287,7 @@ impl<'a> FieldAttrs {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub(crate) enum StructKindHint {
     Struct = 0,
     Tuple = 1,

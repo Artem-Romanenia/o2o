@@ -740,10 +740,8 @@ struct CarDto {
   ``` rust
   impl std::convert::Into<CarDto> for Car {
       fn into(self) -> CarDto {
-          let mut obj = CarDto {
-              number_of_doors: self.number_of_doors,
-              ..Default::default()
-          };
+          let mut obj: CarDto = Default::default();
+          obj.number_of_doors = self.number_of_doors;
           self.vehicle.into_existing(&mut obj);
           obj
       }
