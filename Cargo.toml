@@ -14,4 +14,4 @@ o2o-impl = { version = "0.2.5", path = "o2o-impl" }
 o2o-macros = { version = "0.2.5", path = "o2o-macros" }
 
 [workspace]
-members = ["o2o-impl", "o2o-macros"]
+members = ["o2o-impl", "o2o-macros", "o2o-tests"]
