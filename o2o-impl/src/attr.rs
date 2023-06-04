@@ -20,9 +20,7 @@ impl Parse for OptionalParenthesizedTokenStream{
                 let content;
                 parenthesized!(content in input);
                 Some(content.parse()?)
-            } else {
-                None
-            }
+            } else { None }
         })
     }
 }
@@ -100,7 +98,7 @@ impl Hash for TypePath {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub(crate) enum Kind {
     OwnedInto,
     RefInto,
@@ -108,6 +106,16 @@ pub(crate) enum Kind {
     FromRef,
     OwnedIntoExisting,
     RefIntoExisting
+}
+
+impl Kind {
+    pub fn is_ref(self) -> bool {
+        self == Kind::FromRef || self == Kind::RefInto || self == Kind::RefIntoExisting
+    }
+
+    pub fn is_from(self) -> bool {
+        self == Kind::FromOwned || self == Kind::FromRef
+    }
 }
 
 type ApplicableTo = [bool; 6];
@@ -292,7 +300,8 @@ pub(crate) struct StructAttr {
 pub(crate) struct StructAttrCore {
     pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
-    pub init_data: Option<Punctuated<InitData, Token![,]>>
+    pub init_data: Option<Punctuated<InitData, Token![,]>>,
+    pub quick_return: Option<Action>
 }
 
 impl Parse for StructAttrCore {
@@ -302,18 +311,18 @@ impl Parse for StructAttrCore {
             parenthesized!(content in input);
             let content_stream = content.parse::<TokenStream>()?;
             quote!((#content_stream)).into()
-        } else {
-            input.parse::<syn::Path>()?.into()
-        };
+        } else { input.parse::<syn::Path>()?.into() };
         let struct_kind_hint = if ty.nameless { StructKindHint::Tuple } else { try_parse_struct_kind_hint(input)? };
         let init_data: Option<Punctuated<InitData, Token![,]>> = if input.peek(Token![|]) {
             input.parse::<Token![|]>()?;
             Some(Punctuated::parse_separated_nonempty(input)?)
-        } else {
-            None
-        };
+        } else { None };
+        let quick_return = if input.peek(Token![->]) {
+            input.parse::<Token![->]>()?;
+            try_parse_action(input, true)?
+        } else { None };
 
-        Ok(StructAttrCore { ty, struct_kind_hint, init_data })
+        Ok(StructAttrCore { ty, struct_kind_hint, init_data, quick_return })
     }
 }
 
@@ -328,7 +337,7 @@ impl Parse for InitData {
         Ok(InitData {
             ident: input.parse()?,
             _colon: input.parse()?,
-            action: parse_braced_action(input)?
+            action: try_parse_braced_action(input)?
         })
     }
 }
@@ -388,15 +397,13 @@ impl Parse for GhostData {
             });
             input.parse::<Token![@]>()?;
             child_path
-        } else {
-            None
-        };
+        } else { None };
         let ghost_ident = input.parse()?;
         input.parse::<Token![:]>()?;
         Ok(GhostData {
             child_path,
             ghost_ident,
-            action: parse_braced_action(input)?
+            action: try_parse_braced_action(input)?
         })
     }
 }
@@ -471,9 +478,7 @@ impl Parse for WrappedAttr {
             });
             input.parse::<Token![@]>()?;
             child_path
-        } else {
-            None
-        };
+        } else { None };
         Ok(WrappedAttr {
             container_ty,
             child_path,
@@ -492,7 +497,7 @@ pub(crate) struct FieldAttr  {
 #[derive(Clone)]
 pub(crate) struct FieldAttrCore {
     pub container_ty: Option<TypePath>,
-    pub ident: Option<Member>,
+    pub member: Option<Member>,
     pub action: Option<Action>,
     pub wrapper: bool,
 }
@@ -501,8 +506,8 @@ impl Parse for FieldAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(FieldAttrCore {
             container_ty: try_parse_container_ident(input, false),
-            ident: try_parse_optional_ident(input),
-            action: try_parse_action(input)?,
+            member: try_parse_optional_ident(input),
+            action: try_parse_action(input, false)?,
             wrapper: false
         })
     }
@@ -537,7 +542,7 @@ impl Parse for FieldGhostAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(FieldGhostAttrCore { 
             container_ty: try_parse_container_ident(input, true),
-            action: try_parse_action(input)?,
+            action: try_parse_action(input, false)?,
         })
     }
 }
@@ -576,7 +581,7 @@ impl Parse for FieldChildAttr{
 
 pub(crate) struct AsAttr {
     pub container_ty: Option<TypePath>,
-    pub ident: Option<Member>,
+    pub member: Option<Member>,
     pub tokens: TokenStream,
 }
 
@@ -588,30 +593,17 @@ impl Parse for AsAttr {
             input.parse::<Token![,]>()?;
             let tokens = input.parse()?;
             (ident, tokens)
-        } else {
-            (None, input.parse()?)
-        };
+        } else { (None, input.parse()?) };
 
-        Ok(AsAttr  {
-            container_ty,
-            ident,
-            tokens
-        })
+        Ok(AsAttr { container_ty, member: ident, tokens })
     }
 }
 
-pub(crate) struct WrapperAttr {
-    pub container_ty: Option<TypePath>,
-    pub action: Option<TokenStream>,
-
-}
+pub(crate) struct WrapperAttr(pub Option<TokenStream>);
 
 impl Parse for WrapperAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(WrapperAttr { 
-            container_ty: try_parse_container_ident(input, false),
-            action: try_parse_wrapper_action(input)?
-        })
+        Ok(WrapperAttr(try_parse_wrapper_action(input)?))
     }
 }
 
@@ -700,7 +692,13 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
             MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
-            MemberInstruction::Wrapper(attr) => add_wrapper_attrs(attr, &mut attrs, false),
+            MemberInstruction::Wrapper(attr) => {
+                let container_ty: TypePath = match &input.ty {
+                    syn::Type::Path(path) => path.path.clone().into(),
+                    _ => panic!("weird")
+                };
+                add_wrapper_attrs(&Some(container_ty), attr, &mut attrs, false)
+            },
             MemberInstruction::Unrecognized => ()
         };
     }
@@ -875,8 +873,7 @@ fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token!
     })
 }
 
-// Superficialy parses o2o Actions, when they are guaranteed to be the last thing in the stream.
-fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
+fn try_parse_action(input: ParseStream, allow_braceless: bool) -> Result<Option<Action>> {
     if input.is_empty() {
         Ok(None)
     } else if input.peek(Token![@]) {
@@ -892,6 +889,8 @@ fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
             validate_closure(input)?;
             return Ok(Some(Action::Closure(input.parse()?)))
         }
+    } else if allow_braceless && !input.peek(Brace) {
+        Ok(Some(Action::InlineExpr(input.parse()?)))
     } else {
         let content;
         braced!(content in input);
@@ -899,8 +898,7 @@ fn try_parse_action(input: ParseStream) -> Result<Option<Action>> {
     }
 }
 
-// Rudimentarily parses |x| { x.something } flavor of closure. To be used when closure is not in the end of the stream.
-fn parse_braced_action(input: ParseStream) -> Result<Action> {
+fn try_parse_braced_action(input: ParseStream) -> Result<Action> {
     let mut tokens = Vec::new();
     let mut paramless = false;
     let inline = !input.peek(Token![|]);
@@ -966,7 +964,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
     attrs.push(FieldAttr { 
         attr: FieldAttrCore { 
             container_ty: attr.container_ty.clone(), 
-            ident: attr.ident.clone(), 
+            member: attr.member.clone(), 
             action: Some(Action::InlineTildeExpr(quote!(as #this_ty))),
             wrapper: false,
         }, 
@@ -975,7 +973,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
     attrs.push(FieldAttr { 
         attr: FieldAttrCore { 
             container_ty: attr.container_ty, 
-            ident: attr.ident, 
+            member: attr.member, 
             action: Some(Action::InlineTildeExpr(quote!(as #that_ty))),
             wrapper: false
         }, 
@@ -983,31 +981,31 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
     });
 }
 
-pub(crate) fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>, inverse: bool) {
+pub(crate) fn add_wrapper_attrs (container_ty: &Option<TypePath>, attr: WrapperAttr, attrs: &mut Vec<FieldAttr>, inverse: bool) {
     attrs.push(FieldAttr { 
         attr: FieldAttrCore { 
-            container_ty: attr.container_ty.clone(), 
-            ident: None, 
+            container_ty: container_ty.clone(), 
+            member: None, 
             action: Some(Action::InlineAtExpr(TokenStream::new())),
             wrapper: true,
         }, 
-        applicable_to: [false ^ inverse, attr.action.is_none() & inverse, true ^ inverse, attr.action.is_none() & !inverse, false, false]
+        applicable_to: [false ^ inverse, attr.0.is_none() & inverse, true ^ inverse, attr.0.is_none() & !inverse, false, false]
     });
     attrs.push(FieldAttr { 
         attr: FieldAttrCore { 
-            container_ty: attr.container_ty.clone(), 
-            ident: None, 
+            container_ty: container_ty.clone(), 
+            member: None, 
             action: None,
             wrapper: true,
         }, 
-        applicable_to: [true ^ inverse, attr.action.is_none() & !inverse, false ^ inverse, attr.action.is_none() & inverse, false, false]
+        applicable_to: [true ^ inverse, attr.0.is_none() & !inverse, false ^ inverse, attr.0.is_none() & inverse, false, false]
     });
 
-    if let Some(action) = attr.action {
+    if let Some(action) = attr.0 {
         attrs.push(FieldAttr { 
             attr: FieldAttrCore { 
-                container_ty: attr.container_ty.clone(), 
-                ident: None, 
+                container_ty: container_ty.clone(), 
+                member: None, 
                 action: Some(Action::InlineAtExpr(action.clone())),
                 wrapper: true,
             }, 
@@ -1015,8 +1013,8 @@ pub(crate) fn add_wrapper_attrs (attr: WrapperAttr, attrs: &mut Vec<FieldAttr>, 
         });
         attrs.push(FieldAttr { 
             attr: FieldAttrCore { 
-                container_ty: attr.container_ty, 
-                ident: None, 
+                container_ty: container_ty.clone(), 
+                member: None, 
                 action: Some(Action::InlineTildeExpr(action)),
                 wrapper: true,
             }, 

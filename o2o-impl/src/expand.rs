@@ -50,11 +50,14 @@ fn struct_impl(input: Struct) -> TokenStream {
 
         if let Some(wrapped_attr) = input.attrs.wrapped_attr(ctx.container_ty) {
             let f = &wrapped_attr.ident;
-            quote_from_trait(&ctx, None, quote!(value.#f), true)
+            quote_from_trait_basic(&ctx, None, quote!(value.#f))
         } else {
             let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+            if let Some(quick_return) = &struct_attr.quick_return {
+                return quote_from_trait_basic(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+            }
             let init = struct_init_block(&ctx);
-            quote_from_trait(&ctx, pre_init, init, false)
+            quote_from_trait(&ctx, pre_init, init)
         }
     });
 
@@ -76,11 +79,14 @@ fn struct_impl(input: Struct) -> TokenStream {
                 Some(action) =>  quote_action(&Action::InlineTildeExpr(action.clone()), Some(f.to_token_stream()), &ctx),
                 None => quote!(value.#f)
             };
-            quote_from_trait(&ctx, None, field_path, true)
+            quote_from_trait_basic(&ctx, None, field_path)
         } else {
             let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+            if let Some(quick_return) = &struct_attr.quick_return {
+                return quote_from_trait_basic(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+            }
             let init = struct_init_block(&ctx);
-            quote_from_trait(&ctx, pre_init, init, false)
+            quote_from_trait(&ctx, pre_init, init)
         }
     });
 
@@ -100,13 +106,16 @@ fn struct_impl(input: Struct) -> TokenStream {
 
         if let Some(wrapped_field) = wrapped_field {
             let f = &wrapped_field.member;
-            quote_into_trait(&ctx, None, quote!(self.#f), None, true)
+            quote_into_trait_basic(&ctx, None, quote!(self.#f))
         } else {
             let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+            if let Some(quick_return) = &struct_attr.quick_return {
+                return quote_into_trait_basic(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+            }
             let post_init = struct_post_init(&ctx);
             ctx.has_post_init = post_init.is_some();
             let init = struct_init_block(&ctx);
-            quote_into_trait(&ctx, pre_init, init, post_init, false)
+            quote_into_trait(&ctx, pre_init, init, post_init)
         }
     });
 
@@ -134,13 +143,16 @@ fn struct_impl(input: Struct) -> TokenStream {
                 Some(action) =>  quote_action(action, Some(f.to_token_stream()), &ctx),
                 None => quote!(self.#f)
             };
-            quote_into_trait(&ctx, None, field_path, None, true)
+            quote_into_trait_basic(&ctx, None, field_path)
         } else {
             let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+            if let Some(quick_return) = &struct_attr.quick_return {
+                return quote_into_trait_basic(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+            }
             let post_init = struct_post_init(&ctx);
             ctx.has_post_init = post_init.is_some();
             let init = struct_init_block(&ctx);
-            quote_into_trait(&ctx, pre_init, init, post_init, false)
+            quote_into_trait(&ctx, pre_init, init, post_init)
         }
     });
 
@@ -156,6 +168,9 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            return quote_into_existing_trait_basic(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+        }
         let post_init = struct_post_init(&ctx);
         ctx.has_post_init = post_init.is_some();
         let init = struct_init_block(&ctx);
@@ -174,6 +189,9 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            return quote_into_existing_trait_basic(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+        }
         let post_init = struct_post_init(&ctx);
         ctx.has_post_init = post_init.is_some();
         let init = struct_init_block(&ctx);
@@ -272,9 +290,7 @@ fn struct_init_block_inner(
 
         match field_data {
             FieldData::Field(f) => {
-                if ctx.kind != Kind::FromOwned && ctx.kind != Kind::FromRef 
-                    && (f.attrs.ghost(ctx.container_ty, &ctx.kind).is_some() || f.attrs.has_parent_attr(ctx.container_ty)) 
-                {
+                if !ctx.kind.is_from() && (f.attrs.ghost(ctx.container_ty, &ctx.kind).is_some() || f.attrs.has_parent_attr(ctx.container_ty)) {
                     fields.next();
                     continue;
                 }
@@ -299,10 +315,8 @@ fn struct_init_block_inner(
             }
             FieldData::WrappedData(wrapped_attr) => {
                 let mut attrs = vec![];
-                crate::attr::add_wrapper_attrs(WrapperAttr {
-                    container_ty: wrapped_attr.container_ty.clone(),
-                    action: wrapped_attr.action.clone()
-                }, &mut attrs, ctx.kind == Kind::OwnedInto || ctx.kind == Kind::RefInto);
+                crate::attr::add_wrapper_attrs(&wrapped_attr.container_ty, 
+                    WrapperAttr(wrapped_attr.action.clone()), &mut attrs, !ctx.kind.is_from());
                 let f = Field {
                     member: wrapped_attr.ident.clone(),
                     attrs: FieldAttrs{ attrs, ..Default::default() },
@@ -322,7 +336,7 @@ fn struct_init_block_inner(
         }
     }
 
-    if ctx.kind != Kind::FromOwned && ctx.kind != Kind::FromRef {
+    if !ctx.kind.is_from() {
         if let Some(ghost_attr) = ctx.input.attrs.ghost_attr(ctx.container_ty, &ctx.kind) {
             ghost_attr.ghost_data.iter().for_each(|x| {
                 match (&x.child_path, field_ctx) {
@@ -410,7 +424,7 @@ fn struct_post_init(ctx: &ImplContext) -> Option<TokenStream> {
     let mut fragments: Vec<TokenStream> = vec![];
 
     ctx.input.fields.iter().for_each(|f| {
-        if ctx.kind != Kind::FromOwned && ctx.kind != Kind::FromRef && f.attrs.has_parent_attr(ctx.container_ty) {
+        if !ctx.kind.is_from() && f.attrs.has_parent_attr(ctx.container_ty) {
             fragments.push(render_parent(f, ctx))
         }
     });
@@ -422,15 +436,12 @@ fn struct_post_init(ctx: &ImplContext) -> Option<TokenStream> {
 }
 
 fn render_parent(f: &Field, ctx: &ImplContext) -> TokenStream {
-    match (&f.member, &ctx.kind) {
-        (syn::Member::Named(ident), Kind::OwnedIntoExisting) => quote!(self.#ident.into_existing(other);),
-        (syn::Member::Unnamed(index), Kind::OwnedIntoExisting) => quote!(self.#index.into_existing(other);),
-        (syn::Member::Named(ident), Kind::RefIntoExisting) => quote!((&(self.#ident)).into_existing(other);),
-        (syn::Member::Unnamed(index), Kind::RefIntoExisting) => quote!((&(self.#index)).into_existing(other);),
-        (syn::Member::Named(ident), Kind::OwnedInto) => quote!(self.#ident.into_existing(&mut obj);),
-        (syn::Member::Unnamed(index), Kind::OwnedInto) => quote!(self.#index.into_existing(&mut obj);),
-        (syn::Member::Named(ident), Kind::RefInto) => quote!((&(self.#ident)).into_existing(&mut obj);),
-        (syn::Member::Unnamed(index), Kind::RefInto) => quote!((&(self.#index)).into_existing(&mut obj);),
+    let member = &f.member;
+    match &ctx.kind {
+        Kind::OwnedIntoExisting => quote!(self.#member.into_existing(other);),
+        Kind::RefIntoExisting => quote!((&(self.#member)).into_existing(other);),
+        Kind::OwnedInto => quote!(self.#member.into_existing(&mut obj);),
+        Kind::RefInto => quote!((&(self.#member)).into_existing(&mut obj);),
         _ => panic!("weird")
     }
 }
@@ -502,7 +513,7 @@ fn render_line(
         }
         (syn::Member::Named(ident), None, Kind::FromOwned | Kind::FromRef, StructKindHint::Struct | StructKindHint::Unspecified, _) => 
             if f.attrs.has_parent_attr(ctx.container_ty) {
-                if ctx.kind == Kind::FromOwned {
+                if !ctx.kind.is_ref() {
                     quote!(#ident: (&value).into(),)
                 }else {
                     quote!(#ident: value.into(),)
@@ -528,7 +539,7 @@ fn render_line(
         }
         (syn::Member::Unnamed(_), None, Kind::FromOwned | Kind::FromRef, StructKindHint::Tuple | StructKindHint::Unspecified, _) => 
             if f.attrs.has_parent_attr(ctx.container_ty) {
-                if ctx.kind == Kind::FromOwned {
+                if !ctx.kind.is_ref() {
                     quote!((&value).into(),)
                 }else {
                     quote!(value.into(),)
@@ -539,7 +550,7 @@ fn render_line(
             },
         (syn::Member::Unnamed(_), None, _, StructKindHint::Struct, _) => {
             if f.attrs.has_parent_attr(ctx.container_ty) {
-                if ctx.kind == Kind::FromOwned {
+                if !ctx.kind.is_ref() {
                     quote!((&value).into(),)
                 }else {
                     quote!(value.into(),)
@@ -627,7 +638,7 @@ fn type_closure_param(input: &TokenStream, ctx: &ImplContext) -> TokenStream {
         }
         tokens.push(syn::parse_str(":&").unwrap());
         tokens.push(ctx.src_ty.to_token_stream());
-        if ctx.kind != Kind::FromOwned && ctx.kind != Kind::FromRef {
+        if !ctx.kind.is_from() {
             tokens.push(ctx.input.generics.to_token_stream());
         }
         tokens.push(x.parse::<Token![|]>().unwrap().to_token_stream());
@@ -662,7 +673,7 @@ fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplCont
                 _ => quote!(self),
             };
             let cl = type_closure_param(args, ctx);
-            if ctx.kind == Kind::RefInto || ctx.kind == Kind::FromRef {
+            if ctx.kind.is_ref() {
                 quote!((#cl)(#ident))
             } else {
                 quote!((#cl)(&#ident))
@@ -674,59 +685,73 @@ fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplCont
     }
 }
 
-fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, wrapped: bool) -> TokenStream {
+fn quote_from_trait_basic(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let gens = ctx.input.generics.to_token_stream();
-    let where_clause  = match ctx.input.attrs.where_attr(ctx.container_ty){
-        Some(where_attr) => {
-            let where_clause = where_attr.where_clause.to_token_stream();
-            quote!(where #where_clause)
-        },
-        None => TokenStream::new()
-    };
-    let r = if ctx.kind == Kind::FromRef {
-        quote!(&)
-    } else {
-        TokenStream::new()
-    };
-    if wrapped {
-        quote! {
-            impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
-                fn from(value: #r #src) -> #dst #gens {
-                    #init
-                }
-            }
-        }
-    } else {
-        quote! {
-            impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
-                fn from(value: #r #src) -> #dst #gens {
-                    #pre_init
-                    #dst #init
-                }
+    let where_clause  = ctx.input.attrs.where_attr(ctx.container_ty).map(|x| {
+        let where_clause = x.where_clause.to_token_stream();
+        quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
+    quote! {
+        impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
+            fn from(value: #r #src) -> #dst #gens {
+                #pre_init
+                #init
             }
         }
     }
 }
 
-fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>, wrapped: bool) -> TokenStream {
+fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+    let dst = ctx.dst_ty;
+    let src = ctx.src_ty;
+    let gens = ctx.input.generics.to_token_stream();
+    let where_clause  = ctx.input.attrs.where_attr(ctx.container_ty).map(|x| {
+        let where_clause = x.where_clause.to_token_stream();
+        quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
+    quote! {
+        impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
+            fn from(value: #r #src) -> #dst #gens {
+                #pre_init
+                #dst #init
+            }
+        }
+    }
+}
+
+fn quote_into_trait_basic(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+    let dst = ctx.dst_ty;
+    let src = ctx.src_ty;
+    let gens = ctx.input.generics.to_token_stream();
+    let where_clause  = ctx.input.attrs.where_attr(ctx.container_ty).map(|x|{
+        let where_clause = x.where_clause.to_token_stream();
+        quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
+    quote! {
+        impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
+            fn into(self) -> #dst {
+                #pre_init
+                #init
+            }
+        }
+    }
+}
+
+fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let dst = ctx.dst_ty;
     let dst2 = if ctx.nameless { TokenStream::new() } else { dst.clone() };
     let src = ctx.src_ty;
     let gens = ctx.input.generics.to_token_stream();
-    let where_clause  = match ctx.input.attrs.where_attr(ctx.container_ty){
-        Some(where_attr) => {
-            let where_clause = where_attr.where_clause.to_token_stream();
-            quote!(where #where_clause)
-        },
-        None => TokenStream::new()
-    };
-    let r = if ctx.kind == Kind::RefInto {
-        quote!(&)
-    } else {
-        TokenStream::new()
-    };
+    let where_clause  = ctx.input.attrs.where_attr(ctx.container_ty).map(|x|{
+        let where_clause = x.where_clause.to_token_stream();
+        quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
     match (&ctx.input.named, ctx.struct_kind_hint, post_init) {
         (false, StructKindHint::Tuple | StructKindHint::Unspecified, Some(post_init))
         | (true, StructKindHint::Tuple, Some(post_init)) => quote!{
@@ -749,13 +774,6 @@ fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
                 }
             }
         },
-        (_, _, None) if wrapped => quote! {
-            impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
-                fn into(self) -> #dst {
-                    #init
-                }
-            }
-        },
         (_, _, None) => quote! {
             impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
                 fn into(self) -> #dst {
@@ -767,22 +785,34 @@ fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
     }
 }
 
+fn quote_into_existing_trait_basic(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+    let dst = ctx.dst_ty;
+    let src = ctx.src_ty;
+    let gens = ctx.input.generics.to_token_stream();
+    let where_clause  = ctx.input.attrs.where_attr(ctx.container_ty).map(|x|{
+        let where_clause = x.where_clause.to_token_stream();
+            quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
+    quote! {
+        impl #gens o2o::traits::IntoExisting<#dst> for #r #src #gens #where_clause {
+            fn into_existing(self, other: &mut #dst) {
+                #pre_init
+                *other = #init;
+            }
+        }
+    }
+}
+
 fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let gens = ctx.input.generics.to_token_stream();
-    let where_clause  = match ctx.input.attrs.where_attr(ctx.container_ty){
-        Some(where_attr) => {
-            let where_clause = where_attr.where_clause.to_token_stream();
+    let where_clause  = ctx.input.attrs.where_attr(ctx.container_ty).map(|x|{
+        let where_clause = x.where_clause.to_token_stream();
             quote!(where #where_clause)
-        },
-        None => TokenStream::new()
-    };
-    let r = if ctx.kind == Kind::RefIntoExisting {
-        quote!(&)
-    } else {
-        TokenStream::new()
-    };
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
         impl #gens o2o::traits::IntoExisting<#dst> for #r #src #gens #where_clause {
             fn into_existing(self, other: &mut #dst) {
@@ -798,7 +828,7 @@ impl<'a> ApplicableAttr<'a> {
     fn get_ident(&self) -> &'a Member {
         match self {
             ApplicableAttr::Field(field_attr) => {
-                match &field_attr.ident {
+                match &field_attr.member {
                     Some(val) => val,
                     None => panic!("weird"),
                 }
@@ -810,7 +840,7 @@ impl<'a> ApplicableAttr<'a> {
     fn get_field_name_or(&'a self, field: &'a Member) -> &'a Member {
         match self {
             ApplicableAttr::Field(field_attr) => {
-                match &field_attr.ident {
+                match &field_attr.member {
                     Some(val) => val,
                     None => field,
                 }
@@ -834,7 +864,7 @@ impl<'a> ApplicableAttr<'a> {
     fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, field_path: F1, ctx: &ImplContext, or: F2) -> TokenStream {
         match self {
             ApplicableAttr::Field(field_attr) => {
-                match (&field_attr.ident, &field_attr.action) {
+                match (&field_attr.member, &field_attr.action) {
                     (Some(ident), Some(action)) => quote_action(action, Some(field_path(ident)), ctx),
                     (Some(ident), None) => {
                         let field_path = field_path(ident);

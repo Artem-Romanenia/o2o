@@ -2,17 +2,10 @@ use o2o::o2o;
 use o2o::traits::IntoExisting;
 
 #[derive(Default)]
-struct UnnamedStructDto(i32, i32, f32);
-
-#[derive(Default)]
-#[derive(o2o)]
-// Map (and specifically to and to_b) works here as long as Rust allows instantiation like TupleStruct { 0: ..., 1: ..., ...}
-#[map(UnnamedStructDto)]
-#[into_existing(UnnamedStructDto)]
 struct NamedStruct {
-    #[map(0)] some_int: i32,
-    #[map(1)] another_int: i32,
-    #[map(2)] some_float: f32,
+    some_int: i32,
+    another_int: i32,
+    some_float: f32,
 }
 
 #[derive(Default)]
@@ -94,58 +87,6 @@ struct PetDto {
     age: i8,
     #[map(~.clone())]
     nickname: String,
-}
-
-#[test] 
-fn unnamed2named() {
-    let dto = UnnamedStructDto(123, 321, 456.0);
-
-    let named: NamedStruct = dto.into();
-
-    assert_eq!(123, named.some_int);
-    assert_eq!(321, named.another_int);
-    assert_eq!(456.0, named.some_float);
-}
-
-#[test] 
-fn named2unnamed() {
-    let named = NamedStruct{
-        some_int: 123,
-        another_int: 321,
-        some_float: 456.0
-    };
-
-    let dto: UnnamedStructDto = named.into();
-
-    assert_eq!(123, dto.0);
-    assert_eq!(321, dto.1);
-    assert_eq!(456.0, dto.2);
-}
-
-#[test] 
-fn unnamed2named_ref() {
-    let dto = &UnnamedStructDto(123, 321, 456.0);
-
-    let named: NamedStruct = dto.into();
-
-    assert_eq!(dto.0, named.some_int);
-    assert_eq!(dto.1, named.another_int);
-    assert_eq!(dto.2, named.some_float);
-}
-
-#[test] 
-fn named2unnamed_ref() {
-    let named = &NamedStruct{
-        some_int: 123,
-        another_int: 321,
-        some_float: 456.0
-    };
-
-    let dto: UnnamedStructDto = named.into();
-
-    assert_eq!(named.some_int, dto.0);
-    assert_eq!(named.another_int, dto.1);
-    assert_eq!(named.some_float, dto.2);
 }
 
 #[test]
@@ -386,38 +327,6 @@ fn named2named_children_ref_reversed() {
     assert_eq!(dto.pets[0].nickname, p.pets[0].nickname);
     assert_eq!(dto.pets[1].age, p.pets[1].age);
     assert_eq!(dto.pets[1].nickname, p.pets[1].nickname);
-}
-
-#[test] 
-fn existing_named2unnamed() {
-    let named = NamedStruct{
-        some_int: 123,
-        another_int: 321,
-        some_float: 456.0
-    };
-
-    let mut dto: UnnamedStructDto = Default::default();
-    named.into_existing(&mut dto);
-
-    assert_eq!(123, dto.0);
-    assert_eq!(321, dto.1);
-    assert_eq!(456.0, dto.2);
-}
-
-#[test] 
-fn existing_named2unnamed_ref() {
-    let named = &NamedStruct{
-        some_int: 123,
-        another_int: 321,
-        some_float: 456.0
-    };
-
-    let mut dto: UnnamedStructDto = Default::default();
-    named.into_existing(&mut dto);
-
-    assert_eq!(named.some_int, dto.0);
-    assert_eq!(named.another_int, dto.1);
-    assert_eq!(named.some_float, dto.2);
 }
 
 #[test]

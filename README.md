@@ -26,6 +26,7 @@
   - [Generics](#generics)
   - [Where clauses](#where-clauses)
   - [Define helper variables](#define-helper-variables)
+  - [Quick return](#quick-return)
   - [Mapping to multiple structs](#mapping-to-multiple-structs)
   - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
@@ -1011,6 +1012,54 @@ struct PersonDto {
               first_name: first.into(),
               last_name: last.into(),
           }
+      }
+  }
+  ```
+</details>
+
+### Quick return
+
+**o2o** allows you to bypass most of the logic by specifying quick return inline expression following `->`:
+
+```rust
+#[derive(o2o)]
+#[owned_into(String -> @.0.to_string())]
+struct Wrapper(i32);
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::Into<String> for Wrapper {
+      fn into(self) -> String {
+          self.0.to_string()
+      }
+  }
+  ```
+</details>
+
+Quick returns work well with helper variables:
+
+```rust
+#[derive(o2o)]
+#[owned_into(i32| hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32} 
+    -> hrs * 3600 + mns * 60 + scs)]
+struct Time {
+    hours: i8,
+    minutes: i8,
+    seconds: i8,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust
+  impl std::convert::Into<i32> for Time {
+      fn into(self) -> i32 {
+          let hrs = self.hours as i32;
+          let mns = self.minutes as i32;
+          let scs = self.seconds as i32;
+          hrs * 3600 + mns * 60 + scs
       }
   }
   ```
