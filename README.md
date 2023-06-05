@@ -1,4 +1,4 @@
-﻿Object to Object mapper for Rust<!-- omit from toc --> 
+﻿Object to Object mapper for Rust. Derive `From` and `Into` traits.<!-- omit from toc --> 
 ================================
 [<img alt="github.com" src="https://github.com/Artem-Romanenia/o2o/workflows/Build/badge.svg" height="25">](https://github.com/Artem-Romanenia/o2o/)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/o2o.svg?style=for-the-badge&color=2f4d28&labelColor=f9f7ec&logo=rust&logoColor=black" height="25">](https://crates.io/crates/o2o)
@@ -381,9 +381,9 @@ struct PersonDto {
     id: i32,
     full_name: String,
     age: i8,
-    // (|| None) below provides default value when creating PersonDto from Person
+    // {None} below provides default value when creating PersonDto from Person
     // It could have been omited if we only needed to create Person from PersonDto
-    #[ghost(|| None)]
+    #[ghost({None})]
     zodiac_sign: Option<ZodiacSign>
 }
 enum ZodiacSign {}
@@ -398,7 +398,7 @@ enum ZodiacSign {}
               id: value.id,
               full_name: value.full_name,
               age: value.age,
-              zodiac_sign: (|| None)(),
+              zodiac_sign: None,
           }
       }
   }
@@ -418,7 +418,7 @@ In a reverse case, you need to use a struct level `#[ghost()]` instruction:
 ``` rust
 #[derive(o2o)]
 #[map_owned(PersonDto)]
-#[ghost(zodiac_sign: || { None })] // #[ghost()] struct level instruction accepts only braced closures.
+#[ghost(zodiac_sign: {None})] // #[ghost()] struct level instruction accepts only braced closures.
 struct Person {
     id: i32,
     full_name: String,
@@ -452,7 +452,7 @@ enum ZodiacSign {}
               id: self.id,
               full_name: self.full_name,
               age: self.age,
-              zodiac_sign: (|| None)(),
+              zodiac_sign: None,
           }
       }
   }
@@ -525,7 +525,7 @@ impl Employee {
     // o2o supports closures with one input parameter.
     // This parameter represents instance on the other side of the conversion.
     first_name: |x| {x.get_first_name()},
-    last_name: |x| {x.get_last_name()}
+    last_name: {@.get_last_name()}
 )]
 struct EmployeeDto {
     #[map(id)]
@@ -539,7 +539,7 @@ struct EmployeeDto {
     #[into(subordinate_of, |x| Box::new(x.reports_to.as_ref().into()))]
     reports_to: Box<EmployeeDto>,
 
-    #[map(~.iter().map(|p|Box::new(p.as_ref().into())).collect())]
+    #[map(~.iter().map(|p| Box::new(p.as_ref().into())).collect())]
     subordinates: Vec<Box<EmployeeDto>>
 }
 impl EmployeeDto {
@@ -1241,7 +1241,7 @@ struct Machine {
 #[derive(o2o)]
 #[map_ref(Car)]
 #[children(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghost(vehicle.machine@id: || { 321 })]
+#[ghost(vehicle.machine@id: {321})]
 struct CarDto {
     number_of_doors: i8,
 
@@ -1267,7 +1267,7 @@ struct CarDto {
     height: f32,
     #[o2o(stop_repeat)]
 
-    #[o2o(repeat)] #[ghost(|| {123})]
+    #[o2o(repeat)] #[ghost({123})]
     useless_param: i32,
     useless_param_2: i32,
     useless_param_3: i32,
@@ -1292,9 +1292,9 @@ struct CarDto {
               length: value.vehicle.machine.length,
               width: value.vehicle.machine.width,
               height: value.vehicle.machine.height,
-              useless_param: (|| 123)(),
-              useless_param_2: (|| 123)(),
-              useless_param_3: (|| 123)(),
+              useless_param: 123,
+              useless_param_2: 123,
+              useless_param_3: 123,
           }
       }
   }
@@ -1315,7 +1315,7 @@ struct CarDto {
                       length: self.length,
                       width: self.width,
                       height: self.height,
-                      id: (|| 321)(),
+                      id: 321,
                   },
               },
           }
