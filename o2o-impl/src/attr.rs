@@ -1060,7 +1060,7 @@ fn build_child_path_str(child_path: &Punctuated<Member, Token![.]>) -> Vec<Strin
         if child_path_str.is_empty() {
             child_path_str.push(x.to_token_stream().to_string())
         } else {
-            child_path_str.push(format!("{}.{}", child_path_str.last().unwrap_or(&String::from("")), x.to_token_stream()))
+            child_path_str.push(format!("{}.{}", child_path_str.last().map(|x| x.as_str()).unwrap_or(""), x.to_token_stream()))
         }
     });
     child_path_str

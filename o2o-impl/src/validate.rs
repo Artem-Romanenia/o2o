@@ -34,9 +34,7 @@ pub(crate) fn validate(input: &Struct) -> Result<()> {
     Ok(())
 }
 
-fn validate_struct_attrs<'a, I>(attrs: I) -> Result<()> 
-    where I: Iterator<Item = &'a StructAttrCore>
-{
+fn validate_struct_attrs<'a, I: Iterator<Item = &'a StructAttrCore>>(attrs: I) -> Result<()> {
     let mut unique_ident = HashSet::new();
     for attr in attrs {
         if !unique_ident.insert(&attr.ty) {

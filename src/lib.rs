@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 extern crate o2o_impl;
 extern crate o2o_macros;
 
