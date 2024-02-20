@@ -18,6 +18,8 @@ jobs:
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --verbose
+    - name: Run Doc Tests
+      run: cargo test --package o2o
     - name: Run Integration Tests
       run: cargo test --package o2o-tests
     - name: Run Impl Tests
