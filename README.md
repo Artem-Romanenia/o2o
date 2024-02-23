@@ -2,42 +2,9 @@
 ================================
 [<img alt="github.com" src="https://github.com/Artem-Romanenia/o2o/workflows/Build/badge.svg" height="25">](https://github.com/Artem-Romanenia/o2o/)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/o2o.svg?style=for-the-badge&color=2f4d28&labelColor=f9f7ec&logo=rust&logoColor=black" height="25">](https://crates.io/crates/o2o)
+[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-o2o-444444?style=for-the-badge&labelColor=aaaaaa&logo=docs.rs" height="25">](https://docs.rs/o2o)
 
-## Content<!-- omit from toc --> 
-
-- [Quick pitch](#quick-pitch)
-- [Brief description](#brief-description)
-- [Examples](#examples)
-  - [Simplest Case](#simplest-case)
-  - [Different field name](#different-field-name)
-  - [Different field type](#different-field-type)
-  - [Nested structs](#nested-structs)
-  - [Nested collection](#nested-collection)
-  - [Assymetric fields (skipping and providing default values)](#assymetric-fields-skipping-and-providing-default-values)
-- [Expressions](#expressions)
-  - [Expressions for struct level instructions](#expressions-for-struct-level-instructions)
-  - [Expressions for member level instructions](#expressions-for-member-level-instructions)
-- [More examples](#more-examples)
-  - [Slightly complex example](#slightly-complex-example)
-  - [Flatened children](#flatened-children)
-  - [Tuple structs](#tuple-structs)
-  - [Tuples](#tuples)
-  - [Struct kind hints](#struct-kind-hints)
-  - [Generics](#generics)
-  - [Where clauses](#where-clauses)
-  - [Define helper variables](#define-helper-variables)
-  - [Quick return](#quick-return)
-  - [Mapping to multiple structs](#mapping-to-multiple-structs)
-  - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
-  - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
-    - [Primitive type conversions](#primitive-type-conversions)
-    - [Repeat instructions](#repeat-instructions)
-    - [Wrapper structs and `#[o2o(wrapper)]` instruction](#wrapper-structs-and-o2owrapper-instruction)
-    - [Wrapped structs and `#[o2o(wrapped)]` instruction](#wrapped-structs-and-o2owrapped-instruction)
-  - [Contributions](#contributions)
-    - [License](#license)
-
-## Quick pitch
+## Quick pitch<!-- omit from toc --> 
 
 ``` rust ignore
 impl From<Person> for PersonDto {
@@ -51,48 +18,9 @@ impl From<Person> for PersonDto {
 }
 ```
 
-Writing code like above is not the most exciting or rewarding part of working with Rust. If you're Ok with letting procedural macro write it for you, welcome to the rest of this page.
+Writing code like above is not the most exciting or emotionally rewarding part of working with Rust. If you're Ok with letting procedural macro write it for you, welcome to the rest of this page.
 
-## Brief description
-
-**o2o** procedural macro is able to generate implementation of 6 kinds of traits (currently for structs only):
-
-``` rust ignore
-// #[from_owned()]
-impl std::convert::From<A> for B { ... }
-
-// #[from_ref()]
-impl std::convert::From<&A> for B { ... }
-
-// #[owned_into()]
-impl std::convert::Into<A> for B { ... }
-
-// #[ref_into()]
-impl std::convert::Into<A> for &B { ... }
-
-// #[owned_into_existing()]
-impl o2o::traits::IntoExisting<A> for B { ... }
-
-// #[ref_into_existing()]
-impl o2o::traits::IntoExisting<A> for &B { ... }
-```
-
-It also has shortcuts to configure multiple trait implementations with fewer lines of code:
-
-|                              | #[map()] | #[from()]  | #[into()] | #[map_owned()] | #[map_ref()] | #[into_existing()] |
-| ---------------------------- | -------- | ---------- | --------- | ---------------| ------------ | -------------------|
-| **#[from_owned()]**          | ✔️       | ✔️          | ❌        | ✔️             | ❌           | ❌                |
-| **#[from_ref()]**            | ✔️       | ✔️          | ❌        | ❌            | ✔️            | ❌                |
-| **#[owned_into()]**          | ✔️       | ❌         | ✔️         | ✔️             | ❌           | ❌                |
-| **#[ref_into()]**            | ✔️       | ❌         | ✔️         | ❌            | ✔️            | ❌                |
-| **#[owned_into_existing()]** | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
-| **#[ref_into_existing()]**   | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
-
-With that, let's look at some examples.
-
-## Examples
-
-### Simplest Case
+## Basic Example<!-- omit from toc --> 
 
 ``` rust
 use o2o::o2o;
@@ -104,14 +32,30 @@ struct Person {
 }
 
 #[derive(o2o)]
-#[map_owned(Person)]
+#[from_owned(Person)] // This tells o2o to generate 'From<Person> for PersonDto' implementation
+#[owned_into(Person)] // This generates 'Into<Person> for PersonDto'
 struct PersonDto {
     id: u32,
     name: String,
     age: u8
 }
+
+// Applying #[derive(o2o)] on PersonDto allows you to do this:
+
+let person = Person { id: 123, name: "John".into(), age: 42 };
+let dto = PersonDto::from(person);
+
+assert_eq!(dto.id, 123); assert_eq!(dto.name, "John"); assert_eq!(dto.age, 42);
+
+// and this:
+
+let dto = PersonDto { id: 321, name: "Jack".into(), age: 23 };
+let person: Person = dto.into();
+
+assert_eq!(person.id, 321); assert_eq!(person.name, "Jack"); assert_eq!(person.age, 23);
 ```
-From here on, generated code is produced by [rust-analyzer: Expand macro recursively](https://rust-analyzer.github.io/manual.html#expand-macro-recursively) command
+
+And here's the code that `o2o` generates (from here on, generated code is produced by [rust-analyzer: Expand macro recursively](https://rust-analyzer.github.io/manual.html#expand-macro-recursively) command):
 <details>
   <summary>View generated code</summary>
 
@@ -137,15 +81,136 @@ From here on, generated code is produced by [rust-analyzer: Expand macro recursi
   ```
 </details>
 
-With the above code you should be able to do this:
+## Content<!-- omit from toc --> 
+
+- [Traits and `o2o` *trait instructions*](#traits-and-o2o-trait-instructions)
+- [The (not so big) Problem](#the-not-so-big-problem)
+- [Examples](#examples)
+  - [Different field name](#different-field-name)
+  - [Different field type](#different-field-type)
+  - [Nested structs](#nested-structs)
+  - [Nested collection](#nested-collection)
+  - [Assymetric fields (skipping and providing default values)](#assymetric-fields-skipping-and-providing-default-values)
+- [Expressions](#expressions)
+  - [Expressions for struct instructions](#expressions-for-struct-instructions)
+  - [Expressions for member instructions](#expressions-for-member-instructions)
+- [More examples](#more-examples)
+  - [Slightly complex example](#slightly-complex-example)
+  - [Flatened children](#flatened-children)
+  - [Tuple structs](#tuple-structs)
+  - [Tuples](#tuples)
+  - [Struct kind hints](#struct-kind-hints)
+  - [Generics](#generics)
+  - [Where clauses](#where-clauses)
+  - [Define helper variables](#define-helper-variables)
+  - [Quick return](#quick-return)
+  - [Mapping to multiple structs](#mapping-to-multiple-structs)
+  - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
+  - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
+    - [Primitive type conversions](#primitive-type-conversions)
+    - [Repeat instructions](#repeat-instructions)
+    - [Wrapper structs and `#[o2o(wrapper)]` instruction](#wrapper-structs-and-o2owrapper-instruction)
+    - [Wrapped structs and `#[o2o(wrapped)]` instruction](#wrapped-structs-and-o2owrapped-instruction)
+  - [Contributions](#contributions)
+    - [License](#license)
+
+## Traits and `o2o` *trait instructions*
+
+To let o2o know what traits you want implemented, you have to use type-level `o2o` *trait instructions* (i.e. proc macro attributes):
+
+``` rust
+struct Entity { }
+
+#[derive(o2o::o2o)]
+#[from_owned(Entity)]
+struct EntityDto { }
+```
+
+o2o procedural macro is able to generate implementation of 6 kinds of traits:
 
 ``` rust ignore
-let person = Person { id: 123, name: "John".into(), age: 42 };
-let dto: PersonDto = person.into();
-// and this:
-let dto = PersonDto { id: 123, name: "John".into(), age: 42 };
-let person: Person = dto.into();
+// When applied to a struct B:
+
+// #[from_owned(A)]
+impl std::convert::From<A> for B { ... }
+
+// #[from_ref(A)]
+impl std::convert::From<&A> for B { ... }
+
+// #[owned_into(A)]
+impl std::convert::Into<A> for B { ... }
+
+// #[ref_into(A)]
+impl std::convert::Into<A> for &B { ... }
+
+// #[owned_into_existing(A)]
+impl o2o::traits::IntoExisting<A> for B { ... }
+
+// #[ref_into_existing(A)]
+impl o2o::traits::IntoExisting<A> for &B { ... }
 ```
+
+o2o also has shortcuts to configure multiple trait implementations with fewer lines of code:
+
+|                              | #[map()] | #[from()]  | #[into()] | #[map_owned()] | #[map_ref()] | #[into_existing()] |
+| ---------------------------- | -------- | ---------- | --------- | ---------------| ------------ | -------------------|
+| **#[from_owned()]**          | ✔️       | ✔️          | ❌        | ✔️             | ❌           | ❌                |
+| **#[from_ref()]**            | ✔️       | ✔️          | ❌        | ❌            | ✔️            | ❌                |
+| **#[owned_into()]**          | ✔️       | ❌         | ✔️         | ✔️             | ❌           | ❌                |
+| **#[ref_into()]**            | ✔️       | ❌         | ✔️         | ❌            | ✔️            | ❌                |
+| **#[owned_into_existing()]** | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
+| **#[ref_into_existing()]**   | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
+
+E.g. following two bits of code are equivalent:
+
+``` rust
+struct Entity { }
+
+#[derive(o2o::o2o)]
+#[map(Entity)]
+struct EntityDto { }
+```
+
+``` rust
+struct Entity { }
+
+#[derive(o2o::o2o)]
+#[from_owned(Entity)]
+#[from_ref(Entity)]
+#[owned_into(Entity)]
+#[ref_into(Entity)]
+struct EntityDto { }
+```
+
+And before looking at some examples, let's talk about...
+
+## The (not so big) Problem
+
+This section may be useful for people which are not very familiar with Rust's procedural macros.
+
+Being procedural macro, o2o has knowledge only about the side of the mapping where `#[derive(o2o)]` is applied.
+
+``` rust ignore
+#[derive(o2o::o2o)]
+#[map(Entity)]
+struct EntityDto { }
+```
+
+In code above, o2o knows everything about `EntityDto`, but it doesn't know anything about `Entity`. It doens't know if it is a struct, doesn't know what fields it has, doesn't know if it is struct or a tuple, *it doesn't even know if it exists*.
+
+So unlike mappers from languages like C#, Java, Go etc. that can use reflection to find out what they need to know, `o2o` can only assume things.
+
+For the piece of code above, o2o will assume that:
+
+* `Entity` exists *(duh!)*
+* `Entity` is the same data type that `EntityDto` is (in this case a struct)
+* `Entity` has exactly the same fields that `EntityDto` has
+
+If o2o is wrong in any of its assumptions, you will have to tell it that.
+
+So now let's see how you do it...
+
+## Examples
 
 ### Different field name
 
@@ -322,8 +387,8 @@ struct Child {
 struct EntityDto {
     some_int: i32,
     // Here field name as well as type are different, so we pass in field name and tilde inline expression.
-    // Also, it doesn't hurt to use member level instruction #[map()], 
-    // which is broader than struct level instruction #[map_owned]
+    // Also, it doesn't hurt to use member trait instruction #[map()], 
+    // which is broader than trait instruction #[map_owned]
     #[map(children, ~.iter().map(|p|p.into()).collect())]
     children_vec: Vec<ChildDto>
 }
@@ -430,7 +495,7 @@ use o2o::o2o;
 
 #[derive(o2o)]
 #[map_owned(PersonDto)]
-#[ghost(zodiac_sign: {None})] // #[ghost()] struct level instruction accepts only braced closures.
+#[ghost(zodiac_sign: {None})] // #[ghost()] struct instruction accepts only braced closures.
 struct Person {
     id: i32,
     full_name: String,
@@ -473,7 +538,7 @@ enum ZodiacSign {}
 
 ## Expressions
 
-### Expressions for struct level instructions
+### Expressions for struct instructions
 
 ``` rust ignore
 #[ghost(field: { None })]
@@ -493,7 +558,7 @@ enum ZodiacSign {}
 // field: (|x: &Type| x.get_value())(&self),
 ```
 
-### Expressions for member level instructions
+### Expressions for member instructions
 
 ``` rust ignore
 #[map({ None })]
@@ -550,7 +615,7 @@ struct EmployeeDto {
     full_name: String,
 
     #[from(|x| Box::new(x.subordinate_of.as_ref().into()))]
-    #[into(subordinate_of, |x| Box::new(x.reports_to.as_ref().into()))]
+    #[into(subordinate_of, { Box::new(@.reports_to.as_ref().into()) })]
     reports_to: Box<EmployeeDto>,
 
     #[map(~.iter().map(|p| Box::new(p.as_ref().into())).collect())]

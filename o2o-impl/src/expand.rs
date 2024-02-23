@@ -98,7 +98,7 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
 
-        let wrapped_field = input.fields.iter().find(|f| f.attrs.field_attr(&Kind::OwnedInto, &struct_attr.ty).filter(|&g| g.wrapper).is_some());
+        let wrapped_field = input.fields.iter().find(|f| f.attrs.field_attr_core(&Kind::OwnedInto, &struct_attr.ty).filter(|&g| g.wrapper).is_some());
 
         if let Some(wrapped_field) = wrapped_field {
             let f = &wrapped_field.member;
@@ -111,7 +111,7 @@ fn struct_impl(input: Struct) -> TokenStream {
             let post_init = struct_post_init(&ctx);
             ctx.has_post_init = post_init.is_some();
             let init = struct_init_block(&ctx);
-            let dst = if struct_attr.ty.nameless || post_init.is_some() { TokenStream::new() } else { struct_attr.ty.path.clone() };
+            let dst = if struct_attr.ty.nameless_tuple || post_init.is_some() { TokenStream::new() } else { struct_attr.ty.path.clone() };
             quote_into_trait(&ctx, pre_init, quote!(#dst #init), post_init)
         }
     });
@@ -128,7 +128,7 @@ fn struct_impl(input: Struct) -> TokenStream {
         };
 
         let wrapped_field = input.fields.iter().find_map(|f|
-            f.attrs.field_attr(&Kind::RefInto, &struct_attr.ty)
+            f.attrs.field_attr_core(&Kind::RefInto, &struct_attr.ty)
                 .filter(|&g| g.wrapper)
                 .map(|x| (f, &x.action))
         );
@@ -148,7 +148,7 @@ fn struct_impl(input: Struct) -> TokenStream {
             let post_init = struct_post_init(&ctx);
             ctx.has_post_init = post_init.is_some();
             let init = struct_init_block(&ctx);
-            let dst = if struct_attr.ty.nameless || post_init.is_some() { TokenStream::new() } else { struct_attr.ty.path.clone() };
+            let dst = if struct_attr.ty.nameless_tuple || post_init.is_some() { TokenStream::new() } else { struct_attr.ty.path.clone() };
             quote_into_trait(&ctx, pre_init, quote!(#dst #init), post_init)
         }
     });
@@ -353,7 +353,7 @@ fn struct_init_block_inner(
         return quote!(#(#fragments)*)
     }
 
-    match (&ctx.kind, struct_kind_hint, ctx.input.named) {
+    match (&ctx.kind, struct_kind_hint, ctx.input.named_fields) {
         (Kind::FromOwned | Kind::FromRef, _, true) => quote!({#(#fragments)*}),
         (Kind::FromOwned | Kind::FromRef, _, false) => quote!((#(#fragments)*)),
         (_, StructKindHint::Struct, _) => quote!({#(#fragments)*}),
@@ -454,7 +454,7 @@ fn render_child(
     let child_data = children.find(|child_data| child_data.check_match(path)).unwrap();
     let ty = &child_data.ty;
     let init = struct_init_block_inner(fields, ctx, Some((field_ctx.0, Some(child_data), field_ctx.1 )));
-    match (ctx.input.named, hint) {
+    match (ctx.input.named_fields, hint) {
         (true, StructKindHint::Struct | StructKindHint::Unspecified) => quote!(#child_name: #ty #init,),
         (true, StructKindHint::Tuple) => quote!(#ty #init,),
         (false, StructKindHint::Tuple | StructKindHint::Unspecified) => quote!(#ty #init,),
@@ -543,7 +543,7 @@ fn render_line(
         },
         (syn::Member::Named(ident), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Struct | StructKindHint::Unspecified) =>{
             let field_name = attr.get_field_name_or(&f.member);
-            let right_side = attr.get_action_or(Some(f.member.to_token_stream()), ctx, || quote!(self.#ident));
+            let right_side = attr.get_action_or(Some(ident.to_token_stream()), ctx, || quote!(self.#ident));
             if ctx.has_post_init { quote!(obj.#field_name = #right_side;) } else { quote!(#field_name: #right_side,) }
         },
         (syn::Member::Named(ident), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Struct | StructKindHint::Unspecified) =>{
@@ -565,22 +565,22 @@ fn render_line(
             quote!(#ident: #right_side,)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Tuple | StructKindHint::Unspecified) =>{
-            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
+            let right_side = attr.get_action_or(Some(index.to_token_stream()), ctx, || quote!(self.#index));
             quote!(#right_side,)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Tuple | StructKindHint::Unspecified) =>{
             let field_path = get_field_path(attr.get_field_name_or(&f.member));
-            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
+            let right_side = attr.get_action_or(Some(index.to_token_stream()), ctx, || quote!(self.#index));
             quote!(other.#field_path = #right_side;)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Struct) =>{
             let field_name = attr.get_ident();
-            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
+            let right_side = attr.get_action_or(Some(index.to_token_stream()), ctx, || quote!(self.#index));
             if ctx.has_post_init { quote!(obj.#field_name = #right_side;) } else { quote!(#field_name: #right_side,) }
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Struct) =>{
             let field_path = get_field_path(attr.get_ident());
-            let right_side = attr.get_action_or(Some(get_field_path(&f.member)), ctx, || quote!(self.#index));
+            let right_side = attr.get_action_or(Some(index.to_token_stream()), ctx, || quote!(self.#index));
             quote!(other.#field_path = #right_side;)
         },
         (syn::Member::Unnamed(_), Some(attr), Kind::FromOwned | Kind::FromRef, _) =>{
@@ -626,10 +626,44 @@ fn type_closure_param(input: &TokenStream, ctx: &ImplContext) -> TokenStream {
         tokens.push(x.parse::<Token![|]>().unwrap().to_token_stream());
         tokens.push(x.parse().unwrap());
 
-        cl = TokenStream::from_iter(tokens.into_iter());
+        cl = TokenStream::from_iter(tokens);
         Ok(())
     }, input.clone()).unwrap();
     cl
+}
+
+fn replace_tilde_or_at_in_expr(input: &TokenStream, ident: &TokenStream, path: &TokenStream) -> TokenStream {
+    let mut tokens = Vec::new();
+
+    input.clone().into_iter().for_each(|x| {
+        let f = match x {
+            proc_macro2::TokenTree::Group(group) => {
+                let inner = replace_tilde_or_at_in_expr(&group.stream(), ident, path);
+                match group.delimiter() {
+                    proc_macro2::Delimiter::Parenthesis => quote!(( #inner )),
+                    proc_macro2::Delimiter::Brace => quote!({ #inner }),
+                    proc_macro2::Delimiter::Bracket => quote!([ #inner ]),
+                    proc_macro2::Delimiter::None => quote!(#inner)
+                }
+            },
+            proc_macro2::TokenTree::Punct(ppp) => {
+                let ch = ppp.as_char();
+
+                if ch == '~' {
+                    quote!(#path)
+                } else if ch == '@' {
+                    quote!(#ident)
+                } else {
+                    quote!(#ppp)
+                }
+            },
+            _ => quote!(#x)
+        };
+
+        tokens.push(f)
+    });
+
+    TokenStream::from_iter(tokens)
 }
 
 fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplContext) -> TokenStream {
@@ -648,7 +682,17 @@ fn quote_action(action: &Action, field_path: Option<TokenStream>, ctx: &ImplCont
             };
             quote!(#path #args)
         },
-        Action::InlineExpr(args) => args.clone(),
+        Action::InlineExpr(args) => {
+            let ident = match ctx.kind {
+                Kind::FromOwned | Kind::FromRef => quote!(value),
+                _ => quote!(self),
+            };
+            let path = match ctx.kind {
+                Kind::FromOwned | Kind::FromRef => quote!(value.#field_path),
+                _ => quote!(self.#field_path),
+            };
+            replace_tilde_or_at_in_expr(args, &ident, &path)
+        },
         Action::Closure(args) => {
             let ident = match ctx.kind {
                 Kind::FromOwned | Kind::FromRef => quote!(value),

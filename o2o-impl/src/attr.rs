@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Index;
 
@@ -61,7 +62,7 @@ pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
     pub path_str: String,
-    pub nameless: bool,
+    pub nameless_tuple: bool,
 }
 
 impl From<syn::Path> for TypePath {
@@ -70,7 +71,7 @@ impl From<syn::Path> for TypePath {
             span: value.span(),
             path: value.to_token_stream(),
             path_str: value.to_token_stream().to_string(),
-            nameless: false
+            nameless_tuple: false
         }
     }
 }
@@ -81,7 +82,7 @@ impl From<TokenStream> for TypePath {
             span: value.span(),
             path_str: value.to_string(),
             path: value,
-            nameless: true
+            nameless_tuple: true
         }
     }
 }
@@ -117,6 +118,19 @@ impl Kind {
     }
     pub fn is_into_existing(self) -> bool {
         self == Kind::OwnedIntoExisting || self == Kind::RefIntoExisting
+    }
+}
+
+impl Display for Kind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Kind::OwnedInto => f.write_str("owned_into"),
+            Kind::RefInto => f.write_str("ref_into"),
+            Kind::FromOwned => f.write_str("from_owned"),
+            Kind::FromRef => f.write_str("from_ref"),
+            Kind::OwnedIntoExisting => f.write_str("owned_into_existing"),
+            Kind::RefIntoExisting => f.write_str("ref_into_existing"),
+        }
     }
 }
 
@@ -233,17 +247,27 @@ pub(crate) struct FieldAttrs {
 }
 
 impl<'a> FieldAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &FieldAttrCore> {
-        self.attrs.iter().filter(move |x| x.applicable_to[kind]).map(|x| &x.attr)
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &FieldAttr> {
+        self.attrs.iter().filter(move |x| x.applicable_to[kind])
+    }
+
+    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind) -> impl Iterator<Item = &FieldAttrCore> {
+        self.iter_for_kind(kind).map(|x| &x.attr)
     }
 
     pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<ApplicableAttr> {
         self.ghost(container_ty, kind)
             .map(ApplicableAttr::Ghost)
-            .or_else(|| self.field_attr(kind, container_ty)
-                .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, container_ty) } else { None })
-                .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, container_ty) } else { None })
+            .or_else(|| self.field_attr_core(kind, container_ty)
+                .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr_core(&Kind::OwnedInto, container_ty) } else { None })
+                .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr_core(&Kind::RefInto, container_ty) } else { None })
                 .map(ApplicableAttr::Field))
+    }
+
+    pub(crate) fn applicable_field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&'a FieldAttr> {
+        self.field_attr(kind, container_ty)
+            .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, container_ty) } else { None })
+            .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, container_ty) } else { None })
     }
 
     pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&FieldChildAttr>{
@@ -263,10 +287,16 @@ impl<'a> FieldAttrs {
             .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
     }
 
-    pub(crate) fn field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&FieldAttrCore>{
+    pub(crate) fn field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&FieldAttr>{
         self.iter_for_kind(kind)
+            .find(|x| x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.iter_for_kind(kind).find(|x| x.attr.container_ty.is_none()))
+    }
+
+    pub(crate) fn field_attr_core(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&FieldAttrCore>{
+        self.iter_for_kind_core(kind)
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.iter_for_kind(kind).find(|x| x.container_ty.is_none()))
+            .or_else(|| self.iter_for_kind_core(kind).find(|x| x.container_ty.is_none()))
     }
 
     pub(crate) fn merge(&'a mut self, other: Self) {
@@ -314,7 +344,7 @@ impl Parse for StructAttrCore {
             let content_stream = content.parse::<TokenStream>()?;
             quote!((#content_stream)).into()
         } else { input.parse::<syn::Path>()?.into() };
-        let struct_kind_hint = if ty.nameless { StructKindHint::Tuple } else { try_parse_struct_kind_hint(input)? };
+        let struct_kind_hint = if ty.nameless_tuple { StructKindHint::Tuple } else { try_parse_struct_kind_hint(input)? };
         let init_data: Option<Punctuated<InitData, Token![,]>> = if input.peek(Token![|]) {
             input.parse::<Token![|]>()?;
             Some(Punctuated::parse_separated_nonempty(input)?)
@@ -493,6 +523,7 @@ impl Parse for WrappedAttr {
 #[derive(Clone)]
 pub(crate) struct FieldAttr  {
     pub attr: FieldAttrCore,
+    pub original_instr: String,
     applicable_to: ApplicableTo,
 }
 
@@ -738,7 +769,7 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
         "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
         "wrapped" => Ok(StructInstruction::Wrapped(syn::parse2(input)?)),
-        _ if bark => Err(Error::new(instr.span(), format_args!("Struct level instruction '{}' is not supported.", instr))),
+        _ if bark => Err(Error::new(instr.span(), format_args!("Struct instruction '{}' is not supported.", instr))),
         _ => Ok(StructInstruction::Unrecognized),
     }
 }
@@ -750,6 +781,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
             Ok(MemberInstruction::Map(FieldAttr { 
                 attr: syn::parse2(input)?, 
+                original_instr: instr_str.clone(),
                 applicable_to: [
                     appl_owned_into(instr_str), 
                     appl_ref_into(instr_str), 
@@ -779,7 +811,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
         },
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
         "wrapper" => Ok(MemberInstruction::Wrapper(syn::parse2(input)?)),
-        _ if bark => Err(Error::new(instr.span(), format_args!("Member level instruction '{}' is not supported.", instr))),
+        _ if bark => Err(Error::new(instr.span(), format_args!("Member instruction '{}' is not supported.", instr))),
         _ => Ok(MemberInstruction::Unrecognized)
     }
 }
@@ -970,6 +1002,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
             action: Some(Action::InlineTildeExpr(quote!(as #this_ty))),
             wrapper: false,
         }, 
+        original_instr: "as_type".into(),
         applicable_to: [false, false, true, true, false, false]
     });
     attrs.push(FieldAttr { 
@@ -979,6 +1012,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
             action: Some(Action::InlineTildeExpr(quote!(as #that_ty))),
             wrapper: false
         }, 
+        original_instr: "as_type".into(),
         applicable_to: [true, true, false, false, true, true]
     });
 }
@@ -991,6 +1025,7 @@ pub(crate) fn add_wrapper_attrs (container_ty: &Option<TypePath>, attr: WrapperA
             action: Some(Action::InlineAtExpr(TokenStream::new())),
             wrapper: true,
         }, 
+        original_instr: "wrapper".into(),
         applicable_to: [false ^ inverse, attr.0.is_none() & inverse, true ^ inverse, attr.0.is_none() & !inverse, false, false]
     });
     attrs.push(FieldAttr { 
@@ -1000,6 +1035,7 @@ pub(crate) fn add_wrapper_attrs (container_ty: &Option<TypePath>, attr: WrapperA
             action: None,
             wrapper: true,
         }, 
+        original_instr: "wrapper".into(),
         applicable_to: [true ^ inverse, attr.0.is_none() & !inverse, false ^ inverse, attr.0.is_none() & inverse, false, false]
     });
 
@@ -1011,6 +1047,7 @@ pub(crate) fn add_wrapper_attrs (container_ty: &Option<TypePath>, attr: WrapperA
                 action: Some(Action::InlineAtExpr(action.clone())),
                 wrapper: true,
             }, 
+            original_instr: "wrapper".into(),
             applicable_to: [false, false ^ inverse, false, true ^ inverse, false, false]
         });
         attrs.push(FieldAttr { 
@@ -1020,6 +1057,7 @@ pub(crate) fn add_wrapper_attrs (container_ty: &Option<TypePath>, attr: WrapperA
                 action: Some(Action::InlineTildeExpr(action)),
                 wrapper: true,
             }, 
+            original_instr: "wrapper".into(),
             applicable_to: [false, true ^ inverse, false, false ^ inverse, false, false]
         });
     }
