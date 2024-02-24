@@ -81,11 +81,17 @@ impl From<&EnumWithData> for EnumWithDataDto {
     }
 }
 
+#[derive(o2o::o2o)]
+#[from_owned(Test2)]
 enum Test {
     Opt1(i32, String),
     Opt2 { val: i32, str: String}
 }
 
+enum Test2 {
+    Opt1(i32, String),
+    Opt2 { val: i32, str: String}
+}
 
 struct Entity {
     item_1: String,

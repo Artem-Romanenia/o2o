@@ -1,4 +1,3 @@
-use std::cmp::max_by;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Index;
@@ -9,7 +8,9 @@ use syn::parse::{ParseStream, Parse};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Brace, Paren};
-use syn::{Attribute, Ident, Result, Token, Member, parenthesized, braced, WherePredicate, Error};
+use syn::{braced, parenthesized, Attribute, Error, Field, Ident, Member, Result, Token, WherePredicate};
+
+use crate::ast::DataTypeMember;
 
 struct OptionalParenthesizedTokenStream {
     content: Option<TokenStream>
@@ -32,24 +33,6 @@ impl OptionalParenthesizedTokenStream {
         match self.content {
             Some(content) => content,
             None => TokenStream::new()
-        }
-    }
-}
-
-pub enum DataTypeMember<'a> {
-    Field(&'a syn::Field),
-    Variant(&'a syn::Variant)
-}
-
-impl<'a> DataTypeMember<'a> {
-    fn get_attrs(&'a self) -> Vec<Attribute> {
-        match self {
-            DataTypeMember::Field(f) => {
-                f.attrs
-            },
-            DataTypeMember::Variant(v) => {
-                v.attrs
-            }
         }
     }
 }
@@ -741,15 +724,26 @@ pub(crate) fn get_field_attrs(input: DataTypeMember) -> Result<FieldAttrs> {
             MemberInstruction::Child(attr) => child_attrs.push(attr),
             MemberInstruction::Ghost(attr) => ghost_attrs.push(attr),
             MemberInstruction::Parent(attr) => parent_attrs.push(attr),
-            MemberInstruction::As(attr) => add_as_type_attrs(&input, attr, &mut attrs),
+            MemberInstruction::As(attr) => {
+                match input {
+                    DataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs),
+                    DataTypeMember::Variant(_) => panic!("weird")
+                };
+            },
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
             MemberInstruction::Wrapper(attr) => {
-                let container_ty: TypePath = match &input.ty {
-                    syn::Type::Path(path) => path.path.clone().into(),
-                    _ => panic!("weird")
+                match input {
+                    DataTypeMember::Field(f) => {
+                        let container_ty: TypePath = match &f.ty {
+                            syn::Type::Path(path) => path.path.clone().into(),
+                            _ => panic!("weird")
+                        };
+                        add_wrapper_attrs(&Some(container_ty), attr, &mut attrs, false)        
+                    },
+                    DataTypeMember::Variant(_) => panic!("weird")
                 };
-                add_wrapper_attrs(&Some(container_ty), attr, &mut attrs, false)
+                
             },
             MemberInstruction::Unrecognized => ()
         };
@@ -1011,12 +1005,7 @@ fn validate_closure(input: ParseStream) -> Result<()> {
     Ok(())
 }
 
-fn add_as_type_attrs(input: &DataTypeMember, attr: AsAttr, attrs: &mut Vec<FieldAttr>) {
-    let input = match input {
-        DataTypeMember::Field(f) => f,
-        DataTypeMember::Variant(_) => panic!("weird")
-    };
-
+fn add_as_type_attrs(input: &Field, attr: AsAttr, attrs: &mut Vec<FieldAttr>) {
     let this_ty = input.ty.to_token_stream();
     let that_ty = attr.tokens;
     attrs.push(FieldAttr { 

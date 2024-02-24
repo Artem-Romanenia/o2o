@@ -1,9 +1,9 @@
-use crate::attr::{self, DataTypeMember};
+use crate::attr::{self};
 use crate::attr::{FieldAttrs, StructAttrs};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
+use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
 
 pub(crate) struct Struct<'a> {
     pub attrs: StructAttrs,
@@ -140,5 +140,33 @@ impl<'a> Variant {
             fields,
             named_fields: matches!(&variant.fields, Fields::Named(_)),
         })
+    }
+}
+
+pub(crate) enum DataType<'a> {
+    Struct(&'a Struct<'a>),
+    Enum(&'a Enum<'a>)
+}
+
+impl<'a> DataType<'a> {
+    pub fn get_attrs(&'a self) -> &'a StructAttrs {
+        match self {
+            DataType::Struct(s) => &s.attrs,
+            DataType::Enum(e) => &e.attrs
+        }
+    }
+}
+
+pub(crate) enum DataTypeMember<'a> {
+    Field(&'a syn::Field),
+    Variant(&'a syn::Variant)
+}
+
+impl<'a> DataTypeMember<'a> {
+    pub fn get_attrs(&'a self) -> &'a Vec<Attribute> {
+        match self {
+            DataTypeMember::Field(f) => &f.attrs,
+            DataTypeMember::Variant(v) => &v.attrs
+        }
     }
 }

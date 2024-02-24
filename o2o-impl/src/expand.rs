@@ -1,6 +1,6 @@
 use std::{slice::Iter, iter::Peekable, collections::HashSet};
 
-use crate::{ast::{Enum, Field, Struct}, attr::{
+use crate::{ast::{DataType, Enum, Field, Struct}, attr::{
     Action, ApplicableAttr, ChildData, ChildPath, FieldAttrs, GhostData, InitData, Kind, StructKindHint, TypePath, WrappedAttr, WrapperAttr
 }, validate::validate};
 use proc_macro2::{TokenStream, Ident, Span};
@@ -11,14 +11,14 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
     match &node.data {
         Data::Struct(data) => {
             let input = Struct::from_syn(node, data)?;
-            validate(&input)?;
+            validate(DataType::Struct(&input))?;
             Ok(struct_impl(input))
         },
         Data::Enum(data) => {
             let input = Enum::from_syn(node, data)?;
-            //validate(&input)?;
+            validate(DataType::Enum(&input))?;
+            Ok(TokenStream::new())
             //Ok(struct_impl(input))
-            todo!()
         },
         _ => Err(Error::new_spanned(
             node,
