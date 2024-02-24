@@ -1,3 +1,4 @@
+use std::cmp::max_by;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Index;
@@ -31,6 +32,24 @@ impl OptionalParenthesizedTokenStream {
         match self.content {
             Some(content) => content,
             None => TokenStream::new()
+        }
+    }
+}
+
+pub enum DataTypeMember<'a> {
+    Field(&'a syn::Field),
+    Variant(&'a syn::Variant)
+}
+
+impl<'a> DataTypeMember<'a> {
+    fn get_attrs(&'a self) -> Vec<Attribute> {
+        match self {
+            DataTypeMember::Field(f) => {
+                f.attrs
+            },
+            DataTypeMember::Variant(v) => {
+                v.attrs
+            }
         }
     }
 }
@@ -689,9 +708,9 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
     Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs, wrapped_attrs })
 }
 
-pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
+pub(crate) fn get_field_attrs(input: DataTypeMember) -> Result<FieldAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
-    for x in input.attrs.iter() {
+    for x in input.get_attrs().iter() {
         if x.path.is_ident("doc"){
             continue;
         } else if x.path.is_ident("o2o") {
@@ -722,7 +741,7 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
             MemberInstruction::Child(attr) => child_attrs.push(attr),
             MemberInstruction::Ghost(attr) => ghost_attrs.push(attr),
             MemberInstruction::Parent(attr) => parent_attrs.push(attr),
-            MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
+            MemberInstruction::As(attr) => add_as_type_attrs(&input, attr, &mut attrs),
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
             MemberInstruction::Wrapper(attr) => {
@@ -992,7 +1011,12 @@ fn validate_closure(input: ParseStream) -> Result<()> {
     Ok(())
 }
 
-fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr>) {
+fn add_as_type_attrs(input: &DataTypeMember, attr: AsAttr, attrs: &mut Vec<FieldAttr>) {
+    let input = match input {
+        DataTypeMember::Field(f) => f,
+        DataTypeMember::Variant(_) => panic!("weird")
+    };
+
     let this_ty = input.ty.to_token_stream();
     let that_ty = attr.tokens;
     attrs.push(FieldAttr { 

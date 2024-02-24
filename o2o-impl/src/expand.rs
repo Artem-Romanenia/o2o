@@ -1,8 +1,7 @@
 use std::{slice::Iter, iter::Peekable, collections::HashSet};
 
-use crate::{ast::{Struct, Field}, attr::{
-    Action, ChildData, Kind, StructKindHint, ApplicableAttr, TypePath, 
-    GhostData, ChildPath, WrappedAttr, FieldAttrs, WrapperAttr, InitData
+use crate::{ast::{Enum, Field, Struct}, attr::{
+    Action, ApplicableAttr, ChildData, ChildPath, FieldAttrs, GhostData, InitData, Kind, StructKindHint, TypePath, WrappedAttr, WrapperAttr
 }, validate::validate};
 use proc_macro2::{TokenStream, Ident, Span};
 use syn::{DeriveInput, Result, Error, Data, parse::ParseStream, Token, Member, Index, punctuated::Punctuated};
@@ -15,9 +14,15 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
             validate(&input)?;
             Ok(struct_impl(input))
         },
+        Data::Enum(data) => {
+            let input = Enum::from_syn(node, data)?;
+            //validate(&input)?;
+            //Ok(struct_impl(input))
+            todo!()
+        },
         _ => Err(Error::new_spanned(
             node,
-            "#[derive(o2o)] only supports structs.",
+            "#[derive(o2o)] only supports structs and enums.",
         ))
     }
 }
