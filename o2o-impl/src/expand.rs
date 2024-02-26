@@ -11,14 +11,15 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
     match &node.data {
         Data::Struct(data) => {
             let input = Struct::from_syn(node, data)?;
-            validate(DataType::Struct(&input))?;
+            let input = DataType::Struct(&input);
+            validate(input)?;
             Ok(struct_impl(input))
         },
         Data::Enum(data) => {
             let input = Enum::from_syn(node, data)?;
-            validate(DataType::Enum(&input))?;
-            Ok(TokenStream::new())
-            //Ok(struct_impl(input))
+            let input = DataType::Enum(&input);
+            validate(input)?;
+            Ok(struct_impl(input))
         },
         _ => Err(Error::new_spanned(
             node,
@@ -28,7 +29,7 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
 }
 
 struct ImplContext<'a> {
-    input: &'a Struct<'a>,
+    input: &'a DataType<'a>,
     kind: Kind,
     struct_kind_hint: StructKindHint,
     dst_ty: &'a TokenStream,
@@ -37,10 +38,11 @@ struct ImplContext<'a> {
     has_post_init: bool
 }
 
-fn struct_impl(input: Struct) -> TokenStream {
-    let ty = input.ident.to_token_stream();
+fn struct_impl(input: DataType) -> TokenStream {
+    let ty = input.get_ident().to_token_stream();
+    let attrs = input.get_attrs();
 
-    let from_owned_impls = input.attrs.iter_for_kind(&Kind::FromOwned).map(|struct_attr| {
+    let from_owned_impls = attrs.iter_for_kind(&Kind::FromOwned).map(|struct_attr| {
         let ctx = ImplContext{
             input: &input,
             kind: Kind::FromOwned,
@@ -51,7 +53,7 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
 
-        if let Some(wrapped_attr) = input.attrs.wrapped_attr(ctx.container_ty) {
+        if let Some(wrapped_attr) = attrs.wrapped_attr(ctx.container_ty) {
             let f = &wrapped_attr.ident;
             quote_from_trait(&ctx, None, quote!(value.#f))
         } else {
@@ -64,7 +66,7 @@ fn struct_impl(input: Struct) -> TokenStream {
         }
     });
 
-    let from_ref_impls = input.attrs.iter_for_kind(&Kind::FromRef).map(|struct_attr| {
+    let from_ref_impls = attrs.iter_for_kind(&Kind::FromRef).map(|struct_attr| {
         let ctx = ImplContext{
             input: &input,
             kind: Kind::FromRef,
@@ -75,7 +77,7 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
 
-        if let Some(wrapped_attr) = input.attrs.wrapped_attr(ctx.container_ty) {
+        if let Some(wrapped_attr) = attrs.wrapped_attr(ctx.container_ty) {
             let f = &wrapped_attr.ident;
             let field_path = match &wrapped_attr.action {
                 Some(action) =>  quote_action(&Action::InlineTildeExpr(action.clone()), Some(f.to_token_stream()), &ctx),
@@ -92,7 +94,7 @@ fn struct_impl(input: Struct) -> TokenStream {
         }
     });
 
-    let owned_into_impls = input.attrs.iter_for_kind(&Kind::OwnedInto).map(|struct_attr| {
+    let owned_into_impls = attrs.iter_for_kind(&Kind::OwnedInto).map(|struct_attr| {
         let mut ctx = ImplContext{
             input: &input,
             kind: Kind::OwnedInto,
@@ -103,7 +105,7 @@ fn struct_impl(input: Struct) -> TokenStream {
             has_post_init: false,
         };
 
-        let wrapped_field = input.fields.iter().find(|f| f.attrs.field_attr_core(&Kind::OwnedInto, &struct_attr.ty).filter(|&g| g.wrapper).is_some());
+        let wrapped_field = input.get_field(&struct_attr.ty);
 
         if let Some(wrapped_field) = wrapped_field {
             let f = &wrapped_field.member;
@@ -121,7 +123,7 @@ fn struct_impl(input: Struct) -> TokenStream {
         }
     });
 
-    let ref_into_impls = input.attrs.iter_for_kind(&Kind::RefInto).map(|struct_attr| {
+    let ref_into_impls = attrs.iter_for_kind(&Kind::RefInto).map(|struct_attr| {
         let mut ctx = ImplContext{
             input: &input,
             kind: Kind::RefInto,
@@ -158,7 +160,7 @@ fn struct_impl(input: Struct) -> TokenStream {
         }
     });
 
-    let owned_into_existing_impls = input.attrs.iter_for_kind(&Kind::OwnedIntoExisting).map(|struct_attr| {
+    let owned_into_existing_impls = attrs.iter_for_kind(&Kind::OwnedIntoExisting).map(|struct_attr| {
         let mut ctx = ImplContext{
             input: &input,
             kind: Kind::OwnedIntoExisting,
@@ -179,7 +181,7 @@ fn struct_impl(input: Struct) -> TokenStream {
         quote_into_existing_trait(&ctx, pre_init, init, post_init)
     });
 
-    let ref_into_existing_impls = input.attrs.iter_for_kind(&Kind::RefIntoExisting).map(|struct_attr| {
+    let ref_into_existing_impls = attrs.iter_for_kind(&Kind::RefIntoExisting).map(|struct_attr| {
         let mut ctx = ImplContext{
             input: &input,
             kind: Kind::RefIntoExisting,

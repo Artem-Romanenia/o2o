@@ -1,4 +1,4 @@
-use crate::attr::{self};
+use crate::attr::{self, Kind, TypePath};
 use crate::attr::{FieldAttrs, StructAttrs};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -149,9 +149,33 @@ pub(crate) enum DataType<'a> {
 }
 
 impl<'a> DataType<'a> {
+    pub fn get_ident(&'a self) -> &Ident {
+        match self {
+            DataType::Struct(s) => &s.ident,
+            DataType::Enum(e) => &e.ident
+        }
+    }
+
     pub fn get_attrs(&'a self) -> &'a StructAttrs {
         match self {
             DataType::Struct(s) => &s.attrs,
+            DataType::Enum(e) => &e.attrs
+        }
+    }
+
+    pub fn get_field(&'a self, ty: &TypePath) -> Option<&Field> {
+        match self {
+            DataType::Struct(s) => s.fields.iter().find(|f| 
+                f.attrs.field_attr_core(&Kind::OwnedInto, ty)
+                    .filter(|&g| g.wrapper).is_some()
+            ),
+            DataType::Enum(e) => None
+        }
+    }
+
+    pub fn get_smt(&'a self) -> &Vec<Field> {
+        match self {
+            DataType::Struct(s) => &s.fields,
             DataType::Enum(e) => &e.attrs
         }
     }

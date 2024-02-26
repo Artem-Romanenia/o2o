@@ -82,10 +82,15 @@ impl From<&EnumWithData> for EnumWithDataDto {
 }
 
 #[derive(o2o::o2o)]
-#[from_owned(Test2)]
+#[map_owned(Test2)]
 enum Test {
+    #[map_owned(test)]
     Opt1(i32, String),
-    Opt2 { val: i32, str: String}
+    Opt2 { 
+        val: i32,
+        #[map_owned(strtrtr)]
+        str: String
+    }
 }
 
 enum Test2 {
