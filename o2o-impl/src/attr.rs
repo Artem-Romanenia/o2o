@@ -10,7 +10,7 @@ use syn::spanned::Spanned;
 use syn::token::{Brace, Paren};
 use syn::{braced, parenthesized, Attribute, Error, Field, Ident, Member, Result, Token, WherePredicate};
 
-use crate::ast::DataTypeMember;
+use crate::ast::SynDataTypeMember;
 
 struct OptionalParenthesizedTokenStream {
     content: Option<TokenStream>
@@ -326,11 +326,13 @@ pub(crate) enum StructKindHint {
     Unspecified = 2
 }
 
+#[derive(Clone)]
 pub(crate) struct StructAttr {
     pub attr: StructAttrCore,
     pub applicable_to: ApplicableTo,
 }
 
+#[derive(Clone)]
 pub(crate) struct StructAttrCore {
     pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
@@ -360,6 +362,7 @@ impl Parse for StructAttrCore {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct InitData {
     pub ident: Ident,
     _colon: Token![:],
@@ -691,7 +694,7 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
     Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs, wrapped_attrs })
 }
 
-pub(crate) fn get_field_attrs(input: DataTypeMember) -> Result<FieldAttrs> {
+pub(crate) fn get_field_attrs(input: SynDataTypeMember) -> Result<FieldAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
     for x in input.get_attrs().iter() {
         if x.path.is_ident("doc"){
@@ -726,22 +729,22 @@ pub(crate) fn get_field_attrs(input: DataTypeMember) -> Result<FieldAttrs> {
             MemberInstruction::Parent(attr) => parent_attrs.push(attr),
             MemberInstruction::As(attr) => {
                 match input {
-                    DataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs),
-                    DataTypeMember::Variant(_) => panic!("weird")
+                    SynDataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs),
+                    SynDataTypeMember::Variant(_) => panic!("weird")
                 };
             },
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
             MemberInstruction::Wrapper(attr) => {
                 match input {
-                    DataTypeMember::Field(f) => {
+                    SynDataTypeMember::Field(f) => {
                         let container_ty: TypePath = match &f.ty {
                             syn::Type::Path(path) => path.path.clone().into(),
                             _ => panic!("weird")
                         };
                         add_wrapper_attrs(&Some(container_ty), attr, &mut attrs, false)        
                     },
-                    DataTypeMember::Variant(_) => panic!("weird")
+                    SynDataTypeMember::Variant(_) => panic!("weird")
                 };
                 
             },

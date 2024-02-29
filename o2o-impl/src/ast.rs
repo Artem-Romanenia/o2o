@@ -1,4 +1,4 @@
-use crate::attr::{self, Kind, TypePath};
+use crate::attr::{self, Action, Kind, TypePath};
 use crate::attr::{FieldAttrs, StructAttrs};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -27,6 +27,7 @@ impl<'a> Struct<'a> {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Field {
     pub attrs: FieldAttrs,
     pub idx: usize,
@@ -64,7 +65,7 @@ impl<'a> Field {
 
     fn from_syn(i: usize, field: &'a syn::Field) -> Result<Self> {
         Ok(Field {
-            attrs: attr::get_field_attrs(DataTypeMember::Field(field))?,
+            attrs: attr::get_field_attrs(SynDataTypeMember::Field(field))?,
             idx: i,
             member: field.ident.clone().map(Member::Named).unwrap_or_else(|| {
                 Member::Unnamed(Index {
@@ -98,6 +99,7 @@ impl<'a> Enum<'a> {
 
 pub(crate) struct Variant {
     pub attrs: FieldAttrs,
+    pub ident: Ident,
     pub idx: usize,
     pub fields: Vec<Field>,
     pub named_fields: bool,
@@ -135,7 +137,8 @@ impl<'a> Variant {
     fn from_syn(i: usize, variant: &'a syn::Variant) -> Result<Self> {
         let fields = Field::multiple_from_syn(&variant.fields)?;
         Ok(Variant {
-            attrs: attr::get_field_attrs(DataTypeMember::Variant(&variant))?,
+            attrs: attr::get_field_attrs(SynDataTypeMember::Variant(&variant))?,
+            ident: variant.ident.clone(),
             idx: i,
             fields,
             named_fields: matches!(&variant.fields, Fields::Named(_)),
@@ -163,6 +166,20 @@ impl<'a> DataType<'a> {
         }
     }
 
+    pub fn get_members(&'a self) -> Vec<DataTypeMember> {
+        match self {
+            DataType::Struct(s) => s.fields.iter().map(|x| DataTypeMember::Field(x)).collect(),
+            DataType::Enum(e) => e.variants.iter().map(|x| DataTypeMember::Variant(x)).collect()
+        }
+    }
+
+    pub fn get_generics(&'a self) -> &'a Generics {
+        match self {
+            DataType::Struct(s) => &s.generics,
+            DataType::Enum(e) => &e.generics
+        }
+    }
+
     pub fn get_field(&'a self, ty: &TypePath) -> Option<&Field> {
         match self {
             DataType::Struct(s) => s.fields.iter().find(|f| 
@@ -173,21 +190,40 @@ impl<'a> DataType<'a> {
         }
     }
 
-    pub fn get_smt(&'a self) -> &Vec<Field> {
+    pub fn get_field_with_action(&'a self, ty: &TypePath) -> Option<(&Field, &Option<Action>)> {
         match self {
-            DataType::Struct(s) => &s.fields,
-            DataType::Enum(e) => &e.attrs
+            DataType::Struct(s) => s.fields.iter().find_map(|f|
+                f.attrs.field_attr_core(&Kind::RefInto, ty)
+                    .filter(|&g| g.wrapper)
+                    .map(|x| (f, &x.action))
+            ),
+            DataType::Enum(e) => None
         }
     }
 }
 
-pub(crate) enum DataTypeMember<'a> {
+pub(crate) enum SynDataTypeMember<'a> {
     Field(&'a syn::Field),
     Variant(&'a syn::Variant)
 }
 
-impl<'a> DataTypeMember<'a> {
+impl<'a> SynDataTypeMember<'a> {
     pub fn get_attrs(&'a self) -> &'a Vec<Attribute> {
+        match self {
+            SynDataTypeMember::Field(f) => &f.attrs,
+            SynDataTypeMember::Variant(v) => &v.attrs
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum DataTypeMember<'a> {
+    Field(&'a Field),
+    Variant(&'a Variant)
+}
+
+impl<'a> DataTypeMember<'a> {
+    pub fn get_attrs(&'a self) -> &'a FieldAttrs {
         match self {
             DataTypeMember::Field(f) => &f.attrs,
             DataTypeMember::Variant(v) => &v.attrs

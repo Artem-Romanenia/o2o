@@ -4,7 +4,7 @@ use quote::ToTokens;
 use syn::{spanned::Spanned, Result};
 use crate::{ast::{DataType, Struct}, attr::{ChildrenAttr, FieldChildAttr, Kind, StructAttrCore, StructAttrs, StructGhostAttr, StructKindHint, TypePath, WhereAttr}};
 
-pub(crate) fn validate(input: DataType) -> Result<()> {
+pub(crate) fn validate(input: &DataType) -> Result<()> {
     let attrs = input.get_attrs();
     let mut errors: HashMap<String, Span> = HashMap::new();
 
