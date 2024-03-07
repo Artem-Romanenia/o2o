@@ -19,8 +19,8 @@ pub(crate) struct Field {
 
 impl<'a> Struct<'a> {
     pub fn from_syn(node: &'a DeriveInput, data: &'a DataStruct) -> Result<Self> {
-        let attrs = attr::get_struct_attrs(&node.attrs)?;
-        let fields = Field::multiple_from_syn(&data.fields)?;
+        let (attrs, bark) = attr::get_struct_attrs(&node.attrs)?;
+        let fields = Field::multiple_from_syn(&data.fields, bark)?;
         Ok(Struct {
             attrs,
             ident: &node.ident,
@@ -32,14 +32,14 @@ impl<'a> Struct<'a> {
 }
 
 impl<'a> Field {
-    fn multiple_from_syn(fields: &'a Fields) -> Result<Vec<Self>> {
+    fn multiple_from_syn(fields: &'a Fields, bark: bool) -> Result<Vec<Self>> {
         let mut attrs_to_repeat = None;
 
         fields
             .iter()
             .enumerate()
             .map(|(i, field)| {
-                let mut field = Field::from_syn(i, field)?;
+                let mut field = Field::from_syn(i, field, bark)?;
 
                 if field.attrs.stop_repeat {
                     attrs_to_repeat = None;
@@ -60,9 +60,9 @@ impl<'a> Field {
             .collect()
     }
 
-    fn from_syn(i: usize, node: &'a syn::Field) -> Result<Self> {
+    fn from_syn(i: usize, node: &'a syn::Field, bark: bool) -> Result<Self> {
         Ok(Field {
-            attrs: attr::get_field_attrs(node)?,
+            attrs: attr::get_field_attrs(node, bark)?,
             idx: i,
             member: node.ident.clone().map(Member::Named).unwrap_or_else(|| {
                 Member::Unnamed(Index {

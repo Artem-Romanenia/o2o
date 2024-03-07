@@ -9,11 +9,11 @@ struct Person {
 }
 
 #[derive(o2o)]
-#[from_owned(Person| first_name: {@.first_name}, last_name: {@.last_name})]
-#[from_ref(Person| first_name: {@.first_name.clone()}, last_name: {@.last_name.clone()})]
-#[into(Person| first: {"John"}, last: {"Doe"})]
-#[into_existing(Person| first: {"John"}, last: {"Doe"})]
-#[ghost(first_name: {first.into()}, last_name: {last.into()})]
+#[o2o(from_owned(Person| vars(first_name: {@.first_name}, last_name: {@.last_name})))]
+#[from_ref(Person| vars(first_name: {@.first_name.clone()}, last_name: {@.last_name.clone()}))]
+#[into(Person| vars(first: {"John"}, last: {"Doe"}))]
+#[into_existing(Person| vars(first: {"John"}, last: {"Doe"}))]
+#[ghosts(first_name: {first.into()}, last_name: {last.into()})]
 struct PersonDto {
     age: i8,
     #[ghost({format!("{} {}", first_name, last_name)})]

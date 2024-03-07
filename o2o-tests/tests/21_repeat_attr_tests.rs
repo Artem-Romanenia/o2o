@@ -30,7 +30,7 @@ struct Machine {
 #[map(Car)]
 #[into_existing(Car)]
 #[children(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghost(vehicle.machine@id: { 321 })]
+#[ghosts(vehicle.machine@id: { 321 })]
 struct CarDto {
     number_of_doors: i8,
 

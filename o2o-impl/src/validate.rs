@@ -32,7 +32,7 @@ pub(crate) fn validate(input: &Struct) -> Result<()> {
     validate_children_attrs(&input.attrs.children_attrs, &type_paths, &mut errors);
     validate_where_attrs(&input.attrs.where_attrs, &type_paths, &mut errors);
 
-    validate_fields(input, &input.attrs, &mut errors);
+    validate_fields(input, &input.attrs, &type_paths, &mut errors);
 
     if errors.is_empty() {
         Ok(())
@@ -56,7 +56,7 @@ fn validate_struct_attrs<'a, I: Iterator<Item = &'a StructAttrCore>>(attrs: I, e
 
 fn validate_ghost_attrs(kind: &Kind, ghost_attrs: &[StructGhostAttr], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     if ghost_attrs.iter().filter(|x|x.applicable_to[kind] && x.attr.container_ty.is_none()).count() > 1 {
-        errors.insert("There can be at most one default #[ghost(...)] instruction.".into(), Span::call_site());
+        errors.insert("There can be at most one default #[ghosts(...)] instruction.".into(), Span::call_site());
     }
 
     let mut unique_dedicated_attr_type_path = HashSet::new();
@@ -64,7 +64,7 @@ fn validate_ghost_attrs(kind: &Kind, ghost_attrs: &[StructGhostAttr], type_paths
     for ghost_attr in ghost_attrs.iter().filter(|x|x.applicable_to[kind] && x.attr.container_ty.is_some()) {
         let tp = ghost_attr.attr.container_ty.as_ref().unwrap();
         if !type_paths.contains(tp) {
-            errors.insert("Type {} doesn't match any type specified in trait instructions.".into(), tp.span);
+            errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
         }
         if !unique_dedicated_attr_type_path.insert(tp) {
             errors.insert("Dedicated #[ghost(...)] instruction for  type {} is already defined.".into(), tp.span);
@@ -82,7 +82,7 @@ fn validate_children_attrs(children_attrs: &[ChildrenAttr], type_paths: &HashSet
     for children_attr in children_attrs.iter() {
         if let Some(tp) = &children_attr.container_ty{
             if !type_paths.contains(tp) {
-                errors.insert("Type {} doesn't match any type specified in trait instructions.".into(), tp.span);
+                errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
             }
             if !unique_dedicated_attr_type_path.insert(tp) {
                 errors.insert("Dedicated #[children(...)] instruction for  type {} is already defined.".into(), tp.span);
@@ -109,7 +109,7 @@ fn validate_where_attrs(where_attrs: &[WhereAttr], type_paths: &HashSet<&TypePat
     for where_attr in where_attrs.iter() {
         if let Some(tp) = &where_attr.container_ty{
             if !type_paths.contains(tp) {
-                errors.insert("Type {} doesn't match any type specified in trait instructions.".into(), tp.span);
+                errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
             }
             if !unique_dedicated_attr_type_path.insert(tp) {
                 errors.insert("Dedicated #[where_clause(...)] instruction for  type {} is already defined.".into(), tp.span);
@@ -118,7 +118,27 @@ fn validate_where_attrs(where_attrs: &[WhereAttr], type_paths: &HashSet<&TypePat
     }
 }
 
-fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, errors: &mut HashMap<String, Span>) {
+fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
+    for field in &input.fields {
+        for field_attr in &field.attrs.attrs {
+            if let Some(tp) = &field_attr.attr.container_ty {
+                if !type_paths.contains(tp) {
+                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
+                }
+            }
+        }
+    }
+
+    for field in &input.fields {
+        for parent_attr in &field.attrs.parent_attrs {
+            if let Some(tp) = &parent_attr.container_ty {
+                if !type_paths.contains(tp) {
+                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
+                }
+            }
+        }
+    }
+
     let into_type_paths = struct_attrs.iter_for_kind(&Kind::OwnedInto)
         .chain(struct_attrs.iter_for_kind(&Kind::RefInto))
         .map(|x| &x.ty)
@@ -126,7 +146,14 @@ fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, errors: &mut Hash
 
     for child_attr in input.fields.iter().flat_map(|x| &x.attrs.child_attrs) {
         match &child_attr.container_ty {
-            Some(tp) => check_child_errors(child_attr, struct_attrs, tp, errors),
+            Some(tp) => {
+                if !type_paths.contains(tp) {
+                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
+                }
+                if into_type_paths.contains(tp) {
+                    check_child_errors(child_attr, struct_attrs, tp, errors)
+                }
+            },
             None => for tp in into_type_paths.iter(){
                 check_child_errors(child_attr, struct_attrs, tp, errors)
             }
@@ -135,11 +162,18 @@ fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, errors: &mut Hash
 
     let from_type_paths = struct_attrs.iter_for_kind(&Kind::FromOwned)
         .chain(struct_attrs.iter_for_kind(&Kind::FromRef))
+        .filter(|x| x.update.is_none())
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
 
     for field in &input.fields {
         for ghost_attr in field.attrs.ghost_attrs.iter() {
+            if let Some(tp) = &ghost_attr.attr.container_ty {
+                if !type_paths.contains(tp) {
+                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
+                }
+            }
+
             if ghost_attr.attr.action.is_some() {
                 continue;
             }
@@ -168,7 +202,7 @@ fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, errors: &mut Hash
             .chain(struct_attrs.iter_for_kind(&Kind::FromRef).map(|x| (x, Kind::FromRef)));
 
         for (struct_attr, kind) in struct_attrs {
-            if input.attrs.wrapped_attr(&struct_attr.ty).is_none() && struct_attr.struct_kind_hint == StructKindHint::Struct {
+            if struct_attr.quick_return.is_none() && struct_attr.struct_kind_hint == StructKindHint::Struct {
                 for field in &input.fields {
                     if field.attrs.ghost(&struct_attr.ty, &kind).is_some() || field.attrs.has_parent_attr(&struct_attr.ty) {
                         continue;
@@ -176,10 +210,10 @@ fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, errors: &mut Hash
 
                     if let Some(field_attr) = field.attrs.applicable_field_attr(&kind, &struct_attr.ty) {
                         if kind == Kind::FromOwned || kind == Kind::FromRef {
-                            if !field_attr.attr.wrapper && field_attr.attr.member.is_none() && field_attr.attr.action.is_none() {
+                            if field_attr.attr.member.is_none() && field_attr.attr.action.is_none() {
                                 errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {} or an action", field_attr.original_instr, field.member.to_token_stream(), struct_attr.ty.path), field.member.span());
                             }
-                        } else if !field_attr.attr.wrapper && field_attr.attr.member.is_none() {
+                        } else if field_attr.attr.member.is_none() {
                             errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {}", field_attr.original_instr, field.member.to_token_stream(), struct_attr.ty.path_str), field.member.span());
                         }
                     } else {

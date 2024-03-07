@@ -22,7 +22,7 @@ struct Machine {
 #[map(Car)]
 #[into_existing(Car)]
 #[children(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghost(vehicle.machine@id: || { 321 })]
+#[ghosts(vehicle.machine@id: { 321 })]
 struct CarDto {
     number_of_doors: i8,
 
@@ -67,7 +67,7 @@ pub struct Team {
     map(Team),
     into_existing(Team),
     children(base: Base, division: Division, division.base: Base, division.league: League, division.league.base: Base),
-    ghost_owned( 
+    ghosts_owned( 
         division_id: { @.division.id },
         division.base@id: { @.division.id },
         division.base@name: { @.division.name },
@@ -75,7 +75,7 @@ pub struct Team {
         division.league.base@id: { @.league.id },
         division.league.base@name: { @.league.name }
     ),
-    ghost_ref( 
+    ghosts_ref( 
         division_id: { @.division.id },
         division.base@id: { @.division.id },
         division.base@name: { @.division.name.clone() },
@@ -92,10 +92,10 @@ pub struct TeamDto {
     #[map(~.clone())]
 	name: String,
 
-    #[ghost(|x| (&x.division.base).into())]
+    #[ghost((&@.division.base).into())]
 	division: DivisionDto,
 
-    #[ghost(|x| (&x.division.league.base).into())]
+    #[ghost((&@.division.league.base).into())]
 	league: LeagueDto,
 }
 

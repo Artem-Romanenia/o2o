@@ -3,12 +3,14 @@ use std::hash::Hash;
 use std::ops::Index;
 
 use proc_macro2::{TokenStream, Span};
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::parse::{ParseStream, Parse};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Brace, Paren};
 use syn::{Attribute, Ident, Result, Token, Member, parenthesized, braced, WherePredicate, Error};
+
+use crate::kw;
 
 struct OptionalParenthesizedTokenStream {
     content: Option<TokenStream>
@@ -40,7 +42,7 @@ enum StructInstruction {
     Ghost(StructGhostAttr), 
     Where(WhereAttr),
     Children(ChildrenAttr),
-    Wrapped(WrappedAttr),
+    AllowUnknown,
     Unrecognized
 }
 
@@ -52,9 +54,7 @@ enum MemberInstruction {
     As(AsAttr),
     Repeat(RepeatFor),
     StopRepeat,
-    Wrapper(WrapperAttr),
     Unrecognized,
-    
 }
 
 #[derive(Clone)]
@@ -156,7 +156,6 @@ pub(crate) struct StructAttrs {
     pub ghost_attrs: Vec<StructGhostAttr>,
     pub where_attrs: Vec<WhereAttr>,
     pub children_attrs: Vec<ChildrenAttr>,
-    pub wrapped_attrs: Vec<WrappedAttr>,
 }
 
 impl<'a> StructAttrs {
@@ -180,12 +179,6 @@ impl<'a> StructAttrs {
         self.children_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.children_attrs.iter().find(|x| x.container_ty.is_none()))
-    }
-
-    pub(crate) fn wrapped_attr(&'a self, container_ty: &TypePath) -> Option<&WrappedAttr>{
-        self.wrapped_attrs.iter()
-            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.wrapped_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 }
 
@@ -333,7 +326,8 @@ pub(crate) struct StructAttrCore {
     pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
     pub init_data: Option<Punctuated<InitData, Token![,]>>,
-    pub quick_return: Option<Action>
+    pub update: Option<TokenStream>,
+    pub quick_return: Option<TokenStream>
 }
 
 impl Parse for StructAttrCore {
@@ -345,23 +339,40 @@ impl Parse for StructAttrCore {
             quote!((#content_stream)).into()
         } else { input.parse::<syn::Path>()?.into() };
         let struct_kind_hint = if ty.nameless_tuple { StructKindHint::Tuple } else { try_parse_struct_kind_hint(input)? };
-        let init_data: Option<Punctuated<InitData, Token![,]>> = if input.peek(Token![|]) {
-            input.parse::<Token![|]>()?;
-            Some(Punctuated::parse_separated_nonempty(input)?)
+
+        if !input.peek(Token![|]){
+            return Ok(StructAttrCore { ty, struct_kind_hint, init_data: None, update: None, quick_return: None })
+        }
+
+        input.parse::<Token![|]>()?;
+
+        let init_data: Option<Punctuated<InitData, Token![,]>> = if input.peek(kw::vars) {
+            input.parse::<kw::vars>()?;
+            let content;
+            parenthesized!(content in input);
+            let vars = Some(Punctuated::parse_separated_nonempty(&content)?);
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+            vars
         } else { None };
-        let quick_return = if input.peek(Token![->]) {
-            input.parse::<Token![->]>()?;
+        let update = if input.peek(Token![..]) {
+            input.parse::<Token![..]>()?;
+            try_parse_action(input, true)?
+        } else { None };
+        let quick_return = if input.peek(Token![return]) {
+            input.parse::<Token![return]>()?;
             try_parse_action(input, true)?
         } else { None };
 
-        Ok(StructAttrCore { ty, struct_kind_hint, init_data, quick_return })
+        Ok(StructAttrCore { ty, struct_kind_hint, init_data, update, quick_return })
     }
 }
 
 pub(crate) struct InitData {
     pub ident: Ident,
     _colon: Token![:],
-    pub action: Action,
+    pub action: TokenStream,
 }
 
 impl Parse for InitData {
@@ -396,7 +407,7 @@ impl Parse for StructGhostAttrCore{
 pub(crate) struct GhostData {
     pub child_path: Option<ChildPath>,
     pub ghost_ident: Member,
-    pub action: Action,
+    pub action: TokenStream,
 }
 
 impl GhostData {
@@ -493,33 +504,6 @@ impl Hash for ChildData {
     }
 }
 
-pub(crate) struct WrappedAttr {
-    pub container_ty: Option<TypePath>,
-    pub child_path: Option<ChildPath>,
-    pub ident: Member,
-    pub action: Option<TokenStream>,
-}
-
-impl Parse for WrappedAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let container_ty = try_parse_container_ident(input, false);
-        let child_path = if !peek_wrapped_field_name(input) {
-            let child_path = Some(Punctuated::parse_separated_nonempty(input)?).map(|child_path| {
-                let child_path_str = build_child_path_str(&child_path);
-                ChildPath { child_path, child_path_str }
-            });
-            input.parse::<Token![@]>()?;
-            child_path
-        } else { None };
-        Ok(WrappedAttr {
-            container_ty,
-            child_path,
-            ident: try_parse_optional_ident(input).ok_or(input.error("Member path is expected here."))?,
-            action: try_parse_wrapper_action(input)?
-        })
-    }
-}
-
 #[derive(Clone)]
 pub(crate) struct FieldAttr  {
     pub attr: FieldAttrCore,
@@ -531,8 +515,7 @@ pub(crate) struct FieldAttr  {
 pub(crate) struct FieldAttrCore {
     pub container_ty: Option<TypePath>,
     pub member: Option<Member>,
-    pub action: Option<Action>,
-    pub wrapper: bool,
+    pub action: Option<TokenStream>,
 }
 
 impl Parse for FieldAttrCore {
@@ -540,8 +523,7 @@ impl Parse for FieldAttrCore {
         Ok(FieldAttrCore {
             container_ty: try_parse_container_ident(input, false),
             member: try_parse_optional_ident(input),
-            action: try_parse_action(input, false)?,
-            wrapper: false
+            action: try_parse_action(input, true)?,
         })
     }
 }
@@ -568,14 +550,14 @@ pub(crate) struct FieldGhostAttr {
 #[derive(Clone)]
 pub(crate) struct FieldGhostAttrCore {
     pub container_ty: Option<TypePath>,
-    pub action: Option<Action>,
+    pub action: Option<TokenStream>,
 }
 
 impl Parse for FieldGhostAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(FieldGhostAttrCore { 
             container_ty: try_parse_container_ident(input, true),
-            action: try_parse_action(input, false)?,
+            action: try_parse_action(input, true)?,
         })
     }
 }
@@ -632,24 +614,9 @@ impl Parse for AsAttr {
     }
 }
 
-pub(crate) struct WrapperAttr(pub Option<TokenStream>);
+pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(StructAttrs, bool)> {
+    let mut bark = true;
 
-impl Parse for WrapperAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(WrapperAttr(try_parse_wrapper_action(input)?))
-    }
-}
-
-#[derive(Clone)]
-pub(crate) enum Action {
-    InlineAtExpr(TokenStream),
-    InlineTildeExpr(TokenStream),
-    InlineExpr(TokenStream),
-    Closure(TokenStream),
-    ParamlessClosure(TokenStream),
-}
-
-pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
     let mut instrs: Vec<StructInstruction> = vec![];
     for x in input.iter() {
         if x.path.is_ident("doc"){
@@ -659,22 +626,26 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
                 let new_instrs: Punctuated<StructInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
                     let p: OptionalParenthesizedTokenStream = input.parse()?;
-                    parse_struct_instruction(&instr, p.content(), true)
+                    parse_struct_instruction(&instr, p.content(), true, true)
                 })?;
+
+                if new_instrs.iter().any(|x| matches!(x, StructInstruction::AllowUnknown)) {
+                    bark = false;
+                }
+
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
             })?;
         } else {
             let instr = x.path.get_ident().unwrap();
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_struct_instruction(instr, p.content(), false)?);
+            instrs.push(parse_struct_instruction(instr, p.content(), false, bark)?);
         }
     }
     let mut attrs: Vec<StructAttr> = vec![];
     let mut ghost_attrs: Vec<StructGhostAttr> = vec![];
     let mut where_attrs: Vec<WhereAttr> = vec![];
     let mut children_attrs: Vec<ChildrenAttr> = vec![];
-    let mut wrapped_attrs: Vec<WrappedAttr> = vec![];
     
     for instr in  instrs {
         match instr {
@@ -682,14 +653,13 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<StructAttrs> {
             StructInstruction::Ghost(attr) => ghost_attrs.push(attr),
             StructInstruction::Where(attr) => where_attrs.push(attr),
             StructInstruction::Children(attr) => children_attrs.push(attr),
-            StructInstruction::Wrapped(attr) => wrapped_attrs.push(attr),
-            StructInstruction::Unrecognized => (),
+            StructInstruction::AllowUnknown | StructInstruction::Unrecognized => (),
         };
     }
-    Ok(StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs, wrapped_attrs })
+    Ok((StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs }, bark))
 }
 
-pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
+pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
     for x in input.attrs.iter() {
         if x.path.is_ident("doc"){
@@ -707,7 +677,7 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
         } else {
             let instr = x.path.get_ident().unwrap();
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_member_instruction(instr, p.content(), false)?);
+            instrs.push(parse_member_instruction(instr, p.content(), bark)?);
         }
     }
     let mut child_attrs: Vec<FieldChildAttr> = vec![];
@@ -725,23 +695,17 @@ pub(crate) fn get_field_attrs(input: &syn::Field) -> Result<FieldAttrs> {
             MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
-            MemberInstruction::Wrapper(attr) => {
-                let container_ty: TypePath = match &input.ty {
-                    syn::Type::Path(path) => path.path.clone().into(),
-                    _ => panic!("weird")
-                };
-                add_wrapper_attrs(&Some(container_ty), attr, &mut attrs, false)
-            },
             MemberInstruction::Unrecognized => ()
         };
     }
     Ok(FieldAttrs { child_attrs, parent_attrs, attrs, ghost_attrs, repeat, stop_repeat })
 }
 
-fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Result<StructInstruction>
+fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, bark: bool) -> Result<StructInstruction>
 {
     let instr_str = &instr.to_token_stream().to_string();
     match instr_str.as_ref() {
+        "allow_unknown" if own_instr => Ok(StructInstruction::AllowUnknown),
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
             Ok(StructInstruction::Map(StructAttr { 
@@ -755,21 +719,25 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
                     appl_ref_into_existing(instr_str)
                 ]
             })),
-        "ghost" | "ghost_ref" | "ghost_owned" => Ok(StructInstruction::Ghost(StructGhostAttr {
+        "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(StructInstruction::Ghost(StructGhostAttr {
             attr: syn::parse2(input)?,
             applicable_to: [
-                appl_ghost_owned(instr_str),
-                appl_ghost_ref(instr_str),
-                appl_ghost_owned(instr_str),
-                appl_ghost_ref(instr_str),
-                appl_ghost_owned(instr_str),
-                appl_ghost_ref(instr_str)
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str),
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str),
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str)
             ]
         })),
         "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
-        "wrapped" => Ok(StructInstruction::Wrapped(syn::parse2(input)?)),
-        _ if bark => Err(Error::new(instr.span(), format_args!("Struct instruction '{}' is not supported.", instr))),
+        "ghost" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "ghost_ref" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts_ref'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "ghost_owned" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts_owned'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "parent" if bark => Err(Error::new(instr.span(), format_args!("Struct instruction 'parent' is not supported.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "child" if bark => Err(Error::new(instr.span(), format_args!("Struct instruction 'child' is not supported.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        _ if own_instr => Err(Error::new(instr.span(), format_args!("Struct instruction '{}' is not supported.", instr))),
         _ => Ok(StructInstruction::Unrecognized),
     }
 }
@@ -810,7 +778,6 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
             Ok(MemberInstruction::Repeat(repeat.0))
         },
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
-        "wrapper" => Ok(MemberInstruction::Wrapper(syn::parse2(input)?)),
         _ if bark => Err(Error::new(instr.span(), format_args!("Member instruction '{}' is not supported.", instr))),
         _ => Ok(MemberInstruction::Unrecognized)
     }
@@ -885,14 +852,6 @@ fn peek_ghost_field_name(input: ParseStream) -> bool {
     peek_member(input) && input.peek2(Token![:])
 }
 
-fn peek_wrapped_field_name(input: ParseStream) -> bool {
-    let fork = input.fork();
-    match fork.parse::<Member>() {
-        Ok(_) => fork.is_empty() || fork.peek(Token![,]),
-        Err(_) => false,
-    }
-}
-
 fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token![,]>> {
     input.parse_terminated(|x| {
         let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(x)?;
@@ -907,89 +866,25 @@ fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token!
     })
 }
 
-fn try_parse_action(input: ParseStream, allow_braceless: bool) -> Result<Option<Action>> {
+fn try_parse_action(input: ParseStream, allow_braceless: bool) -> Result<Option<TokenStream>> {
     if input.is_empty() {
         Ok(None)
-    } else if input.peek(Token![@]) {
-        input.parse::<Token![@]>()?;
-        return Ok(Some(Action::InlineAtExpr(input.parse()?)))
-    } else if input.peek(Token![~]) {
-        input.parse::<Token![~]>()?;
-        return Ok(Some(Action::InlineTildeExpr(input.parse()?)))
-    } else if input.peek(Token![|]) {
-        if input.peek2(Token![|]) {
-            return Ok(Some(Action::ParamlessClosure(input.parse()?)))
-        } else {
-            validate_closure(input)?;
-            return Ok(Some(Action::Closure(input.parse()?)))
-        }
+    } else if input.peek(Token![@]) || input.peek(Token![~]) {
+        return Ok(Some(input.parse()?))
     } else if allow_braceless && !input.peek(Brace) {
-        Ok(Some(Action::InlineExpr(input.parse()?)))
+        Ok(Some(input.parse()?))
     } else {
         let content;
         braced!(content in input);
-        return Ok(Some(Action::InlineExpr(content.parse()?)))
+        return Ok(Some(content.parse()?))
     }
 }
 
-fn try_parse_braced_action(input: ParseStream) -> Result<Action> {
-    let mut tokens = Vec::new();
-    let mut paramless = false;
-    let inline = !input.peek(Token![|]);
-    
-    if !inline {
-        tokens.push(input.parse::<Token![|]>()?.to_token_stream());
-        if input.peek(Ident) {
-            tokens.push(input.parse::<Ident>()?.to_token_stream());
-        } else if input.peek(Token![_]) {
-            tokens.push(input.parse::<Token![_]>()?.to_token_stream());
-        } else {
-            paramless = true;
-        }
-        tokens.push(input.parse::<Token![|]>()?.to_token_stream());
-    }
-    
+fn try_parse_braced_action(input: ParseStream) -> Result<TokenStream> {
     let content;
     braced!(content in input);
 
-    if inline {
-        if content.peek(Token![@]) {
-            content.parse::<Token![@]>()?;
-        } else {
-            paramless = true;
-        }
-        
-        tokens.push(content.parse::<TokenStream>()?);
-    } else {
-        let content = content.parse::<TokenStream>()?;
-        tokens.push(quote!({#content}));
-    }
-
-    let token_stream = TokenStream::from_iter(tokens);
-
-    let cl = match (inline, paramless) {
-        (true, true) => Action::InlineExpr(token_stream),
-        (true, false) => Action::InlineAtExpr(token_stream),
-        (false, true) => Action::ParamlessClosure(token_stream),
-        (false, false) => Action::Closure(token_stream)
-    };
-    Ok(cl)
-}
-
-fn try_parse_wrapper_action(input: ParseStream) -> Result<Option<TokenStream>> {
-    if input.is_empty() {
-        Ok(None)
-    } else {
-        input.parse::<Token![~]>()?;
-        Ok(Some(input.parse()?))
-    }
-}
-
-fn validate_closure(input: ParseStream) -> Result<()> {
-    if !input.peek(Token![|]) || (!input.peek2(Ident) && !input.peek2(Token![_])) || !input.peek3(Token![|]) {
-        return Err(input.error("A closure is expected here"))
-    }
-    Ok(())
+    content.parse::<TokenStream>()
 }
 
 fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr>) {
@@ -999,8 +894,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         attr: FieldAttrCore { 
             container_ty: attr.container_ty.clone(), 
             member: attr.member.clone(), 
-            action: Some(Action::InlineTildeExpr(quote!(as #this_ty))),
-            wrapper: false,
+            action: Some(quote!(~ as #this_ty)),
         }, 
         original_instr: "as_type".into(),
         applicable_to: [false, false, true, true, false, false]
@@ -1009,58 +903,11 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         attr: FieldAttrCore { 
             container_ty: attr.container_ty, 
             member: attr.member, 
-            action: Some(Action::InlineTildeExpr(quote!(as #that_ty))),
-            wrapper: false
+            action: Some(quote!(~ as #that_ty)),
         }, 
         original_instr: "as_type".into(),
         applicable_to: [true, true, false, false, true, true]
     });
-}
-
-pub(crate) fn add_wrapper_attrs (container_ty: &Option<TypePath>, attr: WrapperAttr, attrs: &mut Vec<FieldAttr>, inverse: bool) {
-    attrs.push(FieldAttr { 
-        attr: FieldAttrCore { 
-            container_ty: container_ty.clone(), 
-            member: None, 
-            action: Some(Action::InlineAtExpr(TokenStream::new())),
-            wrapper: true,
-        }, 
-        original_instr: "wrapper".into(),
-        applicable_to: [false ^ inverse, attr.0.is_none() & inverse, true ^ inverse, attr.0.is_none() & !inverse, false, false]
-    });
-    attrs.push(FieldAttr { 
-        attr: FieldAttrCore { 
-            container_ty: container_ty.clone(), 
-            member: None, 
-            action: None,
-            wrapper: true,
-        }, 
-        original_instr: "wrapper".into(),
-        applicable_to: [true ^ inverse, attr.0.is_none() & !inverse, false ^ inverse, attr.0.is_none() & inverse, false, false]
-    });
-
-    if let Some(action) = attr.0 {
-        attrs.push(FieldAttr { 
-            attr: FieldAttrCore { 
-                container_ty: container_ty.clone(), 
-                member: None, 
-                action: Some(Action::InlineAtExpr(action.clone())),
-                wrapper: true,
-            }, 
-            original_instr: "wrapper".into(),
-            applicable_to: [false, false ^ inverse, false, true ^ inverse, false, false]
-        });
-        attrs.push(FieldAttr { 
-            attr: FieldAttrCore { 
-                container_ty: container_ty.clone(), 
-                member: None, 
-                action: Some(Action::InlineTildeExpr(action)),
-                wrapper: true,
-            }, 
-            original_instr: "wrapper".into(),
-            applicable_to: [false, true ^ inverse, false, false ^ inverse, false, false]
-        });
-    }
 }
 
 fn appl_owned_into(instr: &str) -> bool {
@@ -1082,6 +929,14 @@ fn appl_owned_into_existing(instr: &str) -> bool {
 
 fn appl_ref_into_existing(instr: &str) -> bool {
     matches!(instr, "ref_into_existing" | "into_existing")
+}
+
+fn appl_ghosts_owned(instr: &str) -> bool {
+    matches!(instr, "ghosts" | "ghosts_owned")
+}
+
+fn appl_ghosts_ref(instr: &str) -> bool {
+    matches!(instr, "ghosts" | "ghosts_ref")
 }
 
 fn appl_ghost_owned(instr: &str) -> bool {

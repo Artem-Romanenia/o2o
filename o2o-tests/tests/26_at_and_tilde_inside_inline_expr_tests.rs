@@ -6,9 +6,7 @@ struct Entity {
     another_int: i16,
     some_float: f32,
     another_float: f64,
-
     extra_float: f32,
-
     child: Child
 }
 
@@ -22,11 +20,11 @@ fn another_int_to_string(e: &Entity) -> String {
 }
 
 fn another_int_string_to_int(f: &EntityDto) -> i16 {
-    f.another_int_string.parse::<i16>().unwrap()
+    f.another_int_string.parse().unwrap()
 }
 
 fn unnamed_another_int_string_to_int(f: &UnnamedEntityDto) -> i16 {
-    f.1.parse::<i16>().unwrap()
+    f.1.parse().unwrap()
 }
 
 fn float_to_string(f: f32) -> String {
@@ -34,7 +32,7 @@ fn float_to_string(f: f32) -> String {
 }
 
 fn string_to_float(f: String) -> f32 {
-    f.parse::<f32>().unwrap()
+    f.parse().unwrap()
 }
 
 fn float64_to_string(f: f64) -> String {
@@ -42,7 +40,7 @@ fn float64_to_string(f: f64) -> String {
 }
 
 fn string_to_float64(f: String) -> f64 {
-    f.parse::<f64>().unwrap()
+    f.parse().unwrap()
 }
 
 fn extra_string(e: &Entity) -> String {
@@ -50,26 +48,26 @@ fn extra_string(e: &Entity) -> String {
 }
 
 fn extra_float(e: &EntityDto) -> f32 {
-    e.extra_string.parse::<f32>().unwrap()
+    e.extra_string.parse().unwrap()
 }
 
 fn extra_float_2(e: &UnnamedEntityDto) -> f32 {
-    e.4.parse::<f32>().unwrap()
+    e.4.parse().unwrap()
 }
 
 #[derive(o2o)]
 #[map(Entity)]
 #[into_existing(Entity)]
 #[children(child: Child)]
-#[ghost(extra_float: { extra_float(&@) })]
+#[ghosts(extra_float: { extra_float(&@) })]
 struct EntityDto {
     some_int: i32,
 
     #[o2o(
         from_ref({ another_int_to_string(@) } ),
         from_owned({ another_int_to_string(&@) } ),
-        ref_into(another_int, { another_int_string_to_int(@) } ),
-        owned_into(another_int, { another_int_string_to_int(&@) } )
+        ref_into(another_int, another_int_string_to_int(@)),
+        owned_into(another_int, another_int_string_to_int(&@))
     )]
     another_int_string: String,
 
@@ -83,7 +81,7 @@ struct EntityDto {
     #[owned_into(another_float, { string_to_float64(~.clone()) } )]
     another_float_string: String,
 
-    #[ghost({ extra_string(&@) })]
+    #[ghost(extra_string(&@))]
     extra_string: String,
 
     #[child(child)]
@@ -96,14 +94,14 @@ struct EntityDto {
 #[map(Entity as {})]
 #[into_existing(Entity as {})]
 #[children(child: Child as {})]
-#[ghost(extra_float: { extra_float_2(&@) })]
+#[ghosts(extra_float: { extra_float_2(&@) })]
 struct UnnamedEntityDto (
     #[map(Entity| some_int)]
     i32,
 
     #[o2o(
-        from_ref({ another_int_to_string(@) } ),
-        from_owned({ another_int_to_string(&@) } ),
+        from_ref(another_int_to_string(@)),
+        from_owned(another_int_to_string(&@)),
         ref_into(another_int, { unnamed_another_int_string_to_int(@) } ),
         owned_into(another_int, { unnamed_another_int_string_to_int(&@) } )
     )]
@@ -261,11 +259,6 @@ fn existing_named2named_ref() {
     assert_eq!(654.0, entity.extra_float);
     assert_eq!(321.0, entity.child.child_float);
 }
-
-
-
-
-
 
 #[test]
 fn unnamed2named() {

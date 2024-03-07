@@ -85,16 +85,16 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 - [Traits and `o2o` *trait instructions*](#traits-and-o2o-trait-instructions)
 - [The (not so big) Problem](#the-not-so-big-problem)
+- [Inline expressions](#inline-expressions)
 - [Examples](#examples)
   - [Different field name](#different-field-name)
   - [Different field type](#different-field-type)
   - [Nested structs](#nested-structs)
   - [Nested collection](#nested-collection)
   - [Assymetric fields (skipping and providing default values)](#assymetric-fields-skipping-and-providing-default-values)
-- [Expressions](#expressions)
-  - [Expressions for struct instructions](#expressions-for-struct-instructions)
-  - [Expressions for member instructions](#expressions-for-member-instructions)
-- [More examples](#more-examples)
+  - [Use struct update syntax (..Default::default())](#use-struct-update-syntax-defaultdefault)
+  - [Define helper variables](#define-helper-variables)
+  - [Quick return](#quick-return)
   - [Slightly complex example](#slightly-complex-example)
   - [Flatened children](#flatened-children)
   - [Tuple structs](#tuple-structs)
@@ -102,15 +102,11 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Struct kind hints](#struct-kind-hints)
   - [Generics](#generics)
   - [Where clauses](#where-clauses)
-  - [Define helper variables](#define-helper-variables)
-  - [Quick return](#quick-return)
   - [Mapping to multiple structs](#mapping-to-multiple-structs)
   - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
     - [Primitive type conversions](#primitive-type-conversions)
     - [Repeat instructions](#repeat-instructions)
-    - [Wrapper structs and `#[o2o(wrapper)]` instruction](#wrapper-structs-and-o2owrapper-instruction)
-    - [Wrapped structs and `#[o2o(wrapped)]` instruction](#wrapped-structs-and-o2owrapped-instruction)
   - [Contributions](#contributions)
     - [License](#license)
 
@@ -122,7 +118,7 @@ To let o2o know what traits you want implemented, you have to use type-level `o2
 struct Entity { }
 
 #[derive(o2o::o2o)]
-#[from_owned(Entity)]
+#[from_ref(Entity)] // This tells o2o to generate 'From<&Person> for PersonDto' implementation
 struct EntityDto { }
 ```
 
@@ -182,11 +178,9 @@ struct Entity { }
 struct EntityDto { }
 ```
 
-And before looking at some examples, let's talk about...
-
 ## The (not so big) Problem
 
-This section may be useful for people which are not very familiar with Rust's procedural macros.
+This section may be useful for people which are not very familiar with Rust's procedural macros and it explains why some things are done the way they're done.
 
 Being procedural macro, o2o has knowledge only about the side of the mapping where `#[derive(o2o)]` is applied.
 
@@ -196,7 +190,7 @@ Being procedural macro, o2o has knowledge only about the side of the mapping whe
 struct EntityDto { }
 ```
 
-In code above, o2o knows everything about `EntityDto`, but it doesn't know anything about `Entity`. It doens't know if it is a struct, doesn't know what fields it has, doesn't know if it is struct or a tuple, *it doesn't even know if it exists*.
+In code above, o2o knows everything about `EntityDto`, but it knows nothing about `Entity`. It doens't know if it is a struct, doesn't know what fields it has, doesn't know if it is a struct or a tuple, *it doesn't even know if it exists*.
 
 So unlike mappers from languages like C#, Java, Go etc. that can use reflection to find out what they need to know, `o2o` can only assume things.
 
@@ -208,7 +202,80 @@ For the piece of code above, o2o will assume that:
 
 If o2o is wrong in any of its assumptions, you will have to tell it that.
 
-So now let's see how you do it...
+## Inline expressions
+
+o2o has a concept of Inline Expressions, which can be passed as a parameter to some of the o2o instructions. You can think of inline expression as a closure, which always has two *implicit* params: `|@, ~| {` **...expression body...** `}` or `|@, ~|` **{ ...expression body... }**
+
+* `@` represents the object that is being converted from.
+* `~` represents the path to a specific field of the object that is being converted from.
+
+``` rust
+struct Entity { some_int: i32 }
+
+#[derive(o2o::o2o)]
+#[map_owned(Entity)] // tells o2o to implement 'From<Person> for PersonDto' and 'Into<Person> for PersonDto'
+struct EntityDto { 
+    #[from(~ * 2)] // Let's say for whatever reason we want to multiply 'some_int' by 2 when converting from Entity
+    #[into(~ / 2)] // And divide back by 2 when converting into it
+    some_int: i32
+}
+```
+
+This example will be expanded into the following code:
+
+``` rust ignore
+impl std::convert::From<Entity> for EntityDto {
+    fn from(value: Entity) -> EntityDto {
+        EntityDto {
+            some_int: value.some_int * 2, // '~' got replaced by 'value.some_int' for From<> implementation
+        }
+    }
+}
+impl std::convert::Into<Entity> for EntityDto {
+    fn into(self) -> Entity {
+        Entity {
+            some_int: self.some_int / 2, // '~' got replaced by 'self.some_int' for Into<> implementation
+        }
+    }
+}
+```
+
+To achieve the same result, `@` could have been used:
+
+``` rust
+struct Entity { some_int: i32 }
+
+#[derive(o2o::o2o)]
+#[map_owned(Entity)]
+struct EntityDto { 
+    #[from(@.some_int * 2)]
+    #[into(@.some_int / 2)]
+    some_int: i32
+}
+```
+
+This expands into exactly the same code:
+
+``` rust ignore
+impl std::convert::From<Entity> for EntityDto {
+    fn from(value: Entity) -> EntityDto {
+        EntityDto {
+            some_int: value.some_int * 2, // '@' got replaced by 'value' for From<> implementation
+        }
+    }
+}
+impl std::convert::Into<Entity> for EntityDto {
+    fn into(self) -> Entity {
+        Entity {
+            some_int: self.some_int / 2, // '@' got replaced by 'self' for Into<> implementation
+        }
+    }
+}
+```
+
+Obviously, you can use `~` for inline expressions that are passed only to member level o2o instructions, while `@` can be used at both member and type level.
+
+So finally, let's look at some examples.
 
 ## Examples
 
@@ -259,21 +326,19 @@ use o2o::o2o;
 
 struct Entity {
     some_int: i32,
-    val: i16,
-    str: String
+    str: String,
+    val: i16
 }
 
 #[derive(o2o)]
 #[map(Entity)]
 struct EntityDto {
     some_int: i32,
-    #[from(~.to_string())] // Tilde allows to append code at the end of the right side of field initialization for From<T> impls
-    #[into(~.parse::<i16>().unwrap())] // here it's the same but for Into<T> impls
-    val: String,
-    // Here Into and From are symmetric, so it has to be only specified once.
-    // Note that .clone() is only needed for borrowing impls, so we use #[map_ref()]
-    #[map_ref(~.clone())] 
-    str: String
+    #[map_ref(@.str.clone())] 
+    str: String,
+    #[from(~.to_string())]
+    #[into(~.parse::<i16>().unwrap())]
+    val: String
 }
 ```
 <details>
@@ -284,8 +349,8 @@ struct EntityDto {
       fn from(value: Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
+              str: value.str,
               val: value.val.to_string(),
-              str: value.str, // no .clone()
           }
       }
   }
@@ -293,8 +358,8 @@ struct EntityDto {
       fn from(value: &Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
-              val: value.val.to_string(),
               str: value.str.clone(),
+              val: value.val.to_string(),
           }
       }
   }
@@ -302,8 +367,8 @@ struct EntityDto {
       fn into(self) -> Entity {
           Entity {
               some_int: self.some_int,
+              str: self.str,
               val: self.val.parse::<i16>().unwrap(),
-              str: self.str, // no .clone()
           }
       }
   }
@@ -311,8 +376,8 @@ struct EntityDto {
       fn into(self) -> Entity {
           Entity {
               some_int: self.some_int,
-              val: self.val.parse::<i16>().unwrap(),
               str: self.str.clone(),
+              val: self.val.parse::<i16>().unwrap(),
           }
       }
   }
@@ -495,7 +560,7 @@ use o2o::o2o;
 
 #[derive(o2o)]
 #[map_owned(PersonDto)]
-#[ghost(zodiac_sign: {None})] // #[ghost()] struct instruction accepts only braced closures.
+#[ghosts(zodiac_sign: {None})]
 struct Person {
     id: i32,
     full_name: String,
@@ -536,49 +601,154 @@ enum ZodiacSign {}
   ```
 </details>
 
-## Expressions
+### Use struct update syntax (..Default::default())
 
-### Expressions for struct instructions
+``` rust
+use o2o::o2o;
 
-``` rust ignore
-#[ghost(field: { None })]
+#[derive(Default)]
+struct Entity {
+    some_int: i32,
+    some_float: f32
+}
 
-// field: None,
+#[derive(Default, o2o)]
+#[from(Entity| ..get_default())]
+#[into(Entity| ..Default::default())]
+struct EntityDto {
+    some_int: i32,
+    #[ghost]
+    some_string: String
+}
 
-#[ghost(field: || { None })]
-
-// field: (|| None)(),
-
-#[ghost(field: { @.get_value() })]
-
-// field: self.get_value(),
-
-#[ghost(field: |x| { x.get_value() })]
-
-// field: (|x: &Type| x.get_value())(&self),
+fn get_default() -> EntityDto {
+    EntityDto { some_int: 0, some_string: "test".into() }
+}
 ```
 
-### Expressions for member instructions
+<details>
+  <summary>View generated code</summary>
 
-``` rust ignore
-#[map({ None })]
+  ``` rust ignore
+  impl std::convert::From<&Entity> for EntityDto {
+      fn from(value: &Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int,
+              ..get_default()
+          }
+      }
+  }
+  impl std::convert::Into<Entity> for EntityDto {
+      fn into(self) -> Entity {
+          Entity {
+              some_int: self.some_int,
+              ..Default::default()
+          }
+      }
+  }
+  ```
+</details>
 
-// field: None,
+### Define helper variables
 
-#[map(~.clone())]
+``` rust
+use o2o::o2o;
 
-// field: value.field.clone(),
+struct Person {
+    age: i8,
+    first_name: String,
+    last_name: String
+}
 
-#[map(@.get_value())]
-
-// field: value.get_value(),
-
-#[map(|x| x.get_value())]
-
-// field: (|x: &Type| x.get_value())(&value),
+#[derive(o2o)]
+#[from_owned(Person| vars(first_name: {@.first_name}, last_name: {@.last_name}))]
+#[owned_into(Person| vars(first: {"John"}, last: {"Doe"}))]
+#[ghosts(first_name: {first.into()}, last_name: {last.into()})]
+struct PersonDto {
+    age: i8,
+    #[ghost({format!("{} {}", first_name, last_name)})]
+    full_name: String
+}
 ```
+<details>
+  <summary>View generated code</summary>
 
-## More examples
+  ``` rust ignore
+  impl std::convert::From<Person> for PersonDto {
+      fn from(value: Person) -> PersonDto {
+          let first_name = value.first_name;
+          let last_name = value.last_name;
+          PersonDto {
+              age: value.age,
+              full_name: format!("{} {}", first_name, last_name),
+          }
+      }
+  }
+  impl std::convert::Into<Person> for PersonDto {
+      fn into(self) -> Person {
+          let first = "John";
+          let last = "Doe";
+          Person {
+              age: self.age,
+              first_name: first.into(),
+              last_name: last.into(),
+          }
+      }
+  }
+  ```
+</details>
+
+### Quick return
+
+**o2o** allows you to bypass most of the logic by specifying quick return inline expression following `return`:
+
+``` rust
+use o2o::o2o;
+
+#[derive(o2o)]
+#[owned_into(String| return @.0.to_string())]
+struct Wrapper(i32);
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::Into<String> for Wrapper {
+      fn into(self) -> String {
+          self.0.to_string()
+      }
+  }
+  ```
+</details>
+
+Quick returns work well with helper variables:
+
+``` rust
+use o2o::o2o;
+
+#[derive(o2o)]
+#[owned_into(i32| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}), 
+    return hrs * 3600 + mns * 60 + scs)]
+struct Time {
+    hours: i8,
+    minutes: i8,
+    seconds: i8,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::Into<i32> for Time {
+      fn into(self) -> i32 {
+          let hrs = self.hours as i32;
+          let mns = self.minutes as i32;
+          let scs = self.seconds as i32;
+          hrs * 3600 + mns * 60 + scs
+      }
+  }
+  ```
+</details>
 
 ### Slightly complex example
 
@@ -600,10 +770,10 @@ impl Employee {
 
 #[derive(o2o)]
 #[map(Employee)]
-#[ghost(
+#[ghosts(
     // o2o supports closures with one input parameter.
     // This parameter represents instance on the other side of the conversion.
-    first_name: |x| {x.get_first_name()},
+    first_name: {@.get_first_name()},
     last_name: {@.get_last_name()}
 )]
 struct EmployeeDto {
@@ -614,8 +784,8 @@ struct EmployeeDto {
     #[ghost(@.get_full_name())]
     full_name: String,
 
-    #[from(|x| Box::new(x.subordinate_of.as_ref().into()))]
-    #[into(subordinate_of, { Box::new(@.reports_to.as_ref().into()) })]
+    #[from(Box::new(@.subordinate_of.as_ref().into()))]
+    #[into(subordinate_of, Box::new(@.reports_to.as_ref().into()))]
     reports_to: Box<EmployeeDto>,
 
     #[map(~.iter().map(|p| Box::new(p.as_ref().into())).collect())]
@@ -1079,107 +1249,6 @@ struct ChildDto<T> {
   ```
 </details>
 
-### Define helper variables
-
-``` rust
-use o2o::o2o;
-
-struct Person {
-    age: i8,
-    first_name: String,
-    last_name: String
-}
-
-#[derive(o2o)]
-#[from_owned(Person| first_name: {@.first_name}, last_name: {@.last_name})]
-#[owned_into(Person| first: {"John"}, last: {"Doe"})]
-#[ghost(first_name: {first.into()}, last_name: {last.into()})]
-struct PersonDto {
-    age: i8,
-    #[ghost({format!("{} {}", first_name, last_name)})]
-    full_name: String
-}
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl std::convert::From<Person> for PersonDto {
-      fn from(value: Person) -> PersonDto {
-          let first_name = value.first_name;
-          let last_name = value.last_name;
-          PersonDto {
-              age: value.age,
-              full_name: format!("{} {}", first_name, last_name),
-          }
-      }
-  }
-  impl std::convert::Into<Person> for PersonDto {
-      fn into(self) -> Person {
-          let first = "John";
-          let last = "Doe";
-          Person {
-              age: self.age,
-              first_name: first.into(),
-              last_name: last.into(),
-          }
-      }
-  }
-  ```
-</details>
-
-### Quick return
-
-**o2o** allows you to bypass most of the logic by specifying quick return inline expression following `->`:
-
-``` rust
-use o2o::o2o;
-
-#[derive(o2o)]
-#[owned_into(String -> @.0.to_string())]
-struct Wrapper(i32);
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl std::convert::Into<String> for Wrapper {
-      fn into(self) -> String {
-          self.0.to_string()
-      }
-  }
-  ```
-</details>
-
-Quick returns work well with helper variables:
-
-``` rust
-use o2o::o2o;
-
-#[derive(o2o)]
-#[owned_into(i32| hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32} 
-    -> hrs * 3600 + mns * 60 + scs)]
-struct Time {
-    hours: i8,
-    minutes: i8,
-    seconds: i8,
-}
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl std::convert::Into<i32> for Time {
-      fn into(self) -> i32 {
-          let hrs = self.hours as i32;
-          let mns = self.minutes as i32;
-          let scs = self.seconds as i32;
-          hrs * 3600 + mns * 60 + scs
-      }
-  }
-  ```
-</details>
-
 ### Mapping to multiple structs
 
 ``` rust
@@ -1366,7 +1435,7 @@ struct Machine {
 #[derive(o2o)]
 #[map_ref(Car)]
 #[children(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghost(vehicle.machine@id: {321})]
+#[ghosts(vehicle.machine@id: {321})]
 struct CarDto {
     number_of_doors: i8,
 
@@ -1448,147 +1517,6 @@ struct CarDto {
   }
   ```
 </details>
-
-#### Wrapper structs and `#[o2o(wrapper)]` instruction
-
-``` rust
-use o2o::o2o;
-
-#[derive(o2o)]
-#[map_owned(Vec<u8>)]
-struct PayloadWrapper {
-    #[o2o(wrapper)]
-    payload: Vec<u8>,
-}
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl std::convert::From<Vec<u8>> for PayloadWrapper {
-      fn from(value: Vec<u8>) -> PayloadWrapper {
-          PayloadWrapper { payload: value }
-      }
-  }
-  impl std::convert::Into<Vec<u8>> for PayloadWrapper {
-      fn into(self) -> Vec<u8> {
-          self.payload
-      }
-  }
-  ```
-</details>
-
-If you need 'ref' implementation, you may need to provide an inline expression:
-
-``` rust
-use o2o::o2o;
-
-#[derive(o2o)]
-#[map(String)]
-struct StringWrapper {
-    #[o2o(wrapper(~.clone()))]
-    str: String
-}
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl std::convert::From<String> for StringWrapper {
-      fn from(value: String) -> StringWrapper {
-          StringWrapper { str: value }
-      }
-  }
-  impl std::convert::From<&String> for StringWrapper {
-      fn from(value: &String) -> StringWrapper {
-          StringWrapper { str: value.clone() }
-      }
-  }
-  impl std::convert::Into<String> for StringWrapper {
-      fn into(self) -> String {
-          self.str
-      }
-  }
-  impl std::convert::Into<String> for &StringWrapper {
-      fn into(self) -> String {
-          self.str.clone()
-      }
-  }
-  ```
-</details>
-
-#### Wrapped structs and `#[o2o(wrapped)]` instruction
-
-``` rust
-use o2o::o2o;
-
-#[derive(o2o)]
-#[map_owned(StuffWrapper as {})]
-#[o2o(wrapped(payload))]
-struct Stuff(i32);
-
-struct StuffWrapper {
-    payload: Stuff,
-}
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl std::convert::From<StuffWrapper> for Stuff {
-      fn from(value: StuffWrapper) -> Stuff {
-          value.payload
-      }
-  }
-  impl std::convert::Into<StuffWrapper> for Stuff {
-      fn into(self) -> StuffWrapper {
-          StuffWrapper { payload: self }
-      }
-  }
-  ```
-</details>
-
-'Ref' implementation
-
-``` rust
-use o2o::o2o;
-
-#[derive(Clone, o2o)]
-#[map(StuffWrapper as ())]
-#[o2o(wrapped(0, ~.clone()))]
-struct Stuff {
-    thing: i32
-}
-
-struct StuffWrapper(Stuff);
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl std::convert::From<StuffWrapper> for Stuff {
-      fn from(value: StuffWrapper) -> Stuff {
-          value.0
-      }
-  }
-  impl std::convert::From<&StuffWrapper> for Stuff {
-      fn from(value: &StuffWrapper) -> Stuff {
-          value.0.clone()
-      }
-  }
-  impl std::convert::Into<StuffWrapper> for Stuff {
-      fn into(self) -> StuffWrapper {
-          StuffWrapper(self)
-      }
-  }
-  impl std::convert::Into<StuffWrapper> for &Stuff {
-      fn into(self) -> StuffWrapper {
-          StuffWrapper(self.clone())
-      }
-  }
-  ```
-</details>
-
 
 ### Contributions
 

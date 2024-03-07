@@ -39,7 +39,7 @@ fn missing_map_instructions() {
             struct Entity {}
         },
         quote! {
-            #[ghost(field: |_| { 123 })]
+            #[ghosts(field: { 123 })]
             struct Entity {}
         },
         quote! {
@@ -63,19 +63,39 @@ fn missing_map_instructions() {
 fn unrecognized_struct_instructions() {
     let test_data = vec![
         (quote! {
+            #[map(EntityDto)]
+            #[parent(EntityDto)]
+            struct Entity {}
+        }, "Struct instruction 'parent' is not supported. To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
+            #[map(EntityDto)]
+            #[child(EntityDto)]
+            struct Entity {}
+        }, "Struct instruction 'child' is not supported. To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
+            #[map(EntityDto)]
+            #[ghost(EntityDto)]
+            struct Entity {}
+        }, "Perhaps you meant 'ghosts'? To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
             #[o2o(mapp(EntityDto))]
             struct Entity {}
-        }, "mapp"),
+        }, "Struct instruction 'mapp' is not supported."),
         (quote! {
             #[o2o(map(EntityDto))]
             #[o2o(parent(EntityDto))]
             struct Entity {}
-        }, "parent"),
+        }, "Struct instruction 'parent' is not supported."),
         (quote! {
             #[o2o(map(EntityDto))]
             #[o2o(child(EntityDto))]
             struct Entity {}
-        }, "child"),
+        }, "Struct instruction 'child' is not supported."),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(ghost(EntityDto))]
+            struct Entity {}
+        }, "Perhaps you meant 'ghosts'?"),
     ];
 
     for (code_fragment, err) in test_data {
@@ -83,13 +103,34 @@ fn unrecognized_struct_instructions() {
         let output = derive(&input);
         let message = get_error(output, false);
     
-        assert_eq!(message, format!("Struct instruction '{}' is not supported.", err));
+        assert_eq!(message, err);
     }
 }
 
 #[test]
 fn unrecognized_member_instructions() {
     let test_data = vec![
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[mapp(diff_field)]
+                child: i32,
+            }
+        }, "mapp"),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[children(diff_field)]
+                child: i32,
+            }
+        }, "children"),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[where_clause(diff_field)]
+                child: i32,
+            }
+        }, "where_clause"),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
@@ -124,22 +165,51 @@ fn unrecognized_member_instructions() {
 
 #[test]
 fn unrecognized_struct_instructions_no_bark() {
-    let code_fragment = quote!{
-        #[from_owned(NamedStruct)]
-        #[unknown()]
-        struct NamedStructDto {}
-    };
+    let test_data = vec![
+        quote! {
+            #[from_owned(NamedStruct)]
+            #[mapp(EntityDto)]
+            struct Entity {}
+        },
+        quote! {
+            #[o2o(allow_unknown)]
+            #[map(EntityDto)]
+            #[parent(EntityDto)]
+            struct Entity {}
+        },
+        quote! {
+            #[o2o(allow_unknown)]
+            #[map(EntityDto)]
+            #[child(EntityDto)]
+            struct Entity {}
+        },
+        quote! {
+            #[o2o(allow_unknown)]
+            #[map(EntityDto)]
+            #[ghost(EntityDto)]
+            struct Entity {}
+        },
+        quote!{
+            #[o2o(allow_unknown)]
+            #[from_owned(NamedStruct)]
+            #[unknown()]
+            struct NamedStructDto {}
+        }
+    ];
 
-    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
-    let output = derive(&input);
+    for code_fragment in test_data {
+        let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+        let output = derive(&input);
 
-    assert!(output.is_ok());
+        assert!(output.is_ok());
+    }
 }
 
 #[test]
 fn unrecognized_member_instructions_no_bark() {
     let code_fragment = quote!{
         #[from_owned(NamedStruct)]
+        #[o2o(allow_unknown)]
         struct NamedStructDto {
             #[unknown()]
             field: i32,
@@ -169,10 +239,10 @@ fn more_than_one_default_instruction() {
         }, "where_clause"),
         (quote! {
             #[map(EntityDto)]
-            #[ghost(field: |_| { Clone })]
-            #[ghost(field: |_| { Clone })]
+            #[ghosts(field: { Clone })]
+            #[ghosts(field: { Clone })]
             struct Entity {}
-        }, "ghost"),
+        }, "ghosts"),
     ];
 
     for (code_fragment, err) in test_data {
@@ -463,8 +533,8 @@ fn incomplete_field_attr_instruction() {
             ("ref_into", "Entity", false),
         ]),
         (quote! {
-            #[map_owned(StuffWrapper as {})]
-            #[o2o(wrapped(payload))]
+            #[owned_into(StuffWrapper| return StuffWrapper { payload: @ })]
+            #[from_owned(StuffWrapper| return @.payload)]
             struct Stuff(i32);
         }, vec![]),
     ];
@@ -570,6 +640,142 @@ fn incomplete_field_attr_instruction_2() {
 
             for (field, ty, or_action) in errs {
                 assert!(errors.iter().any(|x| x.to_string() == format!("Member trait instruction #[{}(...)] for member 0 should specify corresponding field name of the {}{}", field, ty, if or_action {" or an action"} else {""})))
+            }
+        } else {
+            assert!(output.is_ok())
+        }
+    }
+}
+
+#[test]
+fn dedicated_field_instruction_mismatch() {
+    let test_data = vec![
+        (quote! {
+            #[into(EntityDto)]
+            #[ghosts(EntityDto123| ghost: {123})]
+            struct Entity123 {
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[into(EntityDto)]
+            #[ghosts_ref(EntityDto123| ghost: {123})]
+            struct Entity123 {
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[into(EntityDto)]
+            #[ghosts_owned(EntityDto123| ghost: {123})]
+            struct Entity123 {
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[map_owned(EntityDto)]
+            struct Entity {
+                #[ghost(None)]
+                test: Option<i32>
+            }
+        }, vec!["None"]),
+        (quote! {
+            #[map_owned(EntityDto)]
+            struct Entity {
+                #[ghost_ref(None)]
+                test: Option<i32>
+            }
+        }, vec!["None"]),
+        (quote! {
+            #[map_owned(EntityDto)]
+            struct Entity {
+                #[ghost_owned(None)]
+                test: Option<i32>
+            }
+        }, vec!["None"]),
+        (quote! {
+            #[map_owned(EntityDto)]
+            struct Entity {
+                #[ghost({None})]
+                test: Option<i32>
+            }
+        }, vec![]),
+        (quote! {
+            #[map_owned(EntityDto)]
+            struct Entity {
+                #[ghost(123)]
+                test: i32
+            }
+        }, vec![]),
+        (quote! {
+            #[from(EntityDto)]
+            struct Entity {
+                #[child(EntityDto123| test)]
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[into(EntityDto)]
+            struct Entity {
+                #[child(EntityDto123| test)]
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[into(EntityDto)]
+            #[children(test: Test)]
+            struct Entity {
+                #[child(EntityDto| test)]
+                test: i32
+            }
+        }, vec![]),
+        (quote! {
+            #[into(EntityDto)]
+            #[children(EntityDto123| test: Test)]
+            struct Entity123 {
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[into(EntityDto)]
+            #[where_clause(EntityDto123| T: Clone)]
+            struct Entity123 {
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity123 {
+                #[map(EntityDto123| another)]
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity123 {
+                #[parent(EntityDto123)]
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity123 {
+                #[o2o(as_type(EntityDto123| f32))]
+                test: i32
+            }
+        }, vec!["EntityDto123"]),
+    ];
+
+    for (code_fragment, errs) in test_data {
+        let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+        let output = derive(&input);
+
+        if errs.len() > 0 {
+            let errors: Vec<Error> = get_error_iter(output).collect();
+
+            assert_eq!(errs.len(), errors.len());
+
+            for err_ty in errs {
+                assert!(errors.iter().any(|x| x.to_string() == format!("Type '{}' doesn't match any type specified in trait instructions.", err_ty)))
             }
         } else {
             assert!(output.is_ok())

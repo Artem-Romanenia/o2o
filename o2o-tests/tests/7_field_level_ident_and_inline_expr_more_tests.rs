@@ -25,10 +25,10 @@ struct Child {
 #[into_existing(Parent)]
 #[into_existing(ParentModel)]
 struct ParentDto {
-    #[from(Parent| |x|(&x.child).into())]
-    #[into(Parent| child, |x|(&x.diff_child).into())]
-    #[from(ParentModel| |x|(&x.child_diff).into())]
-    #[into(ParentModel| child_diff, |x|(&x.diff_child).into())]
+    #[from(Parent| (&@.child).into())]
+    #[into(Parent| child, (&@.diff_child).into())]
+    #[from(ParentModel| (&@.child_diff).into())]
+    #[into(ParentModel| child_diff, (&@.diff_child).into())]
     diff_child: ChildDto,
     parent_int: i32,
 }
@@ -36,11 +36,11 @@ struct ParentDto {
 #[derive(o2o)]
 #[o2o(map(Child))]
 struct ChildDto {
-    #[o2o(from(|x|x.child_int as i16))]
-    #[o2o(into(|x|x.child_int as i32))]
+    #[o2o(from(@.child_int as i16))]
+    #[o2o(into(@.child_int as i32))]
     child_int: i16,
-    #[o2o(from(|x|x.another_child_int as i8))]
-    #[o2o(into(another_child_int, |x|x.diff_another_child_int as i32))]
+    #[o2o(from(@.another_child_int as i8))]
+    #[o2o(into(another_child_int, @.diff_another_child_int as i32))]
     diff_another_child_int: i8,
 }
 

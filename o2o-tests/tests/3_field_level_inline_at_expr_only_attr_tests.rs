@@ -6,7 +6,7 @@ struct UnnamedStructDto(i32, i32, f32);
 
 #[derive(Default)]
 #[derive(o2o)]
-// Map (and specifically to and to_b) works here as long as Rust allows instantiation like TupleStruct { 0: ..., 1: ..., ...}
+// Map works here as long as Rust allows instantiation like TupleStruct { 0: ..., 1: ..., ...}
 #[map(UnnamedStructDto)]
 #[into_existing(UnnamedStructDto)]
 struct NamedStruct {

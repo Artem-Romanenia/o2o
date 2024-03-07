@@ -2,8 +2,8 @@ use o2o::o2o;
 use o2o::traits::IntoExisting;
 
 #[derive(o2o)]
-#[owned_into(i32| hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32} 
-    -> hrs * 3600 + mns * 60 + scs)]
+#[o2o(owned_into(i32| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}),
+    return hrs * 3600 + mns * 60 + scs))]
 struct Time {
     hours: i8,
     minutes: i8,
@@ -11,10 +11,10 @@ struct Time {
 }
 
 #[derive(o2o)]
-#[from(Time| hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32} 
-    -> { TotalTime {total_seconds: hrs * 3600 + mns * 60 + scs} })]
-#[into(String -> @.total_seconds.to_string())]
-#[into_existing(String -> @.total_seconds.to_string())]
+#[from(Time| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}),
+    return { TotalTime {total_seconds: hrs * 3600 + mns * 60 + scs} })]
+#[into(String| return @.total_seconds.to_string())]
+#[into_existing(String| return @.total_seconds.to_string())]
 struct TotalTime {
     total_seconds: i32
 }

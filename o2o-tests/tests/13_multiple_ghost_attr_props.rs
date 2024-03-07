@@ -18,22 +18,22 @@ struct TupleEntityModel(i32, i16, i32, i16, f32);
 #[o2o(
     map(EntityModel),
     into_existing(EntityModel),
-    ghost_owned(EntityModel| 
-        ghost_int: |x| { x.some_int }, 
-        ghost_int_2: |x| { x.another_int as i16 }, 
+    ghosts_owned(EntityModel| 
+        ghost_int: { @.some_int }, 
+        ghost_int_2: { @.another_int as i16 }, 
         ghost_float: { 456.0 }
     ),
-    ghost_ref(EntityModel| 
-        ghost_int: |x| { x.some_int }, 
-        ghost_int_2: |x| { x.another_int as i16 }, 
-        ghost_float: || { 4567.0 }
+    ghosts_ref(EntityModel| 
+        ghost_int: { @.some_int }, 
+        ghost_int_2: { @.another_int as i16 }, 
+        ghost_float: { 4567.0 }
     ),
     map(TupleEntityModel as ()),
     into_existing(TupleEntityModel as ()),
-    ghost(TupleEntityModel|
-        2: |x| { x.some_int }, 
-        3: |x| { x.another_int as i16 }, 
-        4: |_| { 456.0 }
+    ghosts(TupleEntityModel|
+        2: { @.some_int }, 
+        3: { @.another_int as i16 }, 
+        4: { 456.0 }
     )
 )]
 struct Entity {
@@ -47,17 +47,17 @@ struct Entity {
 #[derive(o2o)]
 #[map(TupleEntityModel)]
 #[into_existing(TupleEntityModel)]
-#[ghost(TupleEntityModel| 
-    2: |x| { x.0 }, 
-    3: |x| { x.1 as i16 }, 
+#[ghosts(TupleEntityModel| 
+    2: { @.0 }, 
+    3: { @.1 as i16 }, 
     4: { 456.0 }
 )]
 #[map(EntityModel as {})]
 #[into_existing(EntityModel as {})]
-#[ghost(EntityModel| 
-    ghost_int: |x| { x.0 }, 
-    ghost_int_2: |x| { x.1 as i16 }, 
-    ghost_float: || { 456.0 }
+#[ghosts(EntityModel| 
+    ghost_int: { @.0 }, 
+    ghost_int_2: { @.1 as i16 }, 
+    ghost_float: { 456.0 }
 )]
 struct TupleEntity (
     #[map(EntityModel| some_int)]
@@ -107,7 +107,7 @@ struct TupleEntityDto(
     #[ghost(TupleEntity| @.1)]
     #[ghost(Entity| @.another_int as i16)]
     i16, 
-    #[o2o(ghost_owned(|| 456.0))]
+    #[o2o(ghost_owned(456.0))]
     #[o2o(ghost_ref({4567.0}))]
     f32
 );
