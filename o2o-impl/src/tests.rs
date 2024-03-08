@@ -66,12 +66,27 @@ fn unrecognized_struct_instructions() {
             #[map(EntityDto)]
             #[parent(EntityDto)]
             struct Entity {}
-        }, "Struct instruction 'parent' is not supported. To turn this message off, use #[o2o(allow_unknown)]"),
+        }, "Member instruction 'parent' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
         (quote! {
             #[map(EntityDto)]
             #[child(EntityDto)]
             struct Entity {}
-        }, "Struct instruction 'child' is not supported. To turn this message off, use #[o2o(allow_unknown)]"),
+        }, "Perhaps you meant 'children'? To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
+            #[map(i32)]
+            #[as_type(i32)]
+            struct Entity {}
+        }, "Member instruction 'as_type' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
+            #[map(EntityDto)]
+            #[repeat(EntityDto)]
+            struct Entity {}
+        }, "Member instruction 'repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
+            #[map(EntityDto)]
+            #[stop_repeat(EntityDto)]
+            struct Entity {}
+        }, "Member instruction 'stop_repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
         (quote! {
             #[map(EntityDto)]
             #[ghost(EntityDto)]
@@ -85,12 +100,27 @@ fn unrecognized_struct_instructions() {
             #[o2o(map(EntityDto))]
             #[o2o(parent(EntityDto))]
             struct Entity {}
-        }, "Struct instruction 'parent' is not supported."),
+        }, "Member instruction 'parent' should be used on a member."),
         (quote! {
             #[o2o(map(EntityDto))]
             #[o2o(child(EntityDto))]
             struct Entity {}
-        }, "Struct instruction 'child' is not supported."),
+        }, "Perhaps you meant 'children'?"),
+        (quote! {
+            #[map(i32)]
+            #[o2o(as_type(i32))]
+            struct Entity {}
+        }, "Member instruction 'as_type' should be used on a member."),
+        (quote! {
+            #[map(EntityDto)]
+            #[o2o(repeat(EntityDto))]
+            struct Entity {}
+        }, "Member instruction 'repeat' should be used on a member."),
+        (quote! {
+            #[map(EntityDto)]
+            #[o2o(stop_repeat(EntityDto))]
+            struct Entity {}
+        }, "Member instruction 'stop_repeat' should be used on a member."),
         (quote! {
             #[o2o(map(EntityDto))]
             #[o2o(ghost(EntityDto))]
@@ -113,45 +143,80 @@ fn unrecognized_member_instructions() {
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[mapp(diff_field)]
+                #[ghosts()]
                 child: i32,
             }
-        }, "mapp"),
+        }, "Perhaps you meant 'ghost'? To turn this message off, use #[o2o(allow_unknown)]"),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[children(diff_field)]
+                #[ghosts_owned()]
                 child: i32,
             }
-        }, "children"),
+        }, "Perhaps you meant 'ghost_owned'? To turn this message off, use #[o2o(allow_unknown)]"),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[where_clause(diff_field)]
+                #[ghosts_ref()]
                 child: i32,
             }
-        }, "where_clause"),
+        }, "Perhaps you meant 'ghost_ref'? To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[children()]
+                child: i32,
+            }
+        }, "Perhaps you meant 'child'? To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[where_clause()]
+                child: i32,
+            }
+        }, "Struct instruction 'where_clause' should be used on a struct. To turn this message off, use #[o2o(allow_unknown)]"),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
                 #[o2o(mapp(diff_field))]
                 child: i32,
             }
-        }, "mapp"),
+        }, "Member instruction 'mapp' is not supported."),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[o2o(children(diff_field))]
+                #[o2o(ghosts())]
                 child: i32,
             }
-        }, "children"),
+        }, "Perhaps you meant 'ghost'?"),
         (quote! {
             #[map(EntityDto)]
             struct Entity {
-                #[o2o(where_clause(diff_field))]
+                #[o2o(ghosts_owned())]
                 child: i32,
             }
-        }, "where_clause"),
+        }, "Perhaps you meant 'ghost_owned'?"),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[o2o(ghosts_ref())]
+                child: i32,
+            }
+        }, "Perhaps you meant 'ghost_ref'?"),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[o2o(children())]
+                child: i32,
+            }
+        }, "Perhaps you meant 'child'?"),
+        (quote! {
+            #[map(EntityDto)]
+            struct Entity {
+                #[o2o(where_clause())]
+                child: i32,
+            }
+        }, "Struct instruction 'where_clause' should be used on a struct."),
     ];
 
     for (code_fragment, err) in test_data {
@@ -159,7 +224,7 @@ fn unrecognized_member_instructions() {
         let output = derive(&input);
         let message = get_error(output, false);
     
-        assert_eq!(message, format!("Member instruction '{}' is not supported.", err));
+        assert_eq!(message, err);
     }
 }
 
@@ -190,7 +255,6 @@ fn unrecognized_struct_instructions_no_bark() {
             struct Entity {}
         },
         quote!{
-            #[o2o(allow_unknown)]
             #[from_owned(NamedStruct)]
             #[unknown()]
             struct NamedStructDto {}
@@ -207,19 +271,62 @@ fn unrecognized_struct_instructions_no_bark() {
 
 #[test]
 fn unrecognized_member_instructions_no_bark() {
-    let code_fragment = quote!{
-        #[from_owned(NamedStruct)]
-        #[o2o(allow_unknown)]
-        struct NamedStructDto {
-            #[unknown()]
-            field: i32,
-        }
-    };
+    let test_data = vec![
+        quote! {
+            #[from_owned(NamedStruct)]
+            struct NamedStructDto {
+                #[unknown()]
+                field: i32,
+            }
+        },
+        quote!{
+            #[from_owned(NamedStruct)]
+            #[o2o(allow_unknown)]
+            struct NamedStructDto {
+                #[ghosts()]
+                field: i32,
+            }
+        },
+        quote!{
+            #[from_owned(NamedStruct)]
+            #[o2o(allow_unknown)]
+            struct NamedStructDto {
+                #[ghosts_owned()]
+                field: i32,
+            }
+        },
+        quote!{
+            #[from_owned(NamedStruct)]
+            #[o2o(allow_unknown)]
+            struct NamedStructDto {
+                #[ghosts_ref()]
+                field: i32,
+            }
+        },
+        quote!{
+            #[from_owned(NamedStruct)]
+            #[o2o(allow_unknown)]
+            struct NamedStructDto {
+                #[children()]
+                field: i32,
+            }
+        },
+        quote!{
+            #[from_owned(NamedStruct)]
+            #[o2o(allow_unknown)]
+            struct NamedStructDto {
+                #[where_clause()]
+                field: i32,
+            }
+        },
+    ];
 
-    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
-    let output = derive(&input);
-
-    assert!(output.is_ok());
+    for code_fragment in test_data {
+        let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+        let output = derive(&input);
+    
+        assert!(output.is_ok());
+    }
 }
 
 #[test]

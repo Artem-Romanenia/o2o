@@ -669,7 +669,7 @@ pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAtt
                 let new_instrs: Punctuated<MemberInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
                     let p: OptionalParenthesizedTokenStream = input.parse()?;
-                    parse_member_instruction(&instr, p.content(), true)
+                    parse_member_instruction(&instr, p.content(), true, true)
                 })?;
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
@@ -677,7 +677,7 @@ pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAtt
         } else {
             let instr = x.path.get_ident().unwrap();
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_member_instruction(instr, p.content(), bark)?);
+            instrs.push(parse_member_instruction(instr, p.content(), false, bark)?);
         }
     }
     let mut child_attrs: Vec<FieldChildAttr> = vec![];
@@ -735,14 +735,17 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "ghost" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         "ghost_ref" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts_ref'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         "ghost_owned" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts_owned'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "parent" if bark => Err(Error::new(instr.span(), format_args!("Struct instruction 'parent' is not supported.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "child" if bark => Err(Error::new(instr.span(), format_args!("Struct instruction 'child' is not supported.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "child" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'children'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "parent" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'parent' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "as_type" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'as_type' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "repeat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'repeat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "stop_repeat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'stop_repeat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         _ if own_instr => Err(Error::new(instr.span(), format_args!("Struct instruction '{}' is not supported.", instr))),
         _ => Ok(StructInstruction::Unrecognized),
     }
 }
 
-fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Result<MemberInstruction> {
+fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, bark: bool) -> Result<MemberInstruction> {
     let instr_str = &instr.to_string();
     match instr_str.as_ref() {
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
@@ -778,7 +781,12 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, bark: bool) -> Re
             Ok(MemberInstruction::Repeat(repeat.0))
         },
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
-        _ if bark => Err(Error::new(instr.span(), format_args!("Member instruction '{}' is not supported.", instr))),
+        "ghosts" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghost'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "ghosts_ref" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghost_ref'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "ghosts_owned" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghost_owned'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "children" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'child'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "where_clause" if bark => Err(Error::new(instr.span(), format_args!("Struct instruction 'where_clause' should be used on a struct.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        _ if own_instr => Err(Error::new(instr.span(), format_args!("Member instruction '{}' is not supported.", instr))),
         _ => Ok(MemberInstruction::Unrecognized)
     }
 }
