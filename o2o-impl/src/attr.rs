@@ -10,6 +10,7 @@ use syn::spanned::Spanned;
 use syn::token::{Brace, Paren};
 use syn::{Attribute, Ident, Result, Token, Member, parenthesized, braced, WherePredicate, Error};
 
+use crate::ast::SynDataTypeMember;
 use crate::kw;
 
 struct OptionalParenthesizedTokenStream {
@@ -317,11 +318,13 @@ pub(crate) enum StructKindHint {
     Unspecified = 2
 }
 
+#[derive(Clone)]
 pub(crate) struct StructAttr {
     pub attr: StructAttrCore,
     pub applicable_to: ApplicableTo,
 }
 
+#[derive(Clone)]
 pub(crate) struct StructAttrCore {
     pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
@@ -369,6 +372,7 @@ impl Parse for StructAttrCore {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct InitData {
     pub ident: Ident,
     _colon: Token![:],
@@ -659,9 +663,9 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(StructAttrs, bool
     Ok((StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs }, bark))
 }
 
-pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAttrs> {
+pub(crate) fn get_field_attrs(input: SynDataTypeMember, bark: bool) -> Result<FieldAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
-    for x in input.attrs.iter() {
+    for x in input.get_attrs().iter() {
         if x.path.is_ident("doc"){
             continue;
         } else if x.path.is_ident("o2o") {
@@ -692,7 +696,12 @@ pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAtt
             MemberInstruction::Child(attr) => child_attrs.push(attr),
             MemberInstruction::Ghost(attr) => ghost_attrs.push(attr),
             MemberInstruction::Parent(attr) => parent_attrs.push(attr),
-            MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
+            MemberInstruction::As(attr) => {
+                match input {
+                    SynDataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs),
+                    SynDataTypeMember::Variant(_) => panic!("weird")
+                };
+            },
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
             MemberInstruction::Unrecognized => ()
