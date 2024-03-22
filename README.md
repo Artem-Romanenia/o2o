@@ -53,6 +53,29 @@ let dto = PersonDto { id: 321, name: "Jack".into(), age: 23 };
 let person: Person = dto.into();
 
 assert_eq!(person.id, 321); assert_eq!(person.name, "Jack"); assert_eq!(person.age, 23);
+
+// Starting from v0.4.2 o2o also supports enums:
+
+enum Creature {
+    Person(Person),
+    Cat { nickname: String },
+    Dog(String),
+    Other
+}
+
+#[derive(o2o)]
+#[from_owned(Creature)]
+enum CreatureDto {
+    Person(#[map(~.into())] PersonDto),
+    Cat { nickname: String },
+    Dog(String),
+    Other
+}
+
+let creature = Creature::Cat { nickname: "Floppa".into() };
+let dto: CreatureDto = creature.into();
+
+if let CreatureDto::Cat { nickname } = dto { assert_eq!(nickname, "Floppa"); } else { assert!(false) }
 ```
 
 And here's the code that `o2o` generates (from here on, generated code is produced by [rust-analyzer: Expand macro recursively](https://rust-analyzer.github.io/manual.html#expand-macro-recursively) command):
@@ -75,6 +98,17 @@ And here's the code that `o2o` generates (from here on, generated code is produc
               id: self.id,
               name: self.name,
               age: self.age,
+          }
+      }
+  }
+
+  impl std::convert::From<Creature> for CreatureDto {
+      fn from(value: Creature) -> CreatureDto {
+          match value {
+              Creature::Person(f0) => CreatureDto::Person(f0.into()),
+              Creature::Cat { nickname } => CreatureDto::Cat { nickname: nickname },
+              Creature::Dog(f0) => CreatureDto::Dog(f0),
+              Creature::Other => CreatureDto::Other,
           }
       }
   }
@@ -107,8 +141,8 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
     - [Primitive type conversions](#primitive-type-conversions)
     - [Repeat instructions](#repeat-instructions)
-  - [Contributions](#contributions)
-    - [License](#license)
+- [Contributions](#contributions)
+- [License](#license)
 
 ## Traits and `o2o` *trait instructions*
 
@@ -1518,11 +1552,11 @@ struct CarDto {
   ```
 </details>
 
-### Contributions
+## Contributions
 
 All issues, questions, pull requests are extremely welcome.
 
-#### License
+## License
 
 <sup>
 Licensed under either an <a href="LICENSE-APACHE">Apache License, Version

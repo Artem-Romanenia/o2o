@@ -1,12 +1,12 @@
 use crate::attr::{self};
-use crate::attr::{FieldAttrs, StructAttrs};
+use crate::attr::{MemberAttrs, DataTypeAttrs};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
 
 pub(crate) struct Struct<'a> {
-    pub attrs: StructAttrs,
+    pub attrs: DataTypeAttrs,
     pub ident: &'a Ident,
     pub generics: &'a Generics,
     pub fields: Vec<Field>,
@@ -29,7 +29,7 @@ impl<'a> Struct<'a> {
 
 #[derive(Clone)]
 pub(crate) struct Field {
-    pub attrs: FieldAttrs,
+    pub attrs: MemberAttrs,
     pub idx: usize,
     pub member: Member,
 }
@@ -78,7 +78,7 @@ impl<'a> Field {
 }
 
 pub(crate) struct Enum<'a> {
-    pub attrs: StructAttrs,
+    pub attrs: DataTypeAttrs,
     pub ident: &'a Ident,
     pub generics: &'a Generics,
     pub variants: Vec<Variant>
@@ -98,9 +98,9 @@ impl<'a> Enum<'a> {
 }
 
 pub(crate) struct Variant {
-    pub attrs: FieldAttrs,
+    pub attrs: MemberAttrs,
     pub ident: Ident,
-    pub idx: usize,
+    _idx: usize,
     pub fields: Vec<Field>,
     pub named_fields: bool,
 }
@@ -137,9 +137,9 @@ impl<'a> Variant {
     fn from_syn(i: usize, variant: &'a syn::Variant, bark: bool) -> Result<Self> {
         let fields = Field::multiple_from_syn(&variant.fields, bark)?;
         Ok(Variant {
-            attrs: attr::get_field_attrs(SynDataTypeMember::Variant(&variant), bark)?,
+            attrs: attr::get_field_attrs(SynDataTypeMember::Variant(variant), bark)?,
             ident: variant.ident.clone(),
-            idx: i,
+            _idx: i,
             fields,
             named_fields: matches!(&variant.fields, Fields::Named(_)),
         })
@@ -154,12 +154,12 @@ pub(crate) enum DataType<'a> {
 impl<'a> DataType<'a> {
     pub fn get_ident(&'a self) -> &Ident {
         match self {
-            DataType::Struct(s) => &s.ident,
-            DataType::Enum(e) => &e.ident
+            DataType::Struct(s) => s.ident,
+            DataType::Enum(e) => e.ident
         }
     }
 
-    pub fn get_attrs(&'a self) -> &'a StructAttrs {
+    pub fn get_attrs(&'a self) -> &'a DataTypeAttrs {
         match self {
             DataType::Struct(s) => &s.attrs,
             DataType::Enum(e) => &e.attrs
@@ -168,38 +168,17 @@ impl<'a> DataType<'a> {
 
     pub fn get_members(&'a self) -> Vec<DataTypeMember> {
         match self {
-            DataType::Struct(s) => s.fields.iter().map(|x| DataTypeMember::Field(x)).collect(),
-            DataType::Enum(e) => e.variants.iter().map(|x| DataTypeMember::Variant(x)).collect()
+            DataType::Struct(s) => s.fields.iter().map(DataTypeMember::Field).collect(),
+            DataType::Enum(e) => e.variants.iter().map(DataTypeMember::Variant).collect()
         }
     }
 
     pub fn get_generics(&'a self) -> &'a Generics {
         match self {
-            DataType::Struct(s) => &s.generics,
-            DataType::Enum(e) => &e.generics
+            DataType::Struct(s) => s.generics,
+            DataType::Enum(e) => e.generics
         }
     }
-
-    // pub fn get_field(&'a self, ty: &TypePath) -> Option<&Field> {
-    //     match self {
-    //         DataType::Struct(s) => s.fields.iter().find(|f| 
-    //             f.attrs.field_attr_core(&Kind::OwnedInto, ty)
-    //                 .filter(|&g| g.wrapper).is_some()
-    //         ),
-    //         DataType::Enum(e) => None
-    //     }
-    // }
-
-    // pub fn get_field_with_action(&'a self, ty: &TypePath) -> Option<(&Field, &Option<Action>)> {
-    //     match self {
-    //         DataType::Struct(s) => s.fields.iter().find_map(|f|
-    //             f.attrs.field_attr_core(&Kind::RefInto, ty)
-    //                 .filter(|&g| g.wrapper)
-    //                 .map(|x| (f, &x.action))
-    //         ),
-    //         DataType::Enum(e) => None
-    //     }
-    // }
 }
 
 pub(crate) enum SynDataTypeMember<'a> {
@@ -223,7 +202,7 @@ pub(crate) enum DataTypeMember<'a> {
 }
 
 impl<'a> DataTypeMember<'a> {
-    pub fn get_attrs(&'a self) -> &'a FieldAttrs {
+    pub fn get_attrs(&'a self) -> &'a MemberAttrs {
         match self {
             DataTypeMember::Field(f) => &f.attrs,
             DataTypeMember::Variant(v) => &v.attrs

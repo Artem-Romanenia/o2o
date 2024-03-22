@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{spanned::Spanned, Result};
-use crate::{ast::{DataType, Struct}, attr::{ChildrenAttr, FieldChildAttr, Kind, StructAttrCore, StructAttrs, StructGhostAttr, StructKindHint, TypePath, WhereAttr}};
+use crate::{ast::{DataType, Struct}, attr::{ChildrenAttr, ChildAttr, Kind, TraitAttrCore, DataTypeAttrs, GhostsAttr, StructKindHint, TypePath, WhereAttr}};
 
 pub(crate) fn validate(input: &DataType) -> Result<()> {
     let attrs = input.get_attrs();
@@ -34,7 +34,7 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     validate_where_attrs(&attrs.where_attrs, &type_paths, &mut errors);
 
     if let DataType::Struct(s) = input {
-        validate_fields(s, &attrs, &type_paths, &mut errors);
+        validate_fields(s, attrs, &type_paths, &mut errors);
     }
 
     if errors.is_empty() {
@@ -48,7 +48,7 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     }
 }
 
-fn validate_struct_attrs<'a, I: Iterator<Item = &'a StructAttrCore>>(attrs: I, errors: &mut HashMap<String, Span>) {
+fn validate_struct_attrs<'a, I: Iterator<Item = &'a TraitAttrCore>>(attrs: I, errors: &mut HashMap<String, Span>) {
     let mut unique_ident = HashSet::new();
     for attr in attrs {
         if !unique_ident.insert(&attr.ty) {
@@ -57,7 +57,7 @@ fn validate_struct_attrs<'a, I: Iterator<Item = &'a StructAttrCore>>(attrs: I, e
     }
 }
 
-fn validate_ghost_attrs(kind: &Kind, ghost_attrs: &[StructGhostAttr], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
+fn validate_ghost_attrs(kind: &Kind, ghost_attrs: &[GhostsAttr], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     if ghost_attrs.iter().filter(|x|x.applicable_to[kind] && x.attr.container_ty.is_none()).count() > 1 {
         errors.insert("There can be at most one default #[ghosts(...)] instruction.".into(), Span::call_site());
     }
@@ -121,7 +121,7 @@ fn validate_where_attrs(where_attrs: &[WhereAttr], type_paths: &HashSet<&TypePat
     }
 }
 
-fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
+fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     for field in &input.fields {
         for field_attr in &field.attrs.attrs {
             if let Some(tp) = &field_attr.attr.container_ty {
@@ -228,7 +228,7 @@ fn validate_fields(input: &Struct, struct_attrs: &StructAttrs, type_paths: &Hash
     }
 }
 
-fn check_child_errors(child_attr: &FieldChildAttr, struct_attrs: &StructAttrs, tp: &TypePath, errors: &mut HashMap<String, Span>) {
+fn check_child_errors(child_attr: &ChildAttr, struct_attrs: &DataTypeAttrs, tp: &TypePath, errors: &mut HashMap<String, Span>) {
     let children_attr = struct_attrs.children_attr(tp);
     for (idx, _level) in child_attr.child_path.child_path.iter().enumerate() {
         let path = child_attr.get_child_path_str(Some(idx));
