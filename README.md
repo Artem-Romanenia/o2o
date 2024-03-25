@@ -53,6 +53,29 @@ let dto = PersonDto { id: 321, name: "Jack".into(), age: 23 };
 let person: Person = dto.into();
 
 assert_eq!(person.id, 321); assert_eq!(person.name, "Jack"); assert_eq!(person.age, 23);
+
+// Starting from v0.4.2 o2o also supports enums:
+
+enum Creature {
+    Person(Person),
+    Cat { nickname: String },
+    Dog(String),
+    Other
+}
+
+#[derive(o2o)]
+#[from_owned(Creature)]
+enum CreatureDto {
+    Person(#[map(~.into())] PersonDto),
+    Cat { nickname: String },
+    Dog(String),
+    Other
+}
+
+let creature = Creature::Cat { nickname: "Floppa".into() };
+let dto: CreatureDto = creature.into();
+
+if let CreatureDto::Cat { nickname } = dto { assert_eq!(nickname, "Floppa"); } else { assert!(false) }
 ```
 
 And here's the code that `o2o` generates (from here on, generated code is produced by [rust-analyzer: Expand macro recursively](https://rust-analyzer.github.io/manual.html#expand-macro-recursively) command):
@@ -78,6 +101,17 @@ And here's the code that `o2o` generates (from here on, generated code is produc
           }
       }
   }
+
+  impl std::convert::From<Creature> for CreatureDto {
+      fn from(value: Creature) -> CreatureDto {
+          match value {
+              Creature::Person(f0) => CreatureDto::Person(f0.into()),
+              Creature::Cat { nickname } => CreatureDto::Cat { nickname: nickname },
+              Creature::Dog(f0) => CreatureDto::Dog(f0),
+              Creature::Other => CreatureDto::Other,
+          }
+      }
+  }
   ```
 </details>
 
@@ -87,7 +121,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 - [The (not so big) Problem](#the-not-so-big-problem)
 - [Inline expressions](#inline-expressions)
 - [Examples](#examples)
-  - [Different field name](#different-field-name)
+  - [Different member name](#different-member-name)
   - [Different field type](#different-field-type)
   - [Nested structs](#nested-structs)
   - [Nested collection](#nested-collection)
@@ -107,8 +141,8 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
     - [Primitive type conversions](#primitive-type-conversions)
     - [Repeat instructions](#repeat-instructions)
-  - [Contributions](#contributions)
-    - [License](#license)
+- [Contributions](#contributions)
+- [License](#license)
 
 ## Traits and `o2o` *trait instructions*
 
@@ -279,7 +313,7 @@ So finally, let's look at some examples.
 
 ## Examples
 
-### Different field name
+### Different member name
 
 ``` rust
 use o2o::o2o;
@@ -289,13 +323,28 @@ struct Entity {
     another_int: i16,
 }
 
+enum EntityEnum {
+    Entity(Entity),
+    SomethingElse { field: i32 }
+}
+
 #[derive(o2o)]
-#[from_ref(Entity)]
-#[ref_into_existing(Entity)]
+#[map_ref(Entity)]
 struct EntityDto {
     some_int: i32,
     #[map(another_int)]
     different_int: i16,
+}
+
+#[derive(o2o)]
+#[map_ref(EntityEnum)]
+enum EntityEnumDto {
+    #[map(Entity)]
+    EntityDto(#[map(~.into())]EntityDto),
+    SomethingElse { 
+        #[map(field, *~)]
+        f: i32 
+    }
 }
 ```
 <details>
@@ -314,6 +363,23 @@ struct EntityDto {
       fn into_existing(self, other: &mut Entity) {
           other.some_int = self.some_int;
           other.another_int = self.different_int;
+      }
+  }
+
+  impl std::convert::From<&EntityEnum> for EntityEnumDto {
+      fn from(value: &EntityEnum) -> EntityEnumDto {
+          match value {
+              EntityEnum::Entity(f0) => EntityEnumDto::EntityDto(f0.into()),
+              EntityEnum::SomethingElse { field } => EntityEnumDto::SomethingElse { f: *field },
+          }
+      }
+  }
+  impl std::convert::Into<EntityEnum> for &EntityEnumDto {
+      fn into(self) -> EntityEnum {
+          match self {
+              EntityEnumDto::EntityDto(f0) => EntityEnum::Entity(f0.into()),
+              EntityEnumDto::SomethingElse { f } => EntityEnum::SomethingElse { field: *f },
+          }
       }
   }
   ```
@@ -451,9 +517,6 @@ struct Child {
 #[map_owned(Entity)]
 struct EntityDto {
     some_int: i32,
-    // Here field name as well as type are different, so we pass in field name and tilde inline expression.
-    // Also, it doesn't hurt to use member trait instruction #[map()], 
-    // which is broader than trait instruction #[map_owned]
     #[map(children, ~.iter().map(|p|p.into()).collect())]
     children_vec: Vec<ChildDto>
 }
@@ -554,7 +617,7 @@ enum ZodiacSign {}
   ```
 </details>
 
-In a reverse case, you need to use a struct level `#[ghost()]` instruction:
+In a reverse case, you need to use a struct level `#[ghosts()]` instruction:
 ``` rust
 use o2o::o2o;
 
@@ -771,16 +834,12 @@ impl Employee {
 #[derive(o2o)]
 #[map(Employee)]
 #[ghosts(
-    // o2o supports closures with one input parameter.
-    // This parameter represents instance on the other side of the conversion.
     first_name: {@.get_first_name()},
     last_name: {@.get_last_name()}
 )]
 struct EmployeeDto {
     #[map(id)]
     employee_id: i32,
-    // '@.' is another flavor of 'inline expression'. 
-    // @ also represents instance on the other side of the conversion.
     #[ghost(@.get_full_name())]
     full_name: String,
 
@@ -1518,11 +1577,11 @@ struct CarDto {
   ```
 </details>
 
-### Contributions
+## Contributions
 
 All issues, questions, pull requests are extremely welcome.
 
-#### License
+## License
 
 <sup>
 Licensed under either an <a href="LICENSE-APACHE">Apache License, Version

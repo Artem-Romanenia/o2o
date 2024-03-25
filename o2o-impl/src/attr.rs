@@ -10,6 +10,7 @@ use syn::spanned::Spanned;
 use syn::token::{Brace, Paren};
 use syn::{Attribute, Ident, Result, Token, Member, parenthesized, braced, WherePredicate, Error};
 
+use crate::ast::SynDataTypeMember;
 use crate::kw;
 
 struct OptionalParenthesizedTokenStream {
@@ -38,8 +39,8 @@ impl OptionalParenthesizedTokenStream {
 }
 
 enum StructInstruction {
-    Map(StructAttr),
-    Ghost(StructGhostAttr), 
+    Map(TraitAttr),
+    Ghost(GhostsAttr), 
     Where(WhereAttr),
     Children(ChildrenAttr),
     AllowUnknown,
@@ -47,9 +48,9 @@ enum StructInstruction {
 }
 
 enum MemberInstruction {
-    Map(FieldAttr),
-    Ghost(FieldGhostAttr),
-    Child(FieldChildAttr),
+    Map(MemberAttr),
+    Ghost(GhostAttr),
+    Child(ChildAttr),
     Parent(ParentAttr),
     As(AsAttr),
     Repeat(RepeatFor),
@@ -151,15 +152,15 @@ impl Index<&Kind> for ApplicableTo {
     }
 }
 
-pub(crate) struct StructAttrs {
-    pub attrs: Vec<StructAttr>,
-    pub ghost_attrs: Vec<StructGhostAttr>,
+pub(crate) struct DataTypeAttrs {
+    pub attrs: Vec<TraitAttr>,
+    pub ghost_attrs: Vec<GhostsAttr>,
     pub where_attrs: Vec<WhereAttr>,
     pub children_attrs: Vec<ChildrenAttr>,
 }
 
-impl<'a> StructAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &StructAttrCore> {
+impl<'a> DataTypeAttrs {
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &TraitAttrCore> {
         self.attrs.iter().filter(move |x| x.applicable_to[kind]).map(|x| &x.attr)
     }
 
@@ -230,21 +231,21 @@ impl Parse for RepeatForWrap {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct FieldAttrs {
-    pub attrs: Vec<FieldAttr>,
-    pub child_attrs: Vec<FieldChildAttr>,
+pub(crate) struct MemberAttrs {
+    pub attrs: Vec<MemberAttr>,
+    pub child_attrs: Vec<ChildAttr>,
     pub parent_attrs: Vec<ParentAttr>,
-    pub ghost_attrs: Vec<FieldGhostAttr>,
+    pub ghost_attrs: Vec<GhostAttr>,
     pub repeat: Option<RepeatFor>,
     pub stop_repeat: bool,
 }
 
-impl<'a> FieldAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &FieldAttr> {
+impl<'a> MemberAttrs {
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &MemberAttr> {
         self.attrs.iter().filter(move |x| x.applicable_to[kind])
     }
 
-    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind) -> impl Iterator<Item = &FieldAttrCore> {
+    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind) -> impl Iterator<Item = &MemberAttrCore> {
         self.iter_for_kind(kind).map(|x| &x.attr)
     }
 
@@ -257,13 +258,13 @@ impl<'a> FieldAttrs {
                 .map(ApplicableAttr::Field))
     }
 
-    pub(crate) fn applicable_field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&'a FieldAttr> {
+    pub(crate) fn applicable_field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&'a MemberAttr> {
         self.field_attr(kind, container_ty)
             .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, container_ty) } else { None })
             .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, container_ty) } else { None })
     }
 
-    pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&FieldChildAttr>{
+    pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&ChildAttr>{
         self.child_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.child_attrs.iter().find(|x| x.container_ty.is_none()))
@@ -280,13 +281,13 @@ impl<'a> FieldAttrs {
             .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
     }
 
-    pub(crate) fn field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&FieldAttr>{
+    pub(crate) fn field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&MemberAttr>{
         self.iter_for_kind(kind)
             .find(|x| x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.iter_for_kind(kind).find(|x| x.attr.container_ty.is_none()))
     }
 
-    pub(crate) fn field_attr_core(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&FieldAttrCore>{
+    pub(crate) fn field_attr_core(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&MemberAttrCore>{
         self.iter_for_kind_core(kind)
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.iter_for_kind_core(kind).find(|x| x.container_ty.is_none()))
@@ -317,12 +318,14 @@ pub(crate) enum StructKindHint {
     Unspecified = 2
 }
 
-pub(crate) struct StructAttr {
-    pub attr: StructAttrCore,
+#[derive(Clone)]
+pub(crate) struct TraitAttr {
+    pub attr: TraitAttrCore,
     pub applicable_to: ApplicableTo,
 }
 
-pub(crate) struct StructAttrCore {
+#[derive(Clone)]
+pub(crate) struct TraitAttrCore {
     pub ty: TypePath,
     pub struct_kind_hint: StructKindHint,
     pub init_data: Option<Punctuated<InitData, Token![,]>>,
@@ -330,7 +333,7 @@ pub(crate) struct StructAttrCore {
     pub quick_return: Option<TokenStream>
 }
 
-impl Parse for StructAttrCore {
+impl Parse for TraitAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
         let ty: TypePath = if input.peek(Paren) {
             let content;
@@ -341,7 +344,7 @@ impl Parse for StructAttrCore {
         let struct_kind_hint = if ty.nameless_tuple { StructKindHint::Tuple } else { try_parse_struct_kind_hint(input)? };
 
         if !input.peek(Token![|]){
-            return Ok(StructAttrCore { ty, struct_kind_hint, init_data: None, update: None, quick_return: None })
+            return Ok(TraitAttrCore { ty, struct_kind_hint, init_data: None, update: None, quick_return: None })
         }
 
         input.parse::<Token![|]>()?;
@@ -365,10 +368,11 @@ impl Parse for StructAttrCore {
             try_parse_action(input, true)?
         } else { None };
 
-        Ok(StructAttrCore { ty, struct_kind_hint, init_data, update, quick_return })
+        Ok(TraitAttrCore { ty, struct_kind_hint, init_data, update, quick_return })
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct InitData {
     pub ident: Ident,
     _colon: Token![:],
@@ -385,7 +389,7 @@ impl Parse for InitData {
     }
 }
 
-pub(crate) struct StructGhostAttr {
+pub(crate) struct GhostsAttr {
     pub attr: StructGhostAttrCore,
     pub applicable_to: ApplicableTo,
 }
@@ -505,22 +509,22 @@ impl Hash for ChildData {
 }
 
 #[derive(Clone)]
-pub(crate) struct FieldAttr  {
-    pub attr: FieldAttrCore,
+pub(crate) struct MemberAttr  {
+    pub attr: MemberAttrCore,
     pub original_instr: String,
     applicable_to: ApplicableTo,
 }
 
 #[derive(Clone)]
-pub(crate) struct FieldAttrCore {
+pub(crate) struct MemberAttrCore {
     pub container_ty: Option<TypePath>,
     pub member: Option<Member>,
     pub action: Option<TokenStream>,
 }
 
-impl Parse for FieldAttrCore {
+impl Parse for MemberAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(FieldAttrCore {
+        Ok(MemberAttrCore {
             container_ty: try_parse_container_ident(input, false),
             member: try_parse_optional_ident(input),
             action: try_parse_action(input, true)?,
@@ -542,7 +546,7 @@ impl Parse for ParentAttr {
 }
 
 #[derive(Clone)]
-pub(crate) struct FieldGhostAttr {
+pub(crate) struct GhostAttr {
     pub attr: FieldGhostAttrCore,
     pub applicable_to: ApplicableTo,
 }
@@ -563,28 +567,28 @@ impl Parse for FieldGhostAttrCore {
 }
 
 pub(crate) enum ApplicableAttr<'a> {
-    Field(&'a FieldAttrCore),
+    Field(&'a MemberAttrCore),
     Ghost(&'a FieldGhostAttrCore),
 }
 
 #[derive(Clone)]
-pub(crate) struct FieldChildAttr {
+pub(crate) struct ChildAttr {
     pub container_ty: Option<TypePath>,
     pub child_path: ChildPath,
 }
 
-impl FieldChildAttr {
+impl ChildAttr {
     pub(crate) fn get_child_path_str(&self, depth: Option<usize>) -> &str {
         self.child_path.get_child_path_str(depth)
     }
 }
 
-impl Parse for FieldChildAttr{
+impl Parse for ChildAttr{
     fn parse(input: ParseStream) -> Result<Self> {
         let container_ty = try_parse_container_ident(input, false);
         let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(input)?;
         let child_path_str = build_child_path_str(&child_path);
-        Ok(FieldChildAttr { 
+        Ok(ChildAttr { 
             container_ty,
             child_path: ChildPath { 
                 child_path,
@@ -614,7 +618,7 @@ impl Parse for AsAttr {
     }
 }
 
-pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(StructAttrs, bool)> {
+pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs, bool)> {
     let mut bark = true;
 
     let mut instrs: Vec<StructInstruction> = vec![];
@@ -642,8 +646,8 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(StructAttrs, bool
             instrs.push(parse_struct_instruction(instr, p.content(), false, bark)?);
         }
     }
-    let mut attrs: Vec<StructAttr> = vec![];
-    let mut ghost_attrs: Vec<StructGhostAttr> = vec![];
+    let mut attrs: Vec<TraitAttr> = vec![];
+    let mut ghost_attrs: Vec<GhostsAttr> = vec![];
     let mut where_attrs: Vec<WhereAttr> = vec![];
     let mut children_attrs: Vec<ChildrenAttr> = vec![];
     
@@ -656,12 +660,12 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(StructAttrs, bool
             StructInstruction::AllowUnknown | StructInstruction::Unrecognized => (),
         };
     }
-    Ok((StructAttrs {attrs, ghost_attrs, where_attrs, children_attrs }, bark))
+    Ok((DataTypeAttrs {attrs, ghost_attrs, where_attrs, children_attrs }, bark))
 }
 
-pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAttrs> {
+pub(crate) fn get_field_attrs(input: SynDataTypeMember, bark: bool) -> Result<MemberAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
-    for x in input.attrs.iter() {
+    for x in input.get_attrs().iter() {
         if x.path.is_ident("doc"){
             continue;
         } else if x.path.is_ident("o2o") {
@@ -680,9 +684,9 @@ pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAtt
             instrs.push(parse_member_instruction(instr, p.content(), false, bark)?);
         }
     }
-    let mut child_attrs: Vec<FieldChildAttr> = vec![];
-    let mut ghost_attrs: Vec<FieldGhostAttr> = vec![];
-    let mut attrs: Vec<FieldAttr> = vec![];
+    let mut child_attrs: Vec<ChildAttr> = vec![];
+    let mut ghost_attrs: Vec<GhostAttr> = vec![];
+    let mut attrs: Vec<MemberAttr> = vec![];
     let mut parent_attrs: Vec<ParentAttr> = vec![];
     let mut repeat = None;
     let mut stop_repeat = false;
@@ -692,13 +696,18 @@ pub(crate) fn get_field_attrs(input: &syn::Field, bark: bool) -> Result<FieldAtt
             MemberInstruction::Child(attr) => child_attrs.push(attr),
             MemberInstruction::Ghost(attr) => ghost_attrs.push(attr),
             MemberInstruction::Parent(attr) => parent_attrs.push(attr),
-            MemberInstruction::As(attr) => add_as_type_attrs(input, attr, &mut attrs),
+            MemberInstruction::As(attr) => {
+                match input {
+                    SynDataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs),
+                    SynDataTypeMember::Variant(_) => panic!("weird")
+                };
+            },
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
             MemberInstruction::Unrecognized => ()
         };
     }
-    Ok(FieldAttrs { child_attrs, parent_attrs, attrs, ghost_attrs, repeat, stop_repeat })
+    Ok(MemberAttrs { child_attrs, parent_attrs, attrs, ghost_attrs, repeat, stop_repeat })
 }
 
 fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, bark: bool) -> Result<StructInstruction>
@@ -708,7 +717,7 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "allow_unknown" if own_instr => Ok(StructInstruction::AllowUnknown),
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
-            Ok(StructInstruction::Map(StructAttr { 
+            Ok(StructInstruction::Map(TraitAttr { 
                 attr: syn::parse2(input)?, 
                 applicable_to: [
                     appl_owned_into(instr_str), 
@@ -719,7 +728,7 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
                     appl_ref_into_existing(instr_str)
                 ]
             })),
-        "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(StructInstruction::Ghost(StructGhostAttr {
+        "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(StructInstruction::Ghost(GhostsAttr {
             attr: syn::parse2(input)?,
             applicable_to: [
                 appl_ghosts_owned(instr_str),
@@ -750,7 +759,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
     match instr_str.as_ref() {
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
-            Ok(MemberInstruction::Map(FieldAttr { 
+            Ok(MemberInstruction::Map(MemberAttr { 
                 attr: syn::parse2(input)?, 
                 original_instr: instr_str.clone(),
                 applicable_to: [
@@ -762,7 +771,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
                     appl_ref_into_existing(instr_str)
                 ]
             })),
-        "ghost" | "ghost_ref" | "ghost_owned" => Ok(MemberInstruction::Ghost(FieldGhostAttr {
+        "ghost" | "ghost_ref" | "ghost_owned" => Ok(MemberInstruction::Ghost(GhostAttr {
             attr: syn::parse2(input)?,
             applicable_to: [
                 appl_ghost_owned(instr_str),
@@ -895,11 +904,11 @@ fn try_parse_braced_action(input: ParseStream) -> Result<TokenStream> {
     content.parse::<TokenStream>()
 }
 
-fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr>) {
+fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<MemberAttr>) {
     let this_ty = input.ty.to_token_stream();
     let that_ty = attr.tokens;
-    attrs.push(FieldAttr { 
-        attr: FieldAttrCore { 
+    attrs.push(MemberAttr { 
+        attr: MemberAttrCore { 
             container_ty: attr.container_ty.clone(), 
             member: attr.member.clone(), 
             action: Some(quote!(~ as #this_ty)),
@@ -907,8 +916,8 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<FieldAttr
         original_instr: "as_type".into(),
         applicable_to: [false, false, true, true, false, false]
     });
-    attrs.push(FieldAttr { 
-        attr: FieldAttrCore { 
+    attrs.push(MemberAttr { 
+        attr: MemberAttrCore { 
             container_ty: attr.container_ty, 
             member: attr.member, 
             action: Some(quote!(~ as #that_ty)),
