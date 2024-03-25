@@ -20,7 +20,6 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
             let input = Enum::from_syn(node, data)?;
             let input = DataType::Enum(&input);
             validate(&input)?;
-            //Ok(TokenStream::new())
             Ok(struct_impl(input))
         },
         _ => Err(Error::new_spanned(
@@ -579,7 +578,7 @@ fn render_struct_line(
                 let index2 = Member::Unnamed(Index { index: idx as u32, span: Span::call_site() });
                 quote!(obj.#index2 = #obj #index;)
             } else { 
-                let index = if ctx.destructured_src { format_ident!("f{}", index).to_token_stream() } else { index.to_token_stream() };
+                let index = if ctx.destructured_src { format_ident!("f{}", index.index).to_token_stream() } else { index.to_token_stream() };
                 quote!(#obj #index,)
             },
         (syn::Member::Unnamed(index), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, StructKindHint::Tuple | StructKindHint::Unspecified) => {
@@ -590,7 +589,7 @@ fn render_struct_line(
             if f.attrs.has_parent_attr(&ctx.struct_attr.ty) {
                 if !ctx.kind.is_ref() { quote!((&value).into(),) } else { quote!(value.into(),) }
             } else {
-                let field_path = if ctx.destructured_src { get_field_path(&Member::Named(format_ident!("f{}", index))) } else { get_field_path(&f.member) };
+                let field_path = if ctx.destructured_src { get_field_path(&Member::Named(format_ident!("f{}", index.index))) } else { get_field_path(&f.member) };
                 quote!(#obj #field_path,)
             },
         (syn::Member::Unnamed(_), None, _, StructKindHint::Struct) => {
@@ -624,7 +623,7 @@ fn render_struct_line(
             quote!(#ident: #right_side,)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, StructKindHint::Tuple | StructKindHint::Unspecified) => {
-            let index = if ctx.destructured_src { Some(format_ident!("f{}", index).to_token_stream()) } else { Some(index.to_token_stream()) };
+            let index = if ctx.destructured_src { Some(format_ident!("f{}", index.index).to_token_stream()) } else { Some(index.to_token_stream()) };
             let right_side = attr.get_action_or(index.clone(), ctx, || quote!(#obj #index));
             quote!(#right_side,)
         },
@@ -644,7 +643,7 @@ fn render_struct_line(
             quote!(other.#field_path = #right_side;)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::FromOwned | Kind::FromRef, _) => {
-            let or = Member::Named(format_ident!("f{}", index));
+            let or = Member::Named(format_ident!("f{}", index.index));
             let right_side = attr.get_stuff(&obj, get_field_path, ctx, || if ctx.destructured_src { &or } else { &f.member});
             quote!(#right_side,)
         }
@@ -891,7 +890,7 @@ impl<'a> ApplicableAttr<'a> {
                     (Some(ident), Some(action)) => {
                         if let Member::Unnamed(index) = ident {
                             if ctx.destructured_src { 
-                                let ident = Member::Named(format_ident!("f{}", index));
+                                let ident = Member::Named(format_ident!("f{}", index.index));
                                 quote_action(action, Some(field_path(&ident)), ctx) 
                             } else { quote_action(action, Some(field_path(ident)), ctx)}
                         } else {
