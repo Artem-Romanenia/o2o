@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{spanned::Spanned, Result};
-use crate::{ast::{DataType, Struct}, attr::{ChildrenAttr, ChildAttr, Kind, TraitAttrCore, DataTypeAttrs, GhostsAttr, StructKindHint, TypePath, WhereAttr}};
+use crate::{ast::{DataType, Struct}, attr::{ChildrenAttr, ChildAttr, Kind, TraitAttrCore, DataTypeAttrs, GhostsAttr, TypeHint, TypePath, WhereAttr}};
 
 pub(crate) fn validate(input: &DataType) -> Result<()> {
     let attrs = input.get_attrs();
@@ -205,7 +205,7 @@ fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &Ha
             .chain(struct_attrs.iter_for_kind(&Kind::FromRef).map(|x| (x, Kind::FromRef)));
 
         for (struct_attr, kind) in struct_attrs {
-            if struct_attr.quick_return.is_none() && struct_attr.struct_kind_hint == StructKindHint::Struct {
+            if struct_attr.quick_return.is_none() && struct_attr.type_hint == TypeHint::Struct {
                 for field in &input.fields {
                     if field.attrs.ghost(&struct_attr.ty, &kind).is_some() || field.attrs.has_parent_attr(&struct_attr.ty) {
                         continue;

@@ -53,6 +53,8 @@ enum MemberInstruction {
     Child(ChildAttr),
     Parent(ParentAttr),
     As(AsAttr),
+    Lit(LitAttr),
+    Pat(PatAttr),
     Repeat(RepeatFor),
     StopRepeat,
     Unrecognized,
@@ -236,6 +238,8 @@ pub(crate) struct MemberAttrs {
     pub child_attrs: Vec<ChildAttr>,
     pub parent_attrs: Vec<ParentAttr>,
     pub ghost_attrs: Vec<GhostAttr>,
+    pub lit_attrs: Vec<LitAttr>,
+    pub pat_attrs: Vec<PatAttr>,
     pub repeat: Option<RepeatFor>,
     pub stop_repeat: bool,
 }
@@ -276,6 +280,18 @@ impl<'a> MemberAttrs {
             .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
+    pub(crate) fn lit(&'a self, container_ty: &TypePath) -> Option<&LitAttr>{
+        self.lit_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.lit_attrs.iter().find(|x| x.container_ty.is_none()))
+    }
+
+    pub(crate) fn pat(&'a self, container_ty: &TypePath) -> Option<&PatAttr>{
+        self.pat_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.pat_attrs.iter().find(|x| x.container_ty.is_none()))
+    }
+
     pub(crate) fn has_parent_attr(&'a self, container_ty: &TypePath) -> bool {
         self.parent_attrs.iter()
             .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
@@ -312,7 +328,7 @@ impl<'a> MemberAttrs {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub(crate) enum StructKindHint {
+pub(crate) enum TypeHint {
     Struct = 0,
     Tuple = 1,
     Unspecified = 2
@@ -327,10 +343,11 @@ pub(crate) struct TraitAttr {
 #[derive(Clone)]
 pub(crate) struct TraitAttrCore {
     pub ty: TypePath,
-    pub struct_kind_hint: StructKindHint,
+    pub type_hint: TypeHint,
     pub init_data: Option<Punctuated<InitData, Token![,]>>,
     pub update: Option<TokenStream>,
-    pub quick_return: Option<TokenStream>
+    pub quick_return: Option<TokenStream>,
+    pub default_case: Option<TokenStream>
 }
 
 impl Parse for TraitAttrCore {
@@ -341,10 +358,10 @@ impl Parse for TraitAttrCore {
             let content_stream = content.parse::<TokenStream>()?;
             quote!((#content_stream)).into()
         } else { input.parse::<syn::Path>()?.into() };
-        let struct_kind_hint = if ty.nameless_tuple { StructKindHint::Tuple } else { try_parse_struct_kind_hint(input)? };
+        let type_hint = if ty.nameless_tuple { TypeHint::Tuple } else { try_parse_type_hint(input)? };
 
         if !input.peek(Token![|]){
-            return Ok(TraitAttrCore { ty, struct_kind_hint, init_data: None, update: None, quick_return: None })
+            return Ok(TraitAttrCore { ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None })
         }
 
         input.parse::<Token![|]>()?;
@@ -367,8 +384,12 @@ impl Parse for TraitAttrCore {
             input.parse::<Token![return]>()?;
             try_parse_action(input, true)?
         } else { None };
+        let default_case = if input.peek(Token![_]) {
+            input.parse::<Token![_]>()?;
+            try_parse_action(input, true)?
+        } else { None };
 
-        Ok(TraitAttrCore { ty, struct_kind_hint, init_data, update, quick_return })
+        Ok(TraitAttrCore { ty, type_hint, init_data, update, quick_return, default_case })
     }
 }
 
@@ -485,7 +506,7 @@ impl Parse for ChildrenAttr {
 
 pub(crate) struct ChildData {
     pub ty: syn::Path,
-    pub struct_kind_hint: StructKindHint,
+    pub type_hint: TypeHint,
     pub field_path: Punctuated<Member, Token![.]>,
     field_path_str: String,
 }
@@ -618,6 +639,32 @@ impl Parse for AsAttr {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct LitAttr {
+    pub container_ty: Option<TypePath>,
+    pub tokens: TokenStream,
+}
+
+impl Parse for LitAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let container_ty = try_parse_container_ident(input, false);
+        Ok(LitAttr { container_ty, tokens: input.parse()? })
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct PatAttr {
+    pub container_ty: Option<TypePath>,
+    pub tokens: TokenStream,
+}
+
+impl Parse for PatAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let container_ty = try_parse_container_ident(input, false);
+        Ok(PatAttr { container_ty, tokens: input.parse()? })
+    }
+}
+
 pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs, bool)> {
     let mut bark = true;
 
@@ -688,6 +735,8 @@ pub(crate) fn get_field_attrs(input: SynDataTypeMember, bark: bool) -> Result<Me
     let mut ghost_attrs: Vec<GhostAttr> = vec![];
     let mut attrs: Vec<MemberAttr> = vec![];
     let mut parent_attrs: Vec<ParentAttr> = vec![];
+    let mut lit_attrs: Vec<LitAttr> = vec![];
+    let mut pat_attrs: Vec<PatAttr> = vec![];
     let mut repeat = None;
     let mut stop_repeat = false;
     for instr in  instrs {
@@ -702,12 +751,14 @@ pub(crate) fn get_field_attrs(input: SynDataTypeMember, bark: bool) -> Result<Me
                     SynDataTypeMember::Variant(_) => panic!("weird")
                 };
             },
+            MemberInstruction::Lit(attr) => lit_attrs.push(attr),
+            MemberInstruction::Pat(attr) => pat_attrs.push(attr),
             MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => stop_repeat = true,
             MemberInstruction::Unrecognized => ()
         };
     }
-    Ok(MemberAttrs { child_attrs, parent_attrs, attrs, ghost_attrs, repeat, stop_repeat })
+    Ok(MemberAttrs { child_attrs, parent_attrs, attrs, ghost_attrs, lit_attrs, pat_attrs, repeat, stop_repeat })
 }
 
 fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, bark: bool) -> Result<StructInstruction>
@@ -747,6 +798,8 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "child" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'children'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         "parent" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'parent' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         "as_type" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'as_type' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "lit" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'lit' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
+        "pat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'pat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         "repeat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'repeat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         "stop_repeat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'stop_repeat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
         _ if own_instr => Err(Error::new(instr.span(), format_args!("Struct instruction '{}' is not supported.", instr))),
@@ -785,6 +838,8 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "child" => Ok(MemberInstruction::Child(syn::parse2(input)?)),
         "parent" => Ok(MemberInstruction::Parent(syn::parse2(input)?)),
         "as_type" => Ok(MemberInstruction::As(syn::parse2(input)?)),
+        "lit" => Ok(MemberInstruction::Lit(syn::parse2(input)?)),
+        "pat" => Ok(MemberInstruction::Pat(syn::parse2(input)?)),
         "repeat" => {
             let repeat: RepeatForWrap = syn::parse2(input)?;
             Ok(MemberInstruction::Repeat(repeat.0))
@@ -800,9 +855,9 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
     }
 }
 
-fn try_parse_struct_kind_hint(input: ParseStream) -> Result<StructKindHint> {
+fn try_parse_type_hint(input: ParseStream) -> Result<TypeHint> {
     if !input.peek(Token![as]){
-        return Ok(StructKindHint::Unspecified)
+        return Ok(TypeHint::Unspecified)
     }
 
     input.parse::<Token![as]>()?;
@@ -810,15 +865,15 @@ fn try_parse_struct_kind_hint(input: ParseStream) -> Result<StructKindHint> {
     let mut _content;
     if input.peek(Brace) {
         braced!(_content in input);
-        return Ok(StructKindHint::Struct)
+        return Ok(TypeHint::Struct)
     }
 
     if input.peek(Paren) {
         parenthesized!(_content in input);
-        return Ok(StructKindHint::Tuple)
+        return Ok(TypeHint::Tuple)
     }
 
-    Err(input.error("Only '()' and '{}' are supported struct kind hints."))
+    Err(input.error("Only '()' and '{}' are supported type hints."))
 }
 
 fn try_parse_container_ident(input: ParseStream, can_be_empty_after: bool) -> Option<TypePath> {
@@ -876,7 +931,7 @@ fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token!
         let ty = x.parse::<syn::Path>()?;
         Ok(ChildData{
             ty,
-            struct_kind_hint: try_parse_struct_kind_hint(x)?,
+            type_hint: try_parse_type_hint(x)?,
             field_path: child_path.clone(),
             field_path_str: child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect(),
         })

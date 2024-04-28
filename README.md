@@ -120,7 +120,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 - [Traits and `o2o` *trait instructions*](#traits-and-o2o-trait-instructions)
 - [The (not so big) Problem](#the-not-so-big-problem)
 - [Inline expressions](#inline-expressions)
-- [Examples](#examples)
+- [Struct Examples](#struct-examples)
   - [Different member name](#different-member-name)
   - [Different field type](#different-field-type)
   - [Nested structs](#nested-structs)
@@ -133,7 +133,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Flatened children](#flatened-children)
   - [Tuple structs](#tuple-structs)
   - [Tuples](#tuples)
-  - [Struct kind hints](#struct-kind-hints)
+  - [Type hints](#type-hints)
   - [Generics](#generics)
   - [Where clauses](#where-clauses)
   - [Mapping to multiple structs](#mapping-to-multiple-structs)
@@ -141,6 +141,12 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
     - [Primitive type conversions](#primitive-type-conversions)
     - [Repeat instructions](#repeat-instructions)
+- [Enum Examples](#enum-examples)
+  - [Different variant name](#different-variant-name)
+  - [Mapping to primitive types](#mapping-to-primitive-types)
+    - [Using literals](#using-literals)
+    - [Using patterns](#using-patterns)
+    - [Using literals and patterns together](#using-literals-and-patterns-together)
 - [Contributions](#contributions)
 - [License](#license)
 
@@ -152,7 +158,7 @@ To let o2o know what traits you want implemented, you have to use type-level `o2
 struct Entity { }
 
 #[derive(o2o::o2o)]
-#[from_ref(Entity)] // This tells o2o to generate 'From<&Person> for PersonDto' implementation
+#[from_ref(Entity)] // This tells o2o to generate 'From<&Entity> for EntityDto' implementation
 struct EntityDto { }
 ```
 
@@ -247,7 +253,7 @@ o2o has a concept of Inline Expressions, which can be passed as a parameter to s
 struct Entity { some_int: i32 }
 
 #[derive(o2o::o2o)]
-#[map_owned(Entity)] // tells o2o to implement 'From<Person> for PersonDto' and 'Into<Person> for PersonDto'
+#[map_owned(Entity)] // tells o2o to implement 'From<Entity> for EntityDto' and 'Into<Entity> for EntityDto'
 struct EntityDto { 
     #[from(~ * 2)] // Let's say for whatever reason we want to multiply 'some_int' by 2 when converting from Entity
     #[into(~ / 2)] // And divide back by 2 when converting into it
@@ -311,7 +317,7 @@ Obviously, you can use `~` for inline expressions that are passed only to member
 
 So finally, let's look at some examples.
 
-## Examples
+## Struct Examples
 
 ### Different member name
 
@@ -1190,9 +1196,9 @@ pub struct Entity{
   ```
 </details>
 
-### Struct kind hints
+### Type hints
 
-By default, **o2o** will suppose that the struct on the other side is the same kind of struct that the original one is. In order to convert between named and tuple structs when you need to place instructions on a tuple side, you`ll need to use Struct Kind Hint:
+By default, **o2o** will suppose that the struct on the other side is the same kind of type that the original one is. In order to convert between named and tuple structs when you need to place instructions on a tuple side, you`ll need to use Type Hint:
 
 ``` rust
 use o2o::o2o;
@@ -1571,6 +1577,264 @@ struct CarDto {
                       id: 321,
                   },
               },
+          }
+      }
+  }
+  ```
+</details>
+
+## Enum Examples
+
+### Different variant name
+
+``` rust
+pub enum Sort {
+    ASC,
+    DESC,
+    None
+}
+
+#[derive(o2o::o2o)]
+#[map_owned(Sort)]
+pub enum SortDto {
+    #[map(ASC)] Ascending,
+    #[map(DESC)] Descending,
+    None
+}
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<Sort> for SortDto {
+      fn from(value: Sort) -> SortDto {
+          match value {
+              Sort::ASC => SortDto::Ascending,
+              Sort::DESC => SortDto::Descending,
+              Sort::None => SortDto::None,
+          }
+      }
+  }
+  impl std::convert::Into<Sort> for SortDto {
+      fn into(self) -> Sort {
+          match self {
+              SortDto::Ascending => Sort::ASC,
+              SortDto::Descending => Sort::DESC,
+              SortDto::None => Sort::None,
+          }
+      }
+  }
+  ```
+</details>
+
+### Mapping to primitive types
+
+#### Using literals
+
+Literals can be used to produce both `From` and `Into` implementations:
+
+```rust
+#[derive(o2o::o2o)]
+#[map_owned(i32| _ => panic!("Not supported"))]
+enum HttpStatus {
+    // 'lit' for Literal
+    #[lit(200)]Ok,
+    #[lit(201)]Created,
+    #[lit(401)]Unauthorized,
+    #[lit(403)]Forbidden,
+    #[lit(404)]NotFound,
+    #[lit(500)]InternalError
+}
+
+type StaticStr = &'static str;
+
+#[derive(o2o::o2o)]
+#[map_owned(StaticStr| _ => todo!())]
+enum Animal {
+    #[lit("🐶")] Dog,
+    #[lit("🐱")] Cat,
+    #[lit("🐵")] Monkey
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<i32> for HttpStatus {
+      fn from(value: i32) -> HttpStatus {
+          match value {
+              200 => HttpStatus::Ok,
+              201 => HttpStatus::Created,
+              401 => HttpStatus::Unauthorized,
+              403 => HttpStatus::Forbidden,
+              404 => HttpStatus::NotFound,
+              500 => HttpStatus::InternalError,
+              _ => panic!("Not supported"),
+          }
+      }
+  }
+  impl std::convert::Into<i32> for HttpStatus {
+      fn into(self) -> i32 {
+          match self {
+              HttpStatus::Ok => 200,
+              HttpStatus::Created => 201,
+              HttpStatus::Unauthorized => 401,
+              HttpStatus::Forbidden => 403,
+              HttpStatus::NotFound => 404,
+              HttpStatus::InternalError => 500,
+          }
+      }
+  }
+
+  impl std::convert::From<StaticStr> for Animal {
+      fn from(value: StaticStr) -> Animal {
+          match value {
+              "🐶" => Animal::Dog,
+              "🐱" => Animal::Cat,
+              "🐵" => Animal::Monkey,
+              _ => todo!(),
+          }
+      }
+  }
+  impl std::convert::Into<StaticStr> for Animal {
+      fn into(self) -> StaticStr {
+          match self {
+              Animal::Dog => "🐶",
+              Animal::Cat => "🐱",
+              Animal::Monkey => "🐵",
+          }
+      }
+  }
+  ```
+</details>
+
+#### Using patterns
+
+Patterns are only used to produce `From` implementations:
+
+```rust
+#[derive(o2o::o2o)]
+#[from_owned(i32| _ => panic!())]
+enum HttpStatusFamily {
+    // 'pat' stands for Pattern
+    #[pat(100..=199)] Information,
+    #[pat(200..=299)] Success,
+    #[pat(300..=399)] Redirection,
+    #[pat(400..=499)] ClientError,
+    #[pat(500..=599)] ServerError,
+}
+
+type StaticStr = &'static str;
+
+#[derive(o2o::o2o)]
+#[from_owned(StaticStr| _ => todo!())]
+enum AnimalKind {
+    #[pat("🐶" | "🐱" | "🐵")]
+    Mammal,
+
+    #[pat("🐟")] 
+    Fish,
+    
+    #[pat("🐛" | "🐜")]
+    Insect
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<i32> for HttpStatusFamily {
+      fn from(value: i32) -> HttpStatusFamily {
+          match value {
+              100..=199 => HttpStatusFamily::Information,
+              200..=299 => HttpStatusFamily::Success,
+              300..=399 => HttpStatusFamily::Redirection,
+              400..=499 => HttpStatusFamily::ClientError,
+              500..=599 => HttpStatusFamily::ServerError,
+              _ => panic!(),
+          }
+      }
+  }
+
+  impl std::convert::From<StaticStr> for AnimalKind {
+      fn from(value: StaticStr) -> AnimalKind {
+          match value {
+              "🐶" | "🐱" | "🐵" => AnimalKind::Mammal,
+              "🐟" => AnimalKind::Fish,
+              "🐛" | "🐜" => AnimalKind::Insect,
+              _ => todo!(),
+          }
+      }
+  }
+  ```
+</details>
+
+#### Using literals and patterns together
+
+```rust
+#[derive(o2o::o2o)]
+#[map_owned(i32)]
+enum HttpStatus {
+    #[lit(200)] Ok,
+    #[lit(404)] NotFound,
+    #[lit(500)] InternalError,
+    #[pat(_)] #[into({f0})] Other(#[from(@)] i32)
+}
+
+type StaticStr = &'static str;
+
+#[derive(o2o::o2o)]
+#[map_owned(StaticStr)]
+enum Animal {
+    #[lit("🐶")] Dog,
+    #[lit("🐱")] Cat,
+    #[lit("🐵")] Monkey,
+    #[pat(_)] #[into({name})] Other{ #[from(@)] name: StaticStr }
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<i32> for HttpStatus {
+      fn from(value: i32) -> HttpStatus {
+          match value {
+              200 => HttpStatus::Ok,
+              404 => HttpStatus::NotFound,
+              500 => HttpStatus::InternalError,
+              _ => HttpStatus::Other(value),
+          }
+      }
+  }
+  impl std::convert::Into<i32> for HttpStatus {
+      fn into(self) -> i32 {
+          match self {
+              HttpStatus::Ok => 200,
+              HttpStatus::NotFound => 404,
+              HttpStatus::InternalError => 500,
+              HttpStatus::Other(f0) => f0,
+          }
+      }
+  }
+
+  impl std::convert::From<StaticStr> for Animal {
+      fn from(value: StaticStr) -> Animal {
+          match value {
+              "🐶" => Animal::Dog,
+              "🐱" => Animal::Cat,
+              "🐵" => Animal::Monkey,
+              _ => Animal::Other { name: value },
+          }
+      }
+  }
+  impl std::convert::Into<StaticStr> for Animal {
+      fn into(self) -> StaticStr {
+          match self {
+              Animal::Dog => "🐶",
+              Animal::Cat => "🐱",
+              Animal::Monkey => "🐵",
+              Animal::Other { name } => name,
           }
       }
   }
