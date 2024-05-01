@@ -231,7 +231,7 @@ fn struct_init_block<'a>(ctx: &'a ImplContext) -> TokenStream {
     })
     .collect::<Vec<(usize, &str, FieldData)>>());
     
-    fields.extend(attrs.ghost_attrs.iter()
+    fields.extend(attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
         .filter(|x| unique_paths.insert(x.get_child_path_str(None)))
         .map(|x| {
@@ -675,9 +675,10 @@ fn render_enum_line(
     let variant_struct: Struct<'_> = Struct {
         attrs: DataTypeAttrs {
             attrs: ctx.input.get_attrs().attrs.clone(),
-            ghost_attrs: vec![],
+            ghosts_attrs: vec![],
             where_attrs: vec![],
             children_attrs: vec![],
+            ..Default::default()
         },
         ident,
         generics: &Generics {

@@ -38,16 +38,21 @@ impl OptionalParenthesizedTokenStream {
     }
 }
 
-enum StructInstruction {
+pub(crate) enum DataTypeInstruction {
     Map(TraitAttr),
-    Ghost(GhostsAttr), 
+    Ghosts(GhostsAttr), 
     Where(WhereAttr),
     Children(ChildrenAttr),
     AllowUnknown,
-    Unrecognized
+
+    Misplaced { instr: &'static str, span: Span, own: bool },
+    Misnamed { instr: &'static str, span: Span, guess_name: &'static str, own: bool },
+    UnrecognizedWithError { instr: String, span: Span },
+    Unrecognized,
 }
 
-enum MemberInstruction {
+#[derive(Clone)]
+pub(crate) enum MemberInstruction {
     Map(MemberAttr),
     Ghost(GhostAttr),
     Child(ChildAttr),
@@ -57,6 +62,10 @@ enum MemberInstruction {
     Pat(PatAttr),
     Repeat(RepeatFor),
     StopRepeat,
+
+    Misplaced { instr: &'static str, span: Span, own: bool },
+    Misnamed { instr: &'static str, span: Span, guess_name: &'static str, own: bool },
+    UnrecognizedWithError { instr: String, span: Span },
     Unrecognized,
 }
 
@@ -154,11 +163,14 @@ impl Index<&Kind> for ApplicableTo {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct DataTypeAttrs {
     pub attrs: Vec<TraitAttr>,
-    pub ghost_attrs: Vec<GhostsAttr>,
+    pub ghosts_attrs: Vec<GhostsAttr>,
     pub where_attrs: Vec<WhereAttr>,
     pub children_attrs: Vec<ChildrenAttr>,
+
+    pub error_instrs: Vec<DataTypeInstruction>
 }
 
 impl<'a> DataTypeAttrs {
@@ -167,9 +179,9 @@ impl<'a> DataTypeAttrs {
     }
 
     pub(crate) fn ghost_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&StructGhostAttrCore> {
-        self.ghost_attrs.iter()
+        self.ghosts_attrs.iter()
             .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
+            .or_else(|| self.ghosts_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
     pub(crate) fn where_attr(&'a self, container_ty: &TypePath) -> Option<&WhereAttr>{
@@ -242,6 +254,8 @@ pub(crate) struct MemberAttrs {
     pub pat_attrs: Vec<PatAttr>,
     pub repeat: Option<RepeatFor>,
     pub stop_repeat: bool,
+
+    pub error_instrs: Vec<MemberInstruction>
 }
 
 impl<'a> MemberAttrs {
@@ -619,6 +633,7 @@ impl Parse for ChildAttr{
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct AsAttr {
     pub container_ty: Option<TypePath>,
     pub member: Option<Member>,
@@ -665,22 +680,22 @@ impl Parse for PatAttr {
     }
 }
 
-pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs, bool)> {
+pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs, bool)> {
     let mut bark = true;
 
-    let mut instrs: Vec<StructInstruction> = vec![];
+    let mut instrs: Vec<DataTypeInstruction> = vec![];
     for x in input.iter() {
         if x.path.is_ident("doc"){
             continue;
         } else if x.path.is_ident("o2o") {
             x.parse_args_with(|input: ParseStream| {
-                let new_instrs: Punctuated<StructInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
+                let new_instrs: Punctuated<DataTypeInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
                     let p: OptionalParenthesizedTokenStream = input.parse()?;
-                    parse_struct_instruction(&instr, p.content(), true, true)
+                    parse_data_type_instruction(&instr, p.content(), true, true)
                 })?;
 
-                if new_instrs.iter().any(|x| matches!(x, StructInstruction::AllowUnknown)) {
+                if new_instrs.iter().any(|x| matches!(x, DataTypeInstruction::AllowUnknown)) {
                     bark = false;
                 }
 
@@ -690,27 +705,26 @@ pub(crate) fn get_struct_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs, bo
         } else {
             let instr = x.path.get_ident().unwrap();
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_struct_instruction(instr, p.content(), false, bark)?);
+            instrs.push(parse_data_type_instruction(instr, p.content(), false, bark)?);
         }
     }
-    let mut attrs: Vec<TraitAttr> = vec![];
-    let mut ghost_attrs: Vec<GhostsAttr> = vec![];
-    let mut where_attrs: Vec<WhereAttr> = vec![];
-    let mut children_attrs: Vec<ChildrenAttr> = vec![];
+
+    let mut attrs = DataTypeAttrs::default();
     
     for instr in  instrs {
         match instr {
-            StructInstruction::Map(attr) => attrs.push(attr),
-            StructInstruction::Ghost(attr) => ghost_attrs.push(attr),
-            StructInstruction::Where(attr) => where_attrs.push(attr),
-            StructInstruction::Children(attr) => children_attrs.push(attr),
-            StructInstruction::AllowUnknown | StructInstruction::Unrecognized => (),
+            DataTypeInstruction::Map(attr) => attrs.attrs.push(attr),
+            DataTypeInstruction::Ghosts(attr) => attrs.ghosts_attrs.push(attr),
+            DataTypeInstruction::Where(attr) => attrs.where_attrs.push(attr),
+            DataTypeInstruction::Children(attr) => attrs.children_attrs.push(attr),
+            DataTypeInstruction::AllowUnknown | DataTypeInstruction::Unrecognized => (),
+            _ => attrs.error_instrs.push(instr)
         };
     }
-    Ok((DataTypeAttrs {attrs, ghost_attrs, where_attrs, children_attrs }, bark))
+    Ok((attrs, bark))
 }
 
-pub(crate) fn get_field_attrs(input: SynDataTypeMember, bark: bool) -> Result<MemberAttrs> {
+pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<MemberAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
     for x in input.get_attrs().iter() {
         if x.path.is_ident("doc"){
@@ -731,44 +745,40 @@ pub(crate) fn get_field_attrs(input: SynDataTypeMember, bark: bool) -> Result<Me
             instrs.push(parse_member_instruction(instr, p.content(), false, bark)?);
         }
     }
-    let mut child_attrs: Vec<ChildAttr> = vec![];
-    let mut ghost_attrs: Vec<GhostAttr> = vec![];
-    let mut attrs: Vec<MemberAttr> = vec![];
-    let mut parent_attrs: Vec<ParentAttr> = vec![];
-    let mut lit_attrs: Vec<LitAttr> = vec![];
-    let mut pat_attrs: Vec<PatAttr> = vec![];
-    let mut repeat = None;
-    let mut stop_repeat = false;
+
+    let mut attrs = MemberAttrs::default();
+
     for instr in  instrs {
         match instr {
-            MemberInstruction::Map(attr) => attrs.push(attr),
-            MemberInstruction::Child(attr) => child_attrs.push(attr),
-            MemberInstruction::Ghost(attr) => ghost_attrs.push(attr),
-            MemberInstruction::Parent(attr) => parent_attrs.push(attr),
+            MemberInstruction::Map(attr) => attrs.attrs.push(attr),
+            MemberInstruction::Child(attr) => attrs.child_attrs.push(attr),
+            MemberInstruction::Ghost(attr) => attrs.ghost_attrs.push(attr),
+            MemberInstruction::Parent(attr) => attrs.parent_attrs.push(attr),
             MemberInstruction::As(attr) => {
                 match input {
-                    SynDataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs),
+                    SynDataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs.attrs),
                     SynDataTypeMember::Variant(_) => panic!("weird")
                 };
             },
-            MemberInstruction::Lit(attr) => lit_attrs.push(attr),
-            MemberInstruction::Pat(attr) => pat_attrs.push(attr),
-            MemberInstruction::Repeat(repeat_for) => repeat = Some(repeat_for),
-            MemberInstruction::StopRepeat => stop_repeat = true,
-            MemberInstruction::Unrecognized => ()
+            MemberInstruction::Lit(attr) => attrs.lit_attrs.push(attr),
+            MemberInstruction::Pat(attr) => attrs.pat_attrs.push(attr),
+            MemberInstruction::Repeat(repeat_for) => attrs.repeat = Some(repeat_for),
+            MemberInstruction::StopRepeat => attrs.stop_repeat = true,
+            MemberInstruction::Unrecognized => (),
+            _ => attrs.error_instrs.push(instr)
         };
     }
-    Ok(MemberAttrs { child_attrs, parent_attrs, attrs, ghost_attrs, lit_attrs, pat_attrs, repeat, stop_repeat })
+    Ok(attrs)
 }
 
-fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, bark: bool) -> Result<StructInstruction>
+fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: bool, bark: bool) -> Result<DataTypeInstruction>
 {
     let instr_str = &instr.to_token_stream().to_string();
     match instr_str.as_ref() {
-        "allow_unknown" if own_instr => Ok(StructInstruction::AllowUnknown),
+        "allow_unknown" if own_instr => Ok(DataTypeInstruction::AllowUnknown),
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
-            Ok(StructInstruction::Map(TraitAttr { 
+            Ok(DataTypeInstruction::Map(TraitAttr { 
                 attr: syn::parse2(input)?, 
                 applicable_to: [
                     appl_owned_into(instr_str), 
@@ -779,7 +789,7 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
                     appl_ref_into_existing(instr_str)
                 ]
             })),
-        "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(StructInstruction::Ghost(GhostsAttr {
+        "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(DataTypeInstruction::Ghosts(GhostsAttr {
             attr: syn::parse2(input)?,
             applicable_to: [
                 appl_ghosts_owned(instr_str),
@@ -790,20 +800,20 @@ fn parse_struct_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
                 appl_ghosts_ref(instr_str)
             ]
         })),
-        "children" => Ok(StructInstruction::Children(syn::parse2(input)?)),
-        "where_clause" => Ok(StructInstruction::Where(syn::parse2(input)?)),
-        "ghost" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "ghost_ref" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts_ref'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "ghost_owned" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghosts_owned'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "child" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'children'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "parent" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'parent' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "as_type" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'as_type' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "lit" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'lit' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "pat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'pat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "repeat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'repeat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "stop_repeat" if bark => Err(Error::new(instr.span(), format_args!("Member instruction 'stop_repeat' should be used on a member.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        _ if own_instr => Err(Error::new(instr.span(), format_args!("Struct instruction '{}' is not supported.", instr))),
-        _ => Ok(StructInstruction::Unrecognized),
+        "children" => Ok(DataTypeInstruction::Children(syn::parse2(input)?)),
+        "where_clause" => Ok(DataTypeInstruction::Where(syn::parse2(input)?)),
+        "ghost" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost", span: instr.span(), guess_name: "ghosts", own: own_instr }),
+        "ghost_ref" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost_ref", span: instr.span(), guess_name: "ghosts_ref", own: own_instr }),
+        "ghost_owned" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost_owned", span: instr.span(), guess_name: "ghosts_owned", own: own_instr }),
+        "child" if bark => Ok(DataTypeInstruction::Misnamed { instr: "child", span: instr.span(), guess_name: "children", own: own_instr }),
+        "parent" if bark => Ok(DataTypeInstruction::Misplaced { instr: "parent", span: instr.span(), own: own_instr }),
+        "as_type" if bark => Ok(DataTypeInstruction::Misplaced { instr: "as_type", span: instr.span(), own: own_instr }),
+        "lit" if bark => Ok(DataTypeInstruction::Misplaced { instr: "lit", span: instr.span(), own: own_instr }),
+        "pat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "pat", span: instr.span(), own: own_instr }),
+        "repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "repeat", span: instr.span(), own: own_instr }),
+        "stop_repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "stop_repeat", span: instr.span(), own: own_instr }),
+        _ if own_instr => Ok(DataTypeInstruction::UnrecognizedWithError { instr: instr_str.clone(), span: instr.span() }),
+        _ => Ok(DataTypeInstruction::Unrecognized),
     }
 }
 
@@ -845,12 +855,13 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
             Ok(MemberInstruction::Repeat(repeat.0))
         },
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
-        "ghosts" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghost'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "ghosts_ref" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghost_ref'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "ghosts_owned" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'ghost_owned'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "children" if bark => Err(Error::new(instr.span(), format_args!("Perhaps you meant 'child'?{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        "where_clause" if bark => Err(Error::new(instr.span(), format_args!("Struct instruction 'where_clause' should be used on a struct.{}", if !own_instr { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" }))),
-        _ if own_instr => Err(Error::new(instr.span(), format_args!("Member instruction '{}' is not supported.", instr))),
+        "ghosts" if bark => Ok(MemberInstruction::Misnamed { instr: "ghosts", span: instr.span(), guess_name: "ghost", own: own_instr }),
+        "ghosts_ref" if bark => Ok(MemberInstruction::Misnamed { instr: "ghosts_ref", span: instr.span(), guess_name: "ghost_ref", own: own_instr }),
+        "ghosts_owned" if bark => Ok(MemberInstruction::Misnamed { instr: "ghosts_owned", span: instr.span(), guess_name: "ghost_owned", own: own_instr }),
+        "children" if bark => Ok(MemberInstruction::Misnamed { instr: "children", span: instr.span(), guess_name: "child", own: own_instr }),
+        "where_clause" if bark => Ok(MemberInstruction::Misplaced { instr: "where_clause", span: instr.span(), own: own_instr }),
+        "allow_unknown" if bark => Ok(MemberInstruction::Misplaced { instr: "allow_unknown", span: instr.span(), own: own_instr }),
+        _ if own_instr => Ok(MemberInstruction::UnrecognizedWithError { instr: instr_str.clone(), span: instr.span() }),
         _ => Ok(MemberInstruction::Unrecognized)
     }
 }

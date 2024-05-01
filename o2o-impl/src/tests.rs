@@ -39,13 +39,26 @@ fn missing_map_instructions() {
             struct Entity {}
         },
         quote! {
+            enum Enum {}
+        },
+        quote! {
             #[ghosts(field: { 123 })]
             struct Entity {}
+        },
+        quote! {
+            #[ghosts(field: { 123 })]
+            enum Enum {}
         },
         quote! {
             struct Entity {
                 #[map(diff_field)]
                 field: i32,
+            }
+        },
+        quote! {
+            enum Enum {
+                #[map(DiffVariant)]
+                Variant
             }
         },
     ];
@@ -66,74 +79,182 @@ fn unrecognized_struct_instructions() {
             #[map(EntityDto)]
             #[parent(EntityDto)]
             struct Entity {}
-        }, "Member instruction 'parent' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
+        }, vec![ "Member instruction 'parent' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EnumDto)]
+            #[parent(EnumDto)]
+            enum Enum {}
+        }, vec![ "Member instruction 'parent' is not applicable to enums. To turn this message off, use #[o2o(allow_unknown)]" ]),
         (quote! {
             #[map(EntityDto)]
             #[child(EntityDto)]
             struct Entity {}
-        }, "Perhaps you meant 'children'? To turn this message off, use #[o2o(allow_unknown)]"),
+        }, vec![ "Perhaps you meant 'children'? To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[child(EntityDto)]
+            enum Enum {}
+        }, vec![ "Member instruction 'child' is not applicable to enums. To turn this message off, use #[o2o(allow_unknown)]" ]),
         (quote! {
             #[map(i32)]
             #[as_type(i32)]
             struct Entity {}
-        }, "Member instruction 'as_type' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
+        }, vec![ "Member instruction 'as_type' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(i32)]
+            #[as_type(i32)]
+            enum Enum {}
+        }, vec![ "Member instruction 'as_type' is not applicable to enums. To turn this message off, use #[o2o(allow_unknown)]" ]),
         (quote! {
             #[map(EntityDto)]
             #[repeat(EntityDto)]
             struct Entity {}
-        }, "Member instruction 'repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
+        }, vec![ "Member instruction 'repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[repeat(EntityDto)]
+            enum Enum {}
+        }, vec![ "Member instruction 'repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]),
         (quote! {
             #[map(EntityDto)]
             #[stop_repeat(EntityDto)]
             struct Entity {}
-        }, "Member instruction 'stop_repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]"),
+        }, vec![ "Member instruction 'stop_repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[stop_repeat(EntityDto)]
+            enum Enum {}
+        }, vec![ "Member instruction 'stop_repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]),
         (quote! {
             #[map(EntityDto)]
             #[ghost(EntityDto)]
             struct Entity {}
-        }, "Perhaps you meant 'ghosts'? To turn this message off, use #[o2o(allow_unknown)]"),
+        }, vec![ "Perhaps you meant 'ghosts'? To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[ghost(EntityDto)]
+            enum Enum {}
+        }, vec![ "Perhaps you meant 'ghosts'? To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[ghost_ref(EntityDto)]
+            struct Entity {}
+        }, vec![ "Perhaps you meant 'ghosts_ref'? To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[ghost_ref(EntityDto)]
+            enum Enum {}
+        }, vec![ "Perhaps you meant 'ghosts_ref'? To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[ghost_owned(EntityDto)]
+            struct Entity {}
+        }, vec![ "Perhaps you meant 'ghosts_owned'? To turn this message off, use #[o2o(allow_unknown)]" ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[ghost_owned(EntityDto)]
+            enum Enum {}
+        }, vec![ "Perhaps you meant 'ghosts_owned'? To turn this message off, use #[o2o(allow_unknown)]" ]),
         (quote! {
             #[o2o(mapp(EntityDto))]
             struct Entity {}
-        }, "Struct instruction 'mapp' is not supported."),
+        }, vec![ "Struct instruction 'mapp' is not supported.", "At least one trait instruction is expected." ]),
+        (quote! {
+            #[o2o(mapp(EntityDto))]
+            enum Enum {}
+        }, vec![ "Struct instruction 'mapp' is not supported.", "At least one trait instruction is expected." ]),
         (quote! {
             #[o2o(map(EntityDto))]
             #[o2o(parent(EntityDto))]
             struct Entity {}
-        }, "Member instruction 'parent' should be used on a member."),
+        }, vec![ "Member instruction 'parent' should be used on a member." ]),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(parent(EntityDto))]
+            enum Enum {}
+        }, vec![ "Member instruction 'parent' is not applicable to enums." ]),
         (quote! {
             #[o2o(map(EntityDto))]
             #[o2o(child(EntityDto))]
             struct Entity {}
-        }, "Perhaps you meant 'children'?"),
+        }, vec![ "Perhaps you meant 'children'?" ]),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(child(EntityDto))]
+            enum Enum {}
+        }, vec![ "Member instruction 'child' is not applicable to enums." ]),
         (quote! {
             #[map(i32)]
             #[o2o(as_type(i32))]
             struct Entity {}
-        }, "Member instruction 'as_type' should be used on a member."),
+        }, vec![ "Member instruction 'as_type' should be used on a member." ]),
+        (quote! {
+            #[map(i32)]
+            #[o2o(as_type(i32))]
+            enum Enum {}
+        }, vec![ "Member instruction 'as_type' is not applicable to enums." ]),
         (quote! {
             #[map(EntityDto)]
             #[o2o(repeat(EntityDto))]
             struct Entity {}
-        }, "Member instruction 'repeat' should be used on a member."),
+        }, vec![ "Member instruction 'repeat' should be used on a member." ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[o2o(repeat(EntityDto))]
+            enum Enum {}
+        }, vec![ "Member instruction 'repeat' should be used on a member." ]),
         (quote! {
             #[map(EntityDto)]
             #[o2o(stop_repeat(EntityDto))]
             struct Entity {}
-        }, "Member instruction 'stop_repeat' should be used on a member."),
+        }, vec![ "Member instruction 'stop_repeat' should be used on a member." ]),
+        (quote! {
+            #[map(EntityDto)]
+            #[o2o(stop_repeat(EntityDto))]
+            enum Enum {}
+        }, vec![ "Member instruction 'stop_repeat' should be used on a member." ]),
         (quote! {
             #[o2o(map(EntityDto))]
             #[o2o(ghost(EntityDto))]
             struct Entity {}
-        }, "Perhaps you meant 'ghosts'?"),
+        }, vec![ "Perhaps you meant 'ghosts'?" ]),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(ghost(EntityDto))]
+            enum Enum {}
+        }, vec![ "Perhaps you meant 'ghosts'?" ]),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(ghost_ref(EntityDto))]
+            struct Entity {}
+        }, vec![ "Perhaps you meant 'ghosts_ref'?" ]),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(ghost_ref(EntityDto))]
+            enum Enum {}
+        }, vec![ "Perhaps you meant 'ghosts_ref'?" ]),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(ghost_owned(EntityDto))]
+            struct Entity {}
+        }, vec![ "Perhaps you meant 'ghosts_owned'?" ]),
+        (quote! {
+            #[o2o(map(EntityDto))]
+            #[o2o(ghost_owned(EntityDto))]
+            enum Enum {}
+        }, vec![ "Perhaps you meant 'ghosts_owned'?" ]),
     ];
 
-    for (code_fragment, err) in test_data {
+    for (code_fragment, errs) in test_data {
         let input: DeriveInput = syn::parse2(code_fragment).unwrap();
         let output = derive(&input);
-        let message = get_error(output, false);
-    
-        assert_eq!(message, err);
+        let errors: Vec<Error> = get_error_iter(output).collect();
+
+        assert_eq!(errs.len(), errors.len());
+
+        for err in errs {
+            assert!(errors.iter().any(|x| x.to_string() == err))
+        }
     }
 }
 
@@ -176,10 +297,24 @@ fn unrecognized_member_instructions() {
             }
         }, "Struct instruction 'where_clause' should be used on a struct. To turn this message off, use #[o2o(allow_unknown)]"),
         (quote! {
+            #[map(EnumDto)]
+            enum Enum {
+                #[where_clause()]
+                Variant,
+            }
+        }, "Struct instruction 'where_clause' is not applicable to enums. To turn this message off, use #[o2o(allow_unknown)]"),
+        (quote! {
             #[map(EntityDto)]
             struct Entity {
                 #[o2o(mapp(diff_field))]
                 child: i32,
+            }
+        }, "Member instruction 'mapp' is not supported."),
+        (quote! {
+            #[map(EnumDto)]
+            enum Enum {
+                #[o2o(mapp(DiffVar))]
+                Variant,
             }
         }, "Member instruction 'mapp' is not supported."),
         (quote! {
@@ -222,7 +357,7 @@ fn unrecognized_member_instructions() {
     for (code_fragment, err) in test_data {
         let input: DeriveInput = syn::parse2(code_fragment).unwrap();
         let output = derive(&input);
-        let message = get_error(output, false);
+        let message = get_error(output, true);
     
         assert_eq!(message, err);
     }
@@ -237,10 +372,21 @@ fn unrecognized_struct_instructions_no_bark() {
             struct Entity {}
         },
         quote! {
+            #[from_owned(EnumDto)]
+            #[mapp(EnumDto)]
+            enum Enum {}
+        },
+        quote! {
             #[o2o(allow_unknown)]
             #[map(EntityDto)]
             #[parent(EntityDto)]
             struct Entity {}
+        },
+        quote! {
+            #[o2o(allow_unknown)]
+            #[map(EnumDto)]
+            #[parent(EnumDto)]
+            enum Enum {}
         },
         quote! {
             #[o2o(allow_unknown)]
@@ -250,14 +396,31 @@ fn unrecognized_struct_instructions_no_bark() {
         },
         quote! {
             #[o2o(allow_unknown)]
+            #[map(EnumDto)]
+            #[child(EnumDto)]
+            enum Enum {}
+        },
+        quote! {
+            #[o2o(allow_unknown)]
             #[map(EntityDto)]
             #[ghost(EntityDto)]
             struct Entity {}
+        },
+        quote! {
+            #[o2o(allow_unknown)]
+            #[map(EnumDto)]
+            #[ghost(EnumDto)]
+            enum Enum {}
         },
         quote!{
             #[from_owned(NamedStruct)]
             #[unknown()]
             struct NamedStructDto {}
+        },
+        quote!{
+            #[from_owned(EnumDto)]
+            #[unknown()]
+            enum Enum {}
         }
     ];
 
@@ -277,6 +440,13 @@ fn unrecognized_member_instructions_no_bark() {
             struct NamedStructDto {
                 #[unknown()]
                 field: i32,
+            }
+        },
+        quote! {
+            #[from_owned(EnumDto)]
+            enum Enum {
+                #[unknown()]
+                Variant,
             }
         },
         quote!{
@@ -319,6 +489,14 @@ fn unrecognized_member_instructions_no_bark() {
                 field: i32,
             }
         },
+        quote!{
+            #[from_owned(EnumDto)]
+            #[o2o(allow_unknown)]
+            enum Enum {
+                #[where_clause()]
+                Variant,
+            }
+        },
     ];
 
     for code_fragment in test_data {
@@ -343,6 +521,12 @@ fn more_than_one_default_instruction() {
             #[where_clause(T: Clone)]
             #[where_clause(T: Clone)]
             struct Entity {}
+        }, "where_clause"),
+        (quote! {
+            #[map(EnumDto)]
+            #[where_clause(T: Clone)]
+            #[where_clause(T: Clone)]
+            enum Enun {}
         }, "where_clause"),
         (quote! {
             #[map(EntityDto)]
@@ -850,12 +1034,24 @@ fn dedicated_field_instruction_mismatch() {
             }
         }, vec!["EntityDto123"]),
         (quote! {
+            #[into(EnumDto)]
+            #[where_clause(EnumDto123| T: Clone)]
+            enum Enum {}
+        }, vec!["EnumDto123"]),
+        (quote! {
             #[map(EntityDto)]
             struct Entity123 {
                 #[map(EntityDto123| another)]
                 test: i32
             }
         }, vec!["EntityDto123"]),
+        (quote! {
+            #[map(EnumDto)]
+            enum Enum {
+                #[map(EnumDto123| AnotheVar)]
+                Variant
+            }
+        }, vec!["EnumDto123"]),
         (quote! {
             #[map(EntityDto)]
             struct Entity123 {
