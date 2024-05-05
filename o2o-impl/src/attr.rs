@@ -808,8 +808,8 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "child" if bark => Ok(DataTypeInstruction::Misnamed { instr: "child", span: instr.span(), guess_name: "children", own: own_instr }),
         "parent" if bark => Ok(DataTypeInstruction::Misplaced { instr: "parent", span: instr.span(), own: own_instr }),
         "as_type" if bark => Ok(DataTypeInstruction::Misplaced { instr: "as_type", span: instr.span(), own: own_instr }),
-        "lit" if bark => Ok(DataTypeInstruction::Misplaced { instr: "lit", span: instr.span(), own: own_instr }),
-        "pat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "pat", span: instr.span(), own: own_instr }),
+        "literal" if bark => Ok(DataTypeInstruction::Misplaced { instr: "literal", span: instr.span(), own: own_instr }),
+        "pattern" if bark => Ok(DataTypeInstruction::Misplaced { instr: "pattern", span: instr.span(), own: own_instr }),
         "repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "repeat", span: instr.span(), own: own_instr }),
         "stop_repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "stop_repeat", span: instr.span(), own: own_instr }),
         _ if own_instr => Ok(DataTypeInstruction::UnrecognizedWithError { instr: instr_str.clone(), span: instr.span() }),
@@ -848,8 +848,8 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "child" => Ok(MemberInstruction::Child(syn::parse2(input)?)),
         "parent" => Ok(MemberInstruction::Parent(syn::parse2(input)?)),
         "as_type" => Ok(MemberInstruction::As(syn::parse2(input)?)),
-        "lit" => Ok(MemberInstruction::Lit(syn::parse2(input)?)),
-        "pat" => Ok(MemberInstruction::Pat(syn::parse2(input)?)),
+        "literal" => Ok(MemberInstruction::Lit(syn::parse2(input)?)),
+        "pattern" => Ok(MemberInstruction::Pat(syn::parse2(input)?)),
         "repeat" => {
             let repeat: RepeatForWrap = syn::parse2(input)?;
             Ok(MemberInstruction::Repeat(repeat.0))

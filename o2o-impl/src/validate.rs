@@ -83,8 +83,7 @@ fn validate_member_error_instrs(input: &DataType, attrs: &MemberAttrs, errors: &
 
     for err in &attrs.error_instrs {
         match (input, err) {
-            (DataType::Enum(_), MemberInstruction::Misnamed { instr: instr @ "children", span, guess_name: _, own }) |
-            (DataType::Enum(_), MemberInstruction::Misplaced { instr: instr @ "where_clause", span, own }) => {
+            (DataType::Enum(_), MemberInstruction::Misnamed { instr: instr @ "children", span, guess_name: _, own }) => {
                 errors.insert(format!("Struct instruction '{}' is not applicable to enums.{}", instr, postfix(*own)), *span);
             }
             (_, MemberInstruction::Misnamed { instr: _, span, guess_name, own }) => { errors.insert(format!("Perhaps you meant '{}'?{}", guess_name, postfix(*own)), *span); },

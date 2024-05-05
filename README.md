@@ -1638,13 +1638,12 @@ Literals can be used to produce both `From` and `Into` implementations:
 #[derive(o2o::o2o)]
 #[map_owned(i32| _ => panic!("Not supported"))]
 enum HttpStatus {
-    // 'lit' for Literal
-    #[lit(200)]Ok,
-    #[lit(201)]Created,
-    #[lit(401)]Unauthorized,
-    #[lit(403)]Forbidden,
-    #[lit(404)]NotFound,
-    #[lit(500)]InternalError
+    #[literal(200)]Ok,
+    #[literal(201)]Created,
+    #[literal(401)]Unauthorized,
+    #[literal(403)]Forbidden,
+    #[literal(404)]NotFound,
+    #[literal(500)]InternalError
 }
 
 type StaticStr = &'static str;
@@ -1652,9 +1651,9 @@ type StaticStr = &'static str;
 #[derive(o2o::o2o)]
 #[map_owned(StaticStr| _ => todo!())]
 enum Animal {
-    #[lit("🐶")] Dog,
-    #[lit("🐱")] Cat,
-    #[lit("🐵")] Monkey
+    #[literal("🐶")] Dog,
+    #[literal("🐱")] Cat,
+    #[literal("🐵")] Monkey
 }
 ```
 <details>
@@ -1717,12 +1716,11 @@ Patterns are only used to produce `From` implementations:
 #[derive(o2o::o2o)]
 #[from_owned(i32| _ => panic!())]
 enum HttpStatusFamily {
-    // 'pat' stands for Pattern
-    #[pat(100..=199)] Information,
-    #[pat(200..=299)] Success,
-    #[pat(300..=399)] Redirection,
-    #[pat(400..=499)] ClientError,
-    #[pat(500..=599)] ServerError,
+    #[pattern(100..=199)] Information,
+    #[pattern(200..=299)] Success,
+    #[pattern(300..=399)] Redirection,
+    #[pattern(400..=499)] ClientError,
+    #[pattern(500..=599)] ServerError,
 }
 
 type StaticStr = &'static str;
@@ -1730,13 +1728,13 @@ type StaticStr = &'static str;
 #[derive(o2o::o2o)]
 #[from_owned(StaticStr| _ => todo!())]
 enum AnimalKind {
-    #[pat("🐶" | "🐱" | "🐵")]
+    #[pattern("🐶" | "🐱" | "🐵")]
     Mammal,
 
-    #[pat("🐟")] 
+    #[pattern("🐟")] 
     Fish,
     
-    #[pat("🐛" | "🐜")]
+    #[pattern("🐛" | "🐜")]
     Insect
 }
 ```
@@ -1776,10 +1774,10 @@ enum AnimalKind {
 #[derive(o2o::o2o)]
 #[map_owned(i32)]
 enum HttpStatus {
-    #[lit(200)] Ok,
-    #[lit(404)] NotFound,
-    #[lit(500)] InternalError,
-    #[pat(_)] #[into({f0})] Other(#[from(@)] i32)
+    #[literal(200)] Ok,
+    #[literal(404)] NotFound,
+    #[literal(500)] InternalError,
+    #[pattern(_)] #[into({f0})] Other(#[from(@)] i32)
 }
 
 type StaticStr = &'static str;
@@ -1787,10 +1785,10 @@ type StaticStr = &'static str;
 #[derive(o2o::o2o)]
 #[map_owned(StaticStr)]
 enum Animal {
-    #[lit("🐶")] Dog,
-    #[lit("🐱")] Cat,
-    #[lit("🐵")] Monkey,
-    #[pat(_)] #[into({name})] Other{ #[from(@)] name: StaticStr }
+    #[literal("🐶")] Dog,
+    #[literal("🐱")] Cat,
+    #[literal("🐵")] Monkey,
+    #[pattern(_)] #[into({name})] Other{ #[from(@)] name: StaticStr }
 }
 ```
 <details>

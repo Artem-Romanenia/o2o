@@ -49,7 +49,7 @@ use syn::{parse_macro_input, DeriveInput};
     map_owned, map_ref, map, 
     owned_into_existing, ref_into_existing, into_existing,
     child, children, parent, ghost, ghosts, where_clause, 
-    lit, pat, o2o))]
+    literal, pattern, o2o))]
 pub fn derive_o2o(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     derive(&input)
