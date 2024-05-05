@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{spanned::Spanned, Result};
-use crate::{ast::{DataType, Struct}, attr::{ChildrenAttr, ChildAttr, Kind, TraitAttrCore, DataTypeAttrs, GhostsAttr, StructKindHint, TypePath, WhereAttr}};
+use crate::{ast::{DataType, Struct}, attr::{ChildAttr, ChildrenAttr, DataTypeAttrs, DataTypeInstruction, GhostsAttr, Kind, MemberAttrs, MemberInstruction, TraitAttrCore, TypeHint, TypePath, WhereAttr}};
 
 pub(crate) fn validate(input: &DataType) -> Result<()> {
     let attrs = input.get_attrs();
@@ -11,6 +11,8 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     if attrs.attrs.is_empty() {
         errors.insert("At least one trait instruction is expected.".into(), Span::call_site());
     }
+
+    validate_error_instrs(input, attrs, &mut errors);
 
     validate_struct_attrs(attrs.iter_for_kind(&Kind::FromOwned), &mut errors);
     validate_struct_attrs(attrs.iter_for_kind(&Kind::FromRef), &mut errors);
@@ -23,15 +25,26 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
         .map(|x| &x.attr.ty)
         .collect::<HashSet<_>>();
 
-    validate_ghost_attrs(&Kind::FromOwned, &attrs.ghost_attrs, &type_paths, &mut errors);
-    validate_ghost_attrs(&Kind::FromRef, &attrs.ghost_attrs, &type_paths, &mut errors);
-    validate_ghost_attrs(&Kind::OwnedInto, &attrs.ghost_attrs, &type_paths, &mut errors);
-    validate_ghost_attrs(&Kind::RefInto, &attrs.ghost_attrs, &type_paths, &mut errors);
-    validate_ghost_attrs(&Kind::OwnedIntoExisting, &attrs.ghost_attrs, &type_paths, &mut errors);
-    validate_ghost_attrs(&Kind::RefIntoExisting, &attrs.ghost_attrs, &type_paths, &mut errors);
+    validate_ghost_attrs(&Kind::FromOwned, &attrs.ghosts_attrs, &type_paths, &mut errors);
+    validate_ghost_attrs(&Kind::FromRef, &attrs.ghosts_attrs, &type_paths, &mut errors);
+    validate_ghost_attrs(&Kind::OwnedInto, &attrs.ghosts_attrs, &type_paths, &mut errors);
+    validate_ghost_attrs(&Kind::RefInto, &attrs.ghosts_attrs, &type_paths, &mut errors);
+    validate_ghost_attrs(&Kind::OwnedIntoExisting, &attrs.ghosts_attrs, &type_paths, &mut errors);
+    validate_ghost_attrs(&Kind::RefIntoExisting, &attrs.ghosts_attrs, &type_paths, &mut errors);
 
     validate_children_attrs(&attrs.children_attrs, &type_paths, &mut errors);
     validate_where_attrs(&attrs.where_attrs, &type_paths, &mut errors);
+
+    for member in input.get_members() {
+        let member_attrs = member.get_attrs();
+        validate_dedicated_member_attrs(&member_attrs.attrs, |x| x.attr.container_ty.as_ref(), &type_paths, &mut errors);
+        validate_dedicated_member_attrs(&member_attrs.parent_attrs, |x| x.container_ty.as_ref(), &type_paths, &mut errors);
+        validate_dedicated_member_attrs(&member_attrs.ghost_attrs, |x| x.attr.container_ty.as_ref(), &type_paths, &mut errors);
+        validate_dedicated_member_attrs(&member_attrs.lit_attrs, |x| x.container_ty.as_ref(), &type_paths, &mut errors);
+        validate_dedicated_member_attrs(&member_attrs.pat_attrs, |x| x.container_ty.as_ref(), &type_paths, &mut errors);
+
+        validate_member_error_instrs(input, member_attrs, &mut errors)
+    }
 
     if let DataType::Struct(s) = input {
         validate_fields(s, attrs, &type_paths, &mut errors);
@@ -45,6 +58,39 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
         errors.iter().for_each(|(err, sp)| root_err.combine(syn::Error::new(*sp, err)));
 
         Err(root_err)
+    }
+}
+
+fn validate_error_instrs(input: &DataType, attrs: &DataTypeAttrs, errors: &mut HashMap<String, Span>) {
+    let postfix = |own: bool| if !own { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" };
+
+    for err in &attrs.error_instrs {
+        match (input, err) {
+            (DataType::Enum(_), DataTypeInstruction::Misnamed { instr: instr @ "child", span, guess_name: _, own }) |
+            (DataType::Enum(_), DataTypeInstruction::Misplaced { instr: instr @ ("parent" | "as_type"), span, own }) => {
+                errors.insert(format!("Member instruction '{}' is not applicable to enums.{}", instr, postfix(*own)), *span);
+            },
+            (_, DataTypeInstruction::Misnamed { instr: _, span, guess_name, own }) => { errors.insert(format!("Perhaps you meant '{}'?{}", guess_name, postfix(*own)), *span); },
+            (_, DataTypeInstruction::Misplaced { instr, span, own }) => { errors.insert(format!("Member instruction '{}' should be used on a member.{}", instr, postfix(*own)), *span); },
+            (_, DataTypeInstruction::UnrecognizedWithError { instr, span }) => { errors.insert(format!("Struct instruction '{}' is not supported.", instr), *span); },
+            _ => panic!("weird")
+        }
+    }
+}
+
+fn validate_member_error_instrs(input: &DataType, attrs: &MemberAttrs, errors: &mut HashMap<String, Span>) {
+    let postfix = |own: bool| if !own { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" };
+
+    for err in &attrs.error_instrs {
+        match (input, err) {
+            (DataType::Enum(_), MemberInstruction::Misnamed { instr: instr @ "children", span, guess_name: _, own }) => {
+                errors.insert(format!("Struct instruction '{}' is not applicable to enums.{}", instr, postfix(*own)), *span);
+            }
+            (_, MemberInstruction::Misnamed { instr: _, span, guess_name, own }) => { errors.insert(format!("Perhaps you meant '{}'?{}", guess_name, postfix(*own)), *span); },
+            (_, MemberInstruction::Misplaced { instr, span, own }) => { errors.insert(format!("Struct instruction '{}' should be used on a struct.{}", instr, postfix(*own)), *span); },
+            (_, MemberInstruction::UnrecognizedWithError { instr, span }) => { errors.insert(format!("Member instruction '{}' is not supported.", instr), *span); },
+            _ => panic!("weird")
+        }
     }
 }
 
@@ -121,62 +167,30 @@ fn validate_where_attrs(where_attrs: &[WhereAttr], type_paths: &HashSet<&TypePat
     }
 }
 
+fn validate_dedicated_member_attrs<T, U: Fn(&T) -> Option<&TypePath>>(attrs: &Vec<T>, extract_type_path: U, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
+    for attr in attrs {
+        if let Some(tp) = extract_type_path(attr) {
+            if !type_paths.contains(tp) {
+                errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
+            }
+        }
+    }
+}
+
 fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
-    for field in &input.fields {
-        for field_attr in &field.attrs.attrs {
-            if let Some(tp) = &field_attr.attr.container_ty {
-                if !type_paths.contains(tp) {
-                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
-                }
-            }
-        }
-    }
-
-    for field in &input.fields {
-        for parent_attr in &field.attrs.parent_attrs {
-            if let Some(tp) = &parent_attr.container_ty {
-                if !type_paths.contains(tp) {
-                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
-                }
-            }
-        }
-    }
-
     let into_type_paths = struct_attrs.iter_for_kind(&Kind::OwnedInto)
         .chain(struct_attrs.iter_for_kind(&Kind::RefInto))
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
-
-    for child_attr in input.fields.iter().flat_map(|x| &x.attrs.child_attrs) {
-        match &child_attr.container_ty {
-            Some(tp) => {
-                if !type_paths.contains(tp) {
-                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
-                }
-                if into_type_paths.contains(tp) {
-                    check_child_errors(child_attr, struct_attrs, tp, errors)
-                }
-            },
-            None => for tp in into_type_paths.iter(){
-                check_child_errors(child_attr, struct_attrs, tp, errors)
-            }
-        }
-    }
 
     let from_type_paths = struct_attrs.iter_for_kind(&Kind::FromOwned)
         .chain(struct_attrs.iter_for_kind(&Kind::FromRef))
         .filter(|x| x.update.is_none())
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
-
+    
     for field in &input.fields {
         for ghost_attr in field.attrs.ghost_attrs.iter() {
-            if let Some(tp) = &ghost_attr.attr.container_ty {
-                if !type_paths.contains(tp) {
-                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
-                }
-            }
-
             if ghost_attr.attr.action.is_some() {
                 continue;
             }
@@ -196,6 +210,22 @@ fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &Ha
         }
     }
 
+    for child_attr in input.fields.iter().flat_map(|x| &x.attrs.child_attrs) {
+        match &child_attr.container_ty {
+            Some(tp) => {
+                if !type_paths.contains(tp) {
+                    errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
+                }
+                if into_type_paths.contains(tp) {
+                    check_child_errors(child_attr, struct_attrs, tp, errors)
+                }
+            },
+            None => for tp in into_type_paths.iter(){
+                check_child_errors(child_attr, struct_attrs, tp, errors)
+            }
+        }
+    }
+
     if !input.named_fields {
         let struct_attrs = struct_attrs.iter_for_kind(&Kind::OwnedInto).map(|x| (x, Kind::OwnedInto))
             .chain(struct_attrs.iter_for_kind(&Kind::RefInto).map(|x| (x, Kind::RefInto)))
@@ -205,7 +235,7 @@ fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &Ha
             .chain(struct_attrs.iter_for_kind(&Kind::FromRef).map(|x| (x, Kind::FromRef)));
 
         for (struct_attr, kind) in struct_attrs {
-            if struct_attr.quick_return.is_none() && struct_attr.struct_kind_hint == StructKindHint::Struct {
+            if struct_attr.quick_return.is_none() && struct_attr.type_hint == TypeHint::Struct {
                 for field in &input.fields {
                     if field.attrs.ghost(&struct_attr.ty, &kind).is_some() || field.attrs.has_parent_attr(&struct_attr.ty) {
                         continue;

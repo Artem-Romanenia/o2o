@@ -15,7 +15,7 @@ pub(crate) struct Struct<'a> {
 
 impl<'a> Struct<'a> {
     pub fn from_syn(node: &'a DeriveInput, data: &'a DataStruct) -> Result<Self> {
-        let (attrs, bark) = attr::get_struct_attrs(&node.attrs)?;
+        let (attrs, bark) = attr::get_data_type_attrs(&node.attrs)?;
         let fields = Field::multiple_from_syn(&data.fields, bark)?;
         Ok(Struct {
             attrs,
@@ -65,7 +65,7 @@ impl<'a> Field {
 
     fn from_syn(i: usize, node: &'a syn::Field, bark: bool) -> Result<Self> {
         Ok(Field {
-            attrs: attr::get_field_attrs(SynDataTypeMember::Field(node), bark)?,
+            attrs: attr::get_member_attrs(SynDataTypeMember::Field(node), bark)?,
             idx: i,
             member: node.ident.clone().map(Member::Named).unwrap_or_else(|| {
                 Member::Unnamed(Index {
@@ -86,7 +86,7 @@ pub(crate) struct Enum<'a> {
 
 impl<'a> Enum<'a> {
     pub fn from_syn(node: &'a DeriveInput, data: &'a DataEnum) -> Result<Self> {
-        let (attrs, bark) = attr::get_struct_attrs(&node.attrs)?;
+        let (attrs, bark) = attr::get_data_type_attrs(&node.attrs)?;
         let variants = Variant::multiple_from_syn(&data.variants, bark)?;
         Ok(Enum {
             attrs,
@@ -137,7 +137,7 @@ impl<'a> Variant {
     fn from_syn(i: usize, variant: &'a syn::Variant, bark: bool) -> Result<Self> {
         let fields = Field::multiple_from_syn(&variant.fields, bark)?;
         Ok(Variant {
-            attrs: attr::get_field_attrs(SynDataTypeMember::Variant(variant), bark)?,
+            attrs: attr::get_member_attrs(SynDataTypeMember::Variant(variant), bark)?,
             ident: variant.ident.clone(),
             _idx: i,
             fields,
