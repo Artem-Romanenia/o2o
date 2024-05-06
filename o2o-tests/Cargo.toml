@@ -11,4 +11,4 @@ repository = "https://github.com/Artem-Romanenia/o2o"
 o2o = { version = "0.4.3", path = "../" }
 
 [dev-dependencies]
-test-case = "*"
+test-case = "3"
