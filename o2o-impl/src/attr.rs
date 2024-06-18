@@ -117,6 +117,10 @@ pub(crate) enum Kind {
     RefInto,
     FromOwned,
     FromRef,
+    OwnedTryInto,
+    RefTryInto,
+    TryFromOwned,
+    TryFromRef,
     OwnedIntoExisting,
     RefIntoExisting
 }
@@ -140,13 +144,17 @@ impl Display for Kind {
             Kind::RefInto => f.write_str("ref_into"),
             Kind::FromOwned => f.write_str("from_owned"),
             Kind::FromRef => f.write_str("from_ref"),
+            Kind::OwnedTryInto => f.write_str("owned_try_into"),
+            Kind::RefTryInto => f.write_str("ref_try_into"),
+            Kind::TryFromOwned => f.write_str("try_from_owned"),
+            Kind::TryFromRef => f.write_str("try_from_ref"),
             Kind::OwnedIntoExisting => f.write_str("owned_into_existing"),
             Kind::RefIntoExisting => f.write_str("ref_into_existing"),
         }
     }
 }
 
-type ApplicableTo = [bool; 6];
+type ApplicableTo = [bool; 10];
 
 impl Index<&Kind> for ApplicableTo {
     type Output = bool;
@@ -157,8 +165,12 @@ impl Index<&Kind> for ApplicableTo {
             Kind::RefInto => &self[1],
             Kind::FromOwned => &self[2],
             Kind::FromRef => &self[3],
-            Kind::OwnedIntoExisting => &self[4],
-            Kind::RefIntoExisting => &self[5],
+            Kind::OwnedTryInto => &self[4],
+            Kind::RefTryInto => &self[5],
+            Kind::TryFromOwned => &self[6],
+            Kind::TryFromRef => &self[7],
+            Kind::OwnedIntoExisting => &self[8],
+            Kind::RefIntoExisting => &self[9],
         }
     }
 }
@@ -777,14 +789,20 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
     match instr_str.as_ref() {
         "allow_unknown" if own_instr => Ok(DataTypeInstruction::AllowUnknown),
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
-        "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
+        "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" |
+        "owned_try_into" | "ref_try_into" | "try_into" | "try_from_owned" | "try_from_ref" | "try_from" | 
+        "try_map_owned" | "try_map_ref" | "try_map" => 
             Ok(DataTypeInstruction::Map(TraitAttr { 
                 attr: syn::parse2(input)?, 
                 applicable_to: [
-                    appl_owned_into(instr_str), 
-                    appl_ref_into(instr_str), 
-                    appl_from_owned(instr_str), 
-                    appl_from_ref(instr_str), 
+                    appl_owned_into(instr_str),
+                    appl_ref_into(instr_str),
+                    appl_from_owned(instr_str),
+                    appl_from_ref(instr_str),
+                    appl_owned_try_into(instr_str),
+                    appl_ref_try_into(instr_str),
+                    appl_try_from_owned(instr_str),
+                    appl_try_from_ref(instr_str),
                     appl_owned_into_existing(instr_str), 
                     appl_ref_into_existing(instr_str)
                 ]
@@ -792,6 +810,10 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(DataTypeInstruction::Ghosts(GhostsAttr {
             attr: syn::parse2(input)?,
             applicable_to: [
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str),
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str),
                 appl_ghosts_owned(instr_str),
                 appl_ghosts_ref(instr_str),
                 appl_ghosts_owned(instr_str),
@@ -826,10 +848,14 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
                 attr: syn::parse2(input)?, 
                 original_instr: instr_str.clone(),
                 applicable_to: [
-                    appl_owned_into(instr_str), 
-                    appl_ref_into(instr_str), 
-                    appl_from_owned(instr_str), 
-                    appl_from_ref(instr_str), 
+                    appl_owned_into(instr_str),
+                    appl_ref_into(instr_str),
+                    appl_from_owned(instr_str),
+                    appl_from_ref(instr_str),
+                    appl_owned_try_into(instr_str),
+                    appl_ref_try_into(instr_str),
+                    appl_try_from_owned(instr_str),
+                    appl_try_from_ref(instr_str),
                     appl_owned_into_existing(instr_str), 
                     appl_ref_into_existing(instr_str)
                 ]
@@ -837,6 +863,10 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "ghost" | "ghost_ref" | "ghost_owned" => Ok(MemberInstruction::Ghost(GhostAttr {
             attr: syn::parse2(input)?,
             applicable_to: [
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str),
+                appl_ghost_owned(instr_str),
+                appl_ghost_ref(instr_str),
                 appl_ghost_owned(instr_str),
                 appl_ghost_ref(instr_str),
                 appl_ghost_owned(instr_str),
@@ -980,7 +1010,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<MemberAtt
             action: Some(quote!(~ as #this_ty)),
         }, 
         original_instr: "as_type".into(),
-        applicable_to: [false, false, true, true, false, false]
+        applicable_to: [false, false, true, true, false, false, false, false, false, false]
     });
     attrs.push(MemberAttr { 
         attr: MemberAttrCore { 
@@ -989,7 +1019,7 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<MemberAtt
             action: Some(quote!(~ as #that_ty)),
         }, 
         original_instr: "as_type".into(),
-        applicable_to: [true, true, false, false, true, true]
+        applicable_to: [true, true, false, false, false, false, false, false, true, true]
     });
 }
 
@@ -1004,6 +1034,19 @@ fn appl_from_owned(instr: &str) -> bool {
 }
 fn appl_from_ref(instr: &str) -> bool {
     matches!(instr, "from_ref" | "from" | "map_ref" | "map")
+}
+
+fn appl_owned_try_into(instr: &str) -> bool {
+    matches!(instr, "owned_try_into" | "try_into" | "try_map_owned" | "try_map")
+}
+fn appl_ref_try_into(instr: &str) -> bool {
+    matches!(instr, "ref_try_into" | "try_into" | "try_map_ref" | "try_map")
+}
+fn appl_try_from_owned(instr: &str) -> bool {
+    matches!(instr, "try_from_owned" | "try_from" | "try_map_owned" | "try_map")
+}
+fn appl_try_from_ref(instr: &str) -> bool {
+    matches!(instr, "try_from_ref" | "try_from" | "try_map_ref" | "try_map")
 }
 
 fn appl_owned_into_existing(instr: &str) -> bool {

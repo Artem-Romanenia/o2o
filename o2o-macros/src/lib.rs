@@ -46,10 +46,15 @@ use syn::{parse_macro_input, DeriveInput};
 #[proc_macro_derive(o2o, attributes(
     owned_into, ref_into, into, 
     from_owned, from_ref, from, 
-    map_owned, map_ref, map, 
+    map_owned, map_ref, map,
+    owned_try_into, ref_try_into, try_into, 
+    try_from_owned, try_from_ref, try_from, 
+    try_map_owned, try_map_ref, try_map, 
     owned_into_existing, ref_into_existing, into_existing,
     child, children, parent, ghost, ghosts, where_clause, 
     literal, pattern, o2o))]
+    // TODO: Research, are there any downsides of having that many attributes? 
+    // (given that all but one are essentially shortcuts and can be avoided with alternative instr syntax)
 pub fn derive_o2o(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     derive(&input)

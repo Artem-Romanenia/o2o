@@ -187,6 +187,7 @@ fn main_code_block(ctx: &ImplContext) -> TokenStream {
                     quote!(#dst #struct_init_block)
                 },
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
+                _ => panic!("weird")
             }
         },
         DataType::Enum(_) => {
@@ -200,6 +201,7 @@ fn main_code_block(ctx: &ImplContext) -> TokenStream {
                     quote!(match self #struct_init_block)
                 },
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
+                _ => panic!("weird")
             }
         }
     }
@@ -420,6 +422,7 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
                 },
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                     render_existing_child(fields, ctx, (child_path, field_ctx.2 + 1)),
+                _ => panic!("weird")
             }
         } else {
             fields.next();
@@ -435,6 +438,7 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
             },
             Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                 render_existing_child(fields, ctx, (child_path, 0)),
+            _ => panic!("weird")
         }
     }
 }
@@ -552,6 +556,7 @@ fn render_struct_line(
             Kind::FromRef => quote!(value.),
             Kind::OwnedIntoExisting => quote!(self.),
             Kind::RefIntoExisting => quote!(self.),
+            _ => panic!("weird")
         }
     };
 
@@ -653,7 +658,8 @@ fn render_struct_line(
             let or = Member::Named(format_ident!("f{}", index.index));
             let right_side = attr.get_stuff(&obj, get_field_path, ctx, || if ctx.destructured_src { &or } else { &f.member});
             quote!(#right_side,)
-        }
+        },
+        _ => panic!("weird")
     }
 }
 
