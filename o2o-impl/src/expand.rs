@@ -216,6 +216,7 @@ fn struct_impl(input: DataType) -> TokenStream {
             fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        //TODO: Consider removing quick returns for into_existing because they are confusing
         if let Some(quick_return) = &struct_attr.quick_return {
             let action = quote_action(quick_return, None, &ctx);
             return quote_into_existing_trait(&ctx, pre_init, quote!(*other = #action;), None)
@@ -237,6 +238,7 @@ fn struct_impl(input: DataType) -> TokenStream {
             fallible: true,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        //TODO: Consider removing quick returns for into_existing because they are confusing
         if let Some(quick_return) = &struct_attr.quick_return {
             let action = quote_action(quick_return, None, &ctx);
             return quote_try_into_existing_trait(&ctx, pre_init, quote!(*other = #action;), None)
@@ -258,6 +260,7 @@ fn struct_impl(input: DataType) -> TokenStream {
             fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        //TODO: Consider removing quick returns for into_existing because they are confusing
         if let Some(quick_return) = &struct_attr.quick_return {
             let action = quote_action(quick_return, None, &ctx);
             return quote_into_existing_trait(&ctx, pre_init, quote!(*other = #action;), None)
@@ -279,6 +282,7 @@ fn struct_impl(input: DataType) -> TokenStream {
             fallible: true,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        //TODO: Consider removing quick returns for into_existing because they are confusing
         if let Some(quick_return) = &struct_attr.quick_return {
             let action = quote_action(quick_return, None, &ctx);
             return quote_try_into_existing_trait(&ctx, pre_init, quote!(*other = #action;), None)
@@ -309,7 +313,11 @@ fn struct_impl(input: DataType) -> TokenStream {
 fn main_code_block_ok(ctx: &ImplContext) -> TokenStream {
     let inner = main_code_block(ctx);
 
-    quote!(Ok(#inner))
+    if ctx.has_post_init {
+        quote!(#inner)
+    } else {
+        quote!(Ok(#inner))
+    }
 }
 
 fn main_code_block(ctx: &ImplContext) -> TokenStream {
@@ -613,11 +621,15 @@ fn struct_post_init(ctx: &ImplContext) -> Option<TokenStream> {
 
 fn render_parent(f: &Field, ctx: &ImplContext) -> TokenStream {
     let member = &f.member;
-    match &ctx.kind {
-        Kind::OwnedIntoExisting => quote!(self.#member.into_existing(other);),
-        Kind::RefIntoExisting => quote!((&(self.#member)).into_existing(other);),
-        Kind::OwnedInto => quote!(self.#member.into_existing(&mut obj);),
-        Kind::RefInto => quote!((&(self.#member)).into_existing(&mut obj);),
+    match (&ctx.kind, ctx.fallible) {
+        (Kind::OwnedIntoExisting, false) => quote!(self.#member.into_existing(other);),
+        (Kind::RefIntoExisting, false) => quote!((&(self.#member)).into_existing(other);),
+        (Kind::OwnedInto, false) => quote!(self.#member.into_existing(&mut obj);),
+        (Kind::RefInto, false) => quote!((&(self.#member)).into_existing(&mut obj);),
+        (Kind::OwnedIntoExisting, true) => quote!(self.#member.try_into_existing(other)?;),
+        (Kind::RefIntoExisting, true) => quote!((&(self.#member)).try_into_existing(other)?;),
+        (Kind::OwnedInto, true) => quote!(self.#member.try_into_existing(&mut obj)?;),
+        (Kind::RefInto, true) => quote!((&(self.#member)).try_into_existing(&mut obj)?;),
         _ => panic!("weird")
     }
 }
@@ -710,7 +722,12 @@ fn render_struct_line(
         }
         (syn::Member::Named(ident), None, Kind::FromOwned | Kind::FromRef, TypeHint::Struct | TypeHint::Unspecified) =>
             if f.attrs.has_parent_attr(&ctx.struct_attr.ty) {
-                if !ctx.kind.is_ref() { quote!(#ident: (&value).into(),) } else { quote!(#ident: value.into(),) }
+                match (ctx.kind.is_ref(), ctx.fallible) {
+                    (true, true) => quote!(#ident: value.try_into()?,),
+                    (true, false) => quote!(#ident: value.into(),),
+                    (false, true) => quote!(#ident: (&value).try_into()?,),
+                    (false, false) => quote!(#ident: (&value).into(),),
+                }
             } else {
                 let field_path = get_field_path(&f.member);
                 quote!(#ident: #obj #field_path,)
@@ -734,14 +751,24 @@ fn render_struct_line(
         }
         (syn::Member::Unnamed(index), None, Kind::FromOwned | Kind::FromRef, TypeHint::Tuple | TypeHint::Unspecified) =>
             if f.attrs.has_parent_attr(&ctx.struct_attr.ty) {
-                if !ctx.kind.is_ref() { quote!((&value).into(),) } else { quote!(value.into(),) }
+                match (ctx.kind.is_ref(), ctx.fallible) {
+                    (true, true) => quote!(value.try_into()?,),
+                    (true, false) => quote!(value.into(),),
+                    (false, true) => quote!((&value).try_into()?,),
+                    (false, false) => quote!((&value).into(),),
+                }
             } else {
                 let field_path = if ctx.destructured_src { get_field_path(&Member::Named(format_ident!("f{}", index.index))) } else { get_field_path(&f.member) };
                 quote!(#obj #field_path,)
             },
         (syn::Member::Unnamed(_), None, _, TypeHint::Struct) => {
             if f.attrs.has_parent_attr(&ctx.struct_attr.ty) {
-                if !ctx.kind.is_ref() { quote!((&value).into(),) } else { quote!(value.into(),) }
+                match (ctx.kind.is_ref(), ctx.fallible) {
+                    (true, true) => quote!(value.try_into()?,),
+                    (true, false) => quote!(value.into(),),
+                    (false, true) => quote!((&value).try_into()?,),
+                    (false, false) => quote!((&value).into(),),
+                }
             } else {
                 panic!("weird")
             }
@@ -973,7 +1000,7 @@ fn quote_try_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
     let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
         impl #gens std::convert::TryFrom<#r #src> for #dst #gens #where_clause {
-            type Error = TryFromIntError;
+            type Error = #err_ty;
 
             fn try_from(value: #r #src) -> Result<#dst #gens, #err_ty> {
                 #pre_init
@@ -1032,7 +1059,7 @@ fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
                     let mut obj: #dst = Default::default();
                     #init
                     #post_init
-                    obj
+                    Ok(obj)
                 }
             }
         },

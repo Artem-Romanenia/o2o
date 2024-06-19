@@ -1,4 +1,4 @@
-﻿Object to Object mapper for Rust. Derive `From` and `Into` traits.<!-- omit from toc --> 
+﻿Object to Object mapper for Rust. Derive `From`, `TryFrom`, `Into` and `TryInto` traits.<!-- omit from toc --> 
 ================================
 [<img alt="github.com" src="https://github.com/Artem-Romanenia/o2o/workflows/Build/badge.svg" height="25">](https://github.com/Artem-Romanenia/o2o/)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/o2o.svg?style=for-the-badge&color=2f4d28&labelColor=f9f7ec&logo=rust&logoColor=black" height="25">](https://crates.io/crates/o2o)
@@ -162,7 +162,7 @@ struct Entity { }
 struct EntityDto { }
 ```
 
-o2o procedural macro is able to generate implementation of 6 kinds of traits:
+o2o procedural macro is able to generate implementation of 12 kinds of traits:
 
 ``` rust ignore
 // When applied to a struct B:
@@ -170,20 +170,38 @@ o2o procedural macro is able to generate implementation of 6 kinds of traits:
 // #[from_owned(A)]
 impl std::convert::From<A> for B { ... }
 
+// #[try_from_owned(A)]
+impl std::convert::TryFrom<A> for B { ... }
+
 // #[from_ref(A)]
 impl std::convert::From<&A> for B { ... }
+
+// #[try_from_ref(A)]
+impl std::convert::TryFrom<&A> for B { ... }
 
 // #[owned_into(A)]
 impl std::convert::Into<A> for B { ... }
 
+// #[try_owned_into(A)]
+impl std::convert::TryInto<A> for B { ... }
+
 // #[ref_into(A)]
 impl std::convert::Into<A> for &B { ... }
+
+// #[try_ref_into(A)]
+impl std::convert::TryInto<A> for &B { ... }
 
 // #[owned_into_existing(A)]
 impl o2o::traits::IntoExisting<A> for B { ... }
 
+// #[owned_try_into_existing(A)]
+impl o2o::traits::TryIntoExisting<A> for B { ... }
+
 // #[ref_into_existing(A)]
 impl o2o::traits::IntoExisting<A> for &B { ... }
+
+// #[ref_try_into_existing(A)]
+impl o2o::traits::TryIntoExisting<A> for &B { ... }
 ```
 
 o2o also has shortcuts to configure multiple trait implementations with fewer lines of code:
@@ -217,6 +235,8 @@ struct Entity { }
 #[ref_into(Entity)]
 struct EntityDto { }
 ```
+
+Exactly the same shortcuts apply to fallible conversions.
 
 ## The (not so big) Problem
 

@@ -377,13 +377,13 @@ impl Parse for TraitAttrCore {
             let content_stream = content.parse::<TokenStream>()?;
             quote!((#content_stream)).into()
         } else { input.parse::<syn::Path>()?.into() };
+        let type_hint = if ty.nameless_tuple { TypeHint::Tuple } else { try_parse_type_hint(input)? };
         let err_ty = if input.peek(Token![,]) {
             input.parse::<Token![,]>()?;
             Some(input.parse::<syn::Path>()?.into())
         } else {
             None
         };
-        let type_hint = if ty.nameless_tuple { TypeHint::Tuple } else { try_parse_type_hint(input)? };
 
         if !input.peek(Token![|]){
             return Ok(TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None })
