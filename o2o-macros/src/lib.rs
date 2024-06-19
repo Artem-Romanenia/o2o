@@ -48,9 +48,10 @@ use syn::{parse_macro_input, DeriveInput};
     from_owned, from_ref, from, 
     map_owned, map_ref, map,
     owned_try_into, ref_try_into, try_into, 
-    try_from_owned, try_from_ref, try_from, 
-    try_map_owned, try_map_ref, try_map, 
     owned_into_existing, ref_into_existing, into_existing,
+    try_from_owned, try_from_ref, try_from, 
+    try_map_owned, try_map_ref, try_map,
+    owned_try_into_existing, ref_try_into_existing, try_into_existing,
     child, children, parent, ghost, ghosts, where_clause, 
     literal, pattern, o2o))]
     // TODO: Research, are there any downsides of having that many attributes? 

@@ -14,12 +14,12 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
 
     validate_error_instrs(input, attrs, &mut errors);
 
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromOwned), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromRef), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedInto), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefInto), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedIntoExisting), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefIntoExisting), &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromOwned, false), &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromRef, false), &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedInto, false), &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefInto, false), &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedIntoExisting, false), &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefIntoExisting, false), &mut errors);
 
     let type_paths = attrs.attrs.iter()
         .map(|x| &x.attr.ty)
@@ -178,13 +178,13 @@ fn validate_dedicated_member_attrs<T, U: Fn(&T) -> Option<&TypePath>>(attrs: &Ve
 }
 
 fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
-    let into_type_paths = struct_attrs.iter_for_kind(&Kind::OwnedInto)
-        .chain(struct_attrs.iter_for_kind(&Kind::RefInto))
+    let into_type_paths = struct_attrs.iter_for_kind(&Kind::OwnedInto, false)
+        .chain(struct_attrs.iter_for_kind(&Kind::RefInto, false))
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
 
-    let from_type_paths = struct_attrs.iter_for_kind(&Kind::FromOwned)
-        .chain(struct_attrs.iter_for_kind(&Kind::FromRef))
+    let from_type_paths = struct_attrs.iter_for_kind(&Kind::FromOwned, false)
+        .chain(struct_attrs.iter_for_kind(&Kind::FromRef, false))
         .filter(|x| x.update.is_none())
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
@@ -227,12 +227,12 @@ fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &Ha
     }
 
     if !input.named_fields {
-        let struct_attrs = struct_attrs.iter_for_kind(&Kind::OwnedInto).map(|x| (x, Kind::OwnedInto))
-            .chain(struct_attrs.iter_for_kind(&Kind::RefInto).map(|x| (x, Kind::RefInto)))
-            .chain(struct_attrs.iter_for_kind(&Kind::OwnedIntoExisting).map(|x| (x, Kind::OwnedIntoExisting)))
-            .chain(struct_attrs.iter_for_kind(&Kind::RefIntoExisting).map(|x| (x, Kind::RefIntoExisting)))
-            .chain(struct_attrs.iter_for_kind(&Kind::FromOwned).map(|x| (x, Kind::FromOwned)))
-            .chain(struct_attrs.iter_for_kind(&Kind::FromRef).map(|x| (x, Kind::FromRef)));
+        let struct_attrs = struct_attrs.iter_for_kind(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
+            .chain(struct_attrs.iter_for_kind(&Kind::RefInto, false).map(|x| (x, Kind::RefInto)))
+            .chain(struct_attrs.iter_for_kind(&Kind::OwnedIntoExisting, false).map(|x| (x, Kind::OwnedIntoExisting)))
+            .chain(struct_attrs.iter_for_kind(&Kind::RefIntoExisting, false).map(|x| (x, Kind::RefIntoExisting)))
+            .chain(struct_attrs.iter_for_kind(&Kind::FromOwned, false).map(|x| (x, Kind::FromOwned)))
+            .chain(struct_attrs.iter_for_kind(&Kind::FromRef, false).map(|x| (x, Kind::FromRef)));
 
         for (struct_attr, kind) in struct_attrs {
             if struct_attr.quick_return.is_none() && struct_attr.type_hint == TypeHint::Struct {
@@ -241,7 +241,7 @@ fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &Ha
                         continue;
                     }
 
-                    if let Some(field_attr) = field.attrs.applicable_field_attr(&kind, &struct_attr.ty) {
+                    if let Some(field_attr) = field.attrs.applicable_field_attr(&kind, false, &struct_attr.ty) {
                         if kind == Kind::FromOwned || kind == Kind::FromRef {
                             if field_attr.attr.member.is_none() && field_attr.attr.action.is_none() {
                                 errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {} or an action", field_attr.original_instr, field.member.to_token_stream(), struct_attr.ty.path), field.member.span());

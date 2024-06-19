@@ -2,7 +2,7 @@ use std::{slice::Iter, iter::Peekable, collections::HashSet};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant}, 
-    attr::{ApplicableAttr, ChildData, ChildPath, GhostData, InitData, Kind, TraitAttrCore, DataTypeAttrs, TypeHint}, validate::validate
+    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, InitData, Kind, TraitAttrCore, TypeHint}, validate::validate
 };
 use proc_macro2::{TokenStream, Span};
 use syn::{punctuated::Punctuated, Data, DeriveInput, Error, Generics, Index, Member, Result, Token};
@@ -29,7 +29,6 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
     }
 }
 
-#[derive(Clone)]
 struct ImplContext<'a> {
     input: &'a DataType<'a>,
     struct_attr: &'a TraitAttrCore,
@@ -38,13 +37,14 @@ struct ImplContext<'a> {
     src_ty: &'a TokenStream,
     has_post_init: bool,
     destructured_src: bool,
+    fallible: bool
 }
 
 fn struct_impl(input: DataType) -> TokenStream {
     let ty = input.get_ident().to_token_stream();
     let attrs = input.get_attrs();
 
-    let from_owned_impls = attrs.iter_for_kind(&Kind::FromOwned).map(|struct_attr| {
+    let from_owned_impls = attrs.iter_for_kind(&Kind::FromOwned, false).map(|struct_attr| {
         let ctx = ImplContext {
             input: &input,
             struct_attr,
@@ -52,7 +52,8 @@ fn struct_impl(input: DataType) -> TokenStream {
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
             has_post_init: false,
-            destructured_src: false
+            destructured_src: false,
+            fallible: false,
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -62,7 +63,26 @@ fn struct_impl(input: DataType) -> TokenStream {
         quote_from_trait(&ctx, pre_init, main_code_block(&ctx))
     });
 
-    let from_ref_impls = attrs.iter_for_kind(&Kind::FromRef).map(|struct_attr| {
+    let try_from_owned_impls = attrs.iter_for_kind(&Kind::FromOwned, true).map(|struct_attr| {
+        let ctx = ImplContext {
+            input: &input,
+            struct_attr,
+            kind: Kind::FromOwned,
+            dst_ty: &ty,
+            src_ty: &struct_attr.ty.path,
+            has_post_init: false,
+            destructured_src: false,
+            fallible: true,
+        };
+
+        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            return quote_try_from_trait(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+        }
+        quote_try_from_trait(&ctx, pre_init, main_code_block_ok(&ctx))
+    });
+
+    let from_ref_impls = attrs.iter_for_kind(&Kind::FromRef, false).map(|struct_attr| {
         let ctx = ImplContext {
             input: &input,
             struct_attr,
@@ -70,7 +90,8 @@ fn struct_impl(input: DataType) -> TokenStream {
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
             has_post_init: false,
-            destructured_src: false
+            destructured_src: false,
+            fallible: false,
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -80,7 +101,26 @@ fn struct_impl(input: DataType) -> TokenStream {
         quote_from_trait(&ctx, pre_init, main_code_block(&ctx))
     });
 
-    let owned_into_impls = attrs.iter_for_kind(&Kind::OwnedInto).map(|struct_attr| {
+    let try_from_ref_impls = attrs.iter_for_kind(&Kind::FromRef, true).map(|struct_attr| {
+        let ctx = ImplContext {
+            input: &input,
+            struct_attr,
+            kind: Kind::FromRef,
+            dst_ty: &ty,
+            src_ty: &struct_attr.ty.path,
+            has_post_init: false,
+            destructured_src: false,
+            fallible: true,
+        };
+
+        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            return quote_try_from_trait(&ctx, pre_init, quote_action(quick_return, None, &ctx))
+        }
+        quote_try_from_trait(&ctx, pre_init, main_code_block_ok(&ctx))
+    });
+
+    let owned_into_impls = attrs.iter_for_kind(&Kind::OwnedInto, false).map(|struct_attr| {
         let mut ctx = ImplContext {
             input: &input,
             struct_attr,
@@ -88,7 +128,8 @@ fn struct_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false
+            destructured_src: false,
+            fallible: false,
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -100,7 +141,28 @@ fn struct_impl(input: DataType) -> TokenStream {
         quote_into_trait(&ctx, pre_init, main_code_block(&ctx), post_init)
     });
 
-    let ref_into_impls = attrs.iter_for_kind(&Kind::RefInto).map(|struct_attr| {
+    let owned_try_into_impls = attrs.iter_for_kind(&Kind::OwnedInto, true).map(|struct_attr| {
+        let mut ctx = ImplContext {
+            input: &input,
+            struct_attr,
+            kind: Kind::OwnedInto,
+            dst_ty: &struct_attr.ty.path,
+            src_ty: &ty,
+            has_post_init: false,
+            destructured_src: false,
+            fallible: true,
+        };
+
+        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            return quote_try_into_trait(&ctx, pre_init, quote_action(quick_return, None, &ctx), None)
+        }
+        let post_init = struct_post_init(&ctx);
+        ctx.has_post_init = post_init.is_some();
+        quote_try_into_trait(&ctx, pre_init, main_code_block_ok(&ctx), post_init)
+    });
+
+    let ref_into_impls = attrs.iter_for_kind(&Kind::RefInto, false).map(|struct_attr| {
         let mut ctx = ImplContext {
             input: &input,
             struct_attr,
@@ -108,7 +170,8 @@ fn struct_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false
+            destructured_src: false,
+            fallible: false,
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -120,7 +183,28 @@ fn struct_impl(input: DataType) -> TokenStream {
         quote_into_trait(&ctx, pre_init, main_code_block(&ctx), post_init)
     });
 
-    let owned_into_existing_impls = attrs.iter_for_kind(&Kind::OwnedIntoExisting).map(|struct_attr| {
+    let ref_try_into_impls = attrs.iter_for_kind(&Kind::RefInto, true).map(|struct_attr| {
+        let mut ctx = ImplContext {
+            input: &input,
+            struct_attr,
+            kind: Kind::RefInto,
+            dst_ty: &struct_attr.ty.path,
+            src_ty: &ty,
+            has_post_init: false,
+            destructured_src: false,
+            fallible: true,
+        };
+
+        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            return quote_try_into_trait(&ctx, pre_init, quote_action(quick_return, None, &ctx), None)
+        }
+        let post_init = struct_post_init(&ctx);
+        ctx.has_post_init = post_init.is_some();
+        quote_try_into_trait(&ctx, pre_init, main_code_block_ok(&ctx), post_init)
+    });
+
+    let owned_into_existing_impls = attrs.iter_for_kind(&Kind::OwnedIntoExisting, false).map(|struct_attr| {
         let mut ctx = ImplContext {
             input: &input,
             struct_attr,
@@ -128,7 +212,8 @@ fn struct_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false
+            destructured_src: false,
+            fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
         if let Some(quick_return) = &struct_attr.quick_return {
@@ -140,7 +225,28 @@ fn struct_impl(input: DataType) -> TokenStream {
         quote_into_existing_trait(&ctx, pre_init, main_code_block(&ctx), post_init)
     });
 
-    let ref_into_existing_impls = attrs.iter_for_kind(&Kind::RefIntoExisting).map(|struct_attr| {
+    let owned_try_into_existing_impls = attrs.iter_for_kind(&Kind::OwnedIntoExisting, true).map(|struct_attr| {
+        let mut ctx = ImplContext {
+            input: &input,
+            struct_attr,
+            kind: Kind::OwnedIntoExisting,
+            dst_ty: &struct_attr.ty.path,
+            src_ty: &ty,
+            has_post_init: false,
+            destructured_src: false,
+            fallible: true,
+        };
+        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            let action = quote_action(quick_return, None, &ctx);
+            return quote_try_into_existing_trait(&ctx, pre_init, quote!(*other = #action;), None)
+        }
+        let post_init = struct_post_init(&ctx);
+        ctx.has_post_init = post_init.is_some();
+        quote_try_into_existing_trait(&ctx, pre_init, main_code_block(&ctx), post_init)
+    });
+
+    let ref_into_existing_impls = attrs.iter_for_kind(&Kind::RefIntoExisting, false).map(|struct_attr| {
         let mut ctx = ImplContext {
             input: &input,
             struct_attr,
@@ -148,7 +254,8 @@ fn struct_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false
+            destructured_src: false,
+            fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
         if let Some(quick_return) = &struct_attr.quick_return {
@@ -160,16 +267,49 @@ fn struct_impl(input: DataType) -> TokenStream {
         quote_into_existing_trait(&ctx, pre_init, main_code_block(&ctx), post_init)
     });
 
+    let ref_try_into_existing_impls = attrs.iter_for_kind(&Kind::RefIntoExisting, true).map(|struct_attr| {
+        let mut ctx = ImplContext {
+            input: &input,
+            struct_attr,
+            kind: Kind::RefIntoExisting,
+            dst_ty: &struct_attr.ty.path,
+            src_ty: &ty,
+            has_post_init: false,
+            destructured_src: false,
+            fallible: true,
+        };
+        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
+        if let Some(quick_return) = &struct_attr.quick_return {
+            let action = quote_action(quick_return, None, &ctx);
+            return quote_try_into_existing_trait(&ctx, pre_init, quote!(*other = #action;), None)
+        }
+        let post_init = struct_post_init(&ctx);
+        ctx.has_post_init = post_init.is_some();
+        quote_try_into_existing_trait(&ctx, pre_init, main_code_block(&ctx), post_init)
+    });
+
     let result = quote! {
         #(#from_owned_impls)*
+        #(#try_from_owned_impls)*
         #(#from_ref_impls)*
+        #(#try_from_ref_impls)*
         #(#owned_into_impls)*
+        #(#owned_try_into_impls)*
         #(#ref_into_impls)*
+        #(#ref_try_into_impls)*
         #(#owned_into_existing_impls)*
+        #(#owned_try_into_existing_impls)*
         #(#ref_into_existing_impls)*
+        #(#ref_try_into_existing_impls)*
     };
 
     result
+}
+
+fn main_code_block_ok(ctx: &ImplContext) -> TokenStream {
+    let inner = main_code_block(ctx);
+
+    quote!(Ok(#inner))
 }
 
 fn main_code_block(ctx: &ImplContext) -> TokenStream {
@@ -187,7 +327,6 @@ fn main_code_block(ctx: &ImplContext) -> TokenStream {
                     quote!(#dst #struct_init_block)
                 },
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
-                _ => panic!("weird")
             }
         },
         DataType::Enum(_) => {
@@ -201,7 +340,6 @@ fn main_code_block(ctx: &ImplContext) -> TokenStream {
                     quote!(match self #struct_init_block)
                 },
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
-                _ => panic!("weird")
             }
         }
     }
@@ -378,7 +516,7 @@ fn variant_destruct_block(ctx: &ImplContext<'_>) -> TokenStream {
         DataType::Struct(s) => {
             if s.named_fields {
                 let idents = s.fields.iter().map(|x| {
-                    let attr = x.attrs.applicable_attr(&ctx.kind, &ctx.struct_attr.ty);
+                    let attr = x.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
 
                     if !ctx.kind.is_from() || attr.is_none() {
                         let ident = &x.member;
@@ -422,7 +560,6 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
                 },
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                     render_existing_child(fields, ctx, (child_path, field_ctx.2 + 1)),
-                _ => panic!("weird")
             }
         } else {
             fields.next();
@@ -438,7 +575,6 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
             },
             Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                 render_existing_child(fields, ctx, (child_path, 0)),
-            _ => panic!("weird")
         }
     }
 }
@@ -537,7 +673,7 @@ fn render_struct_line(
     hint: TypeHint, 
     idx: usize
 ) -> TokenStream {
-    let attr = f.attrs.applicable_attr(&ctx.kind, &ctx.struct_attr.ty);
+    let attr = f.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
     let get_field_path = |x: &Member| {
         match f.attrs.child(&ctx.struct_attr.ty) {
             Some(child_attr) => {
@@ -556,7 +692,6 @@ fn render_struct_line(
             Kind::FromRef => quote!(value.),
             Kind::OwnedIntoExisting => quote!(self.),
             Kind::RefIntoExisting => quote!(self.),
-            _ => panic!("weird")
         }
     };
 
@@ -659,7 +794,6 @@ fn render_struct_line(
             let right_side = attr.get_stuff(&obj, get_field_path, ctx, || if ctx.destructured_src { &or } else { &f.member});
             quote!(#right_side,)
         },
-        _ => panic!("weird")
     }
 }
 
@@ -669,7 +803,7 @@ fn render_enum_line(
     hint: TypeHint, 
     _idx: usize
 ) -> TokenStream {
-    let attr = v.attrs.applicable_attr(&ctx.kind, &ctx.struct_attr.ty);
+    let attr = v.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
     let lit = v.attrs.lit(&ctx.struct_attr.ty);
     let pat = v.attrs.pat(&ctx.struct_attr.ty);
 
@@ -827,6 +961,28 @@ fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
     }
 }
 
+fn quote_try_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+    let dst = ctx.dst_ty;
+    let src = ctx.src_ty;
+    let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
+    let gens = ctx.input.get_generics().to_token_stream();
+    let where_clause  = ctx.input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
+        let where_clause = x.where_clause.to_token_stream();
+        quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
+    quote! {
+        impl #gens std::convert::TryFrom<#r #src> for #dst #gens #where_clause {
+            type Error = TryFromIntError;
+
+            fn try_from(value: #r #src) -> Result<#dst #gens, #err_ty> {
+                #pre_init
+                #init
+            }
+        }
+    }
+}
+
 fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
@@ -858,6 +1014,40 @@ fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
     }
 }
 
+fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+    let dst = ctx.dst_ty;
+    let src = ctx.src_ty;
+    let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
+    let gens = ctx.input.get_generics().to_token_stream();
+    let where_clause  = ctx.input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x|{
+        let where_clause = x.where_clause.to_token_stream();
+        quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
+    match post_init {
+        Some(post_init) => quote!{
+            impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
+                type Error = #err_ty;
+                fn try_into(self) -> Result<#dst, #err_ty> {
+                    let mut obj: #dst = Default::default();
+                    #init
+                    #post_init
+                    obj
+                }
+            }
+        },
+        None => quote! {
+            impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
+                type Error = #err_ty;
+                fn try_into(self) -> Result<#dst, #err_ty> {
+                    #pre_init
+                    #init
+                }
+            }
+        }
+    }
+}
+
 fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
@@ -873,6 +1063,29 @@ fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, i
                 #pre_init
                 #init
                 #post_init
+            }
+        }
+    }
+}
+
+fn quote_try_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+    let dst = ctx.dst_ty;
+    let src = ctx.src_ty;
+    let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
+    let gens = ctx.input.get_generics().to_token_stream();
+    let where_clause  = ctx.input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x|{
+        let where_clause = x.where_clause.to_token_stream();
+            quote!(where #where_clause)
+    });
+    let r = ctx.kind.is_ref().then_some(quote!(&));
+    quote! {
+        impl #gens o2o::traits::TryIntoExisting<#dst> for #r #src #gens #where_clause {
+            type Error = #err_ty;
+            fn try_into_existing(self, other: &mut #dst) -> Result<(), #err_ty> {
+                #pre_init
+                #init
+                #post_init
+                Ok(())
             }
         }
     }
