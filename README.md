@@ -93,7 +93,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
       }
   }
   impl std::convert::TryInto<Person> for PersonDto {
-      type Error = String;
+      type Error = std::io::Error;
       fn try_into(self) -> Result<Person, String> {
           Ok(Person {
               id: self.id,
