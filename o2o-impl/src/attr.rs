@@ -174,8 +174,8 @@ pub(crate) struct DataTypeAttrs {
 }
 
 impl<'a> DataTypeAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &TraitAttrCore> {
-        self.attrs.iter().filter(move |x| x.applicable_to[kind]).map(|x| &x.attr)
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &TraitAttrCore> {
+        self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind]).map(|x| &x.attr)
     }
 
     pub(crate) fn ghost_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&StructGhostAttrCore> {
@@ -259,27 +259,30 @@ pub(crate) struct MemberAttrs {
 }
 
 impl<'a> MemberAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind) -> impl Iterator<Item = &MemberAttr> {
-        self.attrs.iter().filter(move |x| x.applicable_to[kind])
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &MemberAttr> {
+        self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind])
     }
 
-    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind) -> impl Iterator<Item = &MemberAttrCore> {
-        self.iter_for_kind(kind).map(|x| &x.attr)
+    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &MemberAttrCore> {
+        self.iter_for_kind(kind, fallible).map(|x| &x.attr)
     }
 
-    pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<ApplicableAttr> {
+    pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<ApplicableAttr> {
         self.ghost(container_ty, kind)
             .map(ApplicableAttr::Ghost)
-            .or_else(|| self.field_attr_core(kind, container_ty)
-                .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr_core(&Kind::OwnedInto, container_ty) } else { None })
-                .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr_core(&Kind::RefInto, container_ty) } else { None })
+            .or_else(|| self.field_attr_core(kind, fallible, container_ty)
+                .or_else(|| if fallible { self.field_attr_core(kind, false, container_ty) } else { None })
+                .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr_core(&Kind::OwnedInto, fallible, container_ty) } else { None })
+                .or_else(|| if kind == &Kind::OwnedIntoExisting && fallible { self.field_attr_core(&Kind::OwnedInto, false, container_ty) } else { None })
+                .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr_core(&Kind::RefInto, fallible, container_ty) } else { None })
+                .or_else(|| if kind == &Kind::RefIntoExisting && fallible { self.field_attr_core(&Kind::RefInto, false, container_ty) } else { None })
                 .map(ApplicableAttr::Field))
     }
 
-    pub(crate) fn applicable_field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&'a MemberAttr> {
-        self.field_attr(kind, container_ty)
-            .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, container_ty) } else { None })
-            .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, container_ty) } else { None })
+    pub(crate) fn applicable_field_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&'a MemberAttr> {
+        self.field_attr(kind, fallible, container_ty)
+            .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, fallible, container_ty) } else { None })
+            .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, fallible, container_ty) } else { None })
     }
 
     pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&ChildAttr>{
@@ -311,16 +314,16 @@ impl<'a> MemberAttrs {
             .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
     }
 
-    pub(crate) fn field_attr(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&MemberAttr>{
-        self.iter_for_kind(kind)
+    pub(crate) fn field_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&MemberAttr>{
+        self.iter_for_kind(kind, fallible)
             .find(|x| x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.iter_for_kind(kind).find(|x| x.attr.container_ty.is_none()))
+            .or_else(|| self.iter_for_kind(kind, fallible).find(|x| x.attr.container_ty.is_none()))
     }
 
-    pub(crate) fn field_attr_core(&'a self, kind: &'a Kind, container_ty: &TypePath) -> Option<&MemberAttrCore>{
-        self.iter_for_kind_core(kind)
+    pub(crate) fn field_attr_core(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&MemberAttrCore>{
+        self.iter_for_kind_core(kind, fallible)
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.iter_for_kind_core(kind).find(|x| x.container_ty.is_none()))
+            .or_else(|| self.iter_for_kind_core(kind, fallible).find(|x| x.container_ty.is_none()))
     }
 
     pub(crate) fn merge(&'a mut self, other: Self) {
@@ -351,12 +354,14 @@ pub(crate) enum TypeHint {
 #[derive(Clone)]
 pub(crate) struct TraitAttr {
     pub attr: TraitAttrCore,
+    pub fallible: bool,
     pub applicable_to: ApplicableTo,
 }
 
 #[derive(Clone)]
 pub(crate) struct TraitAttrCore {
     pub ty: TypePath,
+    pub err_ty: Option<TypePath>,
     pub type_hint: TypeHint,
     pub init_data: Option<Punctuated<InitData, Token![,]>>,
     pub update: Option<TokenStream>,
@@ -373,9 +378,15 @@ impl Parse for TraitAttrCore {
             quote!((#content_stream)).into()
         } else { input.parse::<syn::Path>()?.into() };
         let type_hint = if ty.nameless_tuple { TypeHint::Tuple } else { try_parse_type_hint(input)? };
+        let err_ty = if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            Some(input.parse::<syn::Path>()?.into())
+        } else {
+            None
+        };
 
         if !input.peek(Token![|]){
-            return Ok(TraitAttrCore { ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None })
+            return Ok(TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None })
         }
 
         input.parse::<Token![|]>()?;
@@ -403,7 +414,7 @@ impl Parse for TraitAttrCore {
             try_parse_action(input, true)?
         } else { None };
 
-        Ok(TraitAttrCore { ty, type_hint, init_data, update, quick_return, default_case })
+        Ok(TraitAttrCore { ty, err_ty, type_hint, init_data, update, quick_return, default_case })
     }
 }
 
@@ -546,6 +557,7 @@ impl Hash for ChildData {
 #[derive(Clone)]
 pub(crate) struct MemberAttr  {
     pub attr: MemberAttrCore,
+    pub fallible: bool,
     pub original_instr: String,
     applicable_to: ApplicableTo,
 }
@@ -779,16 +791,32 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
             Ok(DataTypeInstruction::Map(TraitAttr { 
-                attr: syn::parse2(input)?, 
+                attr: syn::parse2(input)?,
+                fallible: false,
                 applicable_to: [
-                    appl_owned_into(instr_str), 
-                    appl_ref_into(instr_str), 
-                    appl_from_owned(instr_str), 
-                    appl_from_ref(instr_str), 
+                    appl_owned_into(instr_str),
+                    appl_ref_into(instr_str),
+                    appl_from_owned(instr_str),
+                    appl_from_ref(instr_str),
                     appl_owned_into_existing(instr_str), 
                     appl_ref_into_existing(instr_str)
                 ]
             })),
+        "owned_try_into" | "ref_try_into" | "try_into" | "try_from_owned" | "try_from_ref" | "try_from" | 
+        "try_map_owned" | "try_map_ref" | "try_map" | "owned_try_into_existing" | "ref_try_into_existing" | "try_into_existing" => {
+            Ok(DataTypeInstruction::Map(TraitAttr {
+                attr: syn::parse2(input)?,
+                fallible: true,
+                applicable_to: [
+                    appl_owned_into(instr_str),
+                    appl_ref_into(instr_str),
+                    appl_from_owned(instr_str),
+                    appl_from_ref(instr_str),
+                    appl_owned_into_existing(instr_str), 
+                    appl_ref_into_existing(instr_str)
+                ]
+            }))
+        },
         "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(DataTypeInstruction::Ghosts(GhostsAttr {
             attr: syn::parse2(input)?,
             applicable_to: [
@@ -823,13 +851,29 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
             Ok(MemberInstruction::Map(MemberAttr { 
-                attr: syn::parse2(input)?, 
+                attr: syn::parse2(input)?,
+                fallible: false,
                 original_instr: instr_str.clone(),
                 applicable_to: [
-                    appl_owned_into(instr_str), 
-                    appl_ref_into(instr_str), 
-                    appl_from_owned(instr_str), 
-                    appl_from_ref(instr_str), 
+                    appl_owned_into(instr_str),
+                    appl_ref_into(instr_str),
+                    appl_from_owned(instr_str),
+                    appl_from_ref(instr_str),
+                    appl_owned_into_existing(instr_str), 
+                    appl_ref_into_existing(instr_str)
+                ]
+            })),
+        "owned_try_into" | "ref_try_into" | "try_into" | "try_from_owned" | "try_from_ref" | "try_from" | 
+        "try_map_owned" | "try_map_ref" | "try_map" => 
+            Ok(MemberInstruction::Map(MemberAttr { 
+                attr: syn::parse2(input)?,
+                fallible: true,
+                original_instr: instr_str.clone(),
+                applicable_to: [
+                    appl_owned_into(instr_str),
+                    appl_ref_into(instr_str),
+                    appl_from_owned(instr_str),
+                    appl_from_ref(instr_str),
                     appl_owned_into_existing(instr_str), 
                     appl_ref_into_existing(instr_str)
                 ]
@@ -975,10 +1019,11 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<MemberAtt
     let that_ty = attr.tokens;
     attrs.push(MemberAttr { 
         attr: MemberAttrCore { 
-            container_ty: attr.container_ty.clone(), 
+            container_ty: attr.container_ty.clone(),
             member: attr.member.clone(), 
             action: Some(quote!(~ as #this_ty)),
-        }, 
+        },
+        fallible: false,
         original_instr: "as_type".into(),
         applicable_to: [false, false, true, true, false, false]
     });
@@ -987,31 +1032,32 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<MemberAtt
             container_ty: attr.container_ty, 
             member: attr.member, 
             action: Some(quote!(~ as #that_ty)),
-        }, 
+        },
+        fallible: false,
         original_instr: "as_type".into(),
         applicable_to: [true, true, false, false, true, true]
     });
 }
 
 fn appl_owned_into(instr: &str) -> bool {
-    matches!(instr, "owned_into" | "into" | "map_owned" | "map")
+    matches!(instr, "owned_into" | "into" | "map_owned" | "map" | "owned_try_into" | "try_into" | "try_map_owned" | "try_map")
 }
 fn appl_ref_into(instr: &str) -> bool {
-    matches!(instr, "ref_into" | "into" | "map_ref" | "map")
+    matches!(instr, "ref_into" | "into" | "map_ref" | "map" | "ref_try_into" | "try_into" | "try_map_ref" | "try_map")
 }
 fn appl_from_owned(instr: &str) -> bool {
-    matches!(instr, "from_owned" | "from" | "map_owned" | "map")
+    matches!(instr, "from_owned" | "from" | "map_owned" | "map" | "try_from_owned" | "try_from" | "try_map_owned" | "try_map")
 }
 fn appl_from_ref(instr: &str) -> bool {
-    matches!(instr, "from_ref" | "from" | "map_ref" | "map")
+    matches!(instr, "from_ref" | "from" | "map_ref" | "map" | "try_from_ref" | "try_from" | "try_map_ref" | "try_map")
 }
 
 fn appl_owned_into_existing(instr: &str) -> bool {
-    matches!(instr, "owned_into_existing" | "into_existing")
+    matches!(instr, "owned_into_existing" | "into_existing" | "owned_try_into_existing" | "try_into_existing")
 }
 
 fn appl_ref_into_existing(instr: &str) -> bool {
-    matches!(instr, "ref_into_existing" | "into_existing")
+    matches!(instr, "ref_into_existing" | "into_existing" | "ref_try_into_existing" | "try_into_existing")
 }
 
 fn appl_ghosts_owned(instr: &str) -> bool {
