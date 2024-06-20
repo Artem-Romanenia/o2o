@@ -14,12 +14,19 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
 
     validate_error_instrs(input, attrs, &mut errors);
 
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromOwned, false), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromRef, false), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedInto, false), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefInto, false), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedIntoExisting, false), &mut errors);
-    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefIntoExisting, false), &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromOwned, false), false, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromRef, false), false, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedInto, false), false, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefInto, false), false, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedIntoExisting, false), false, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefIntoExisting, false), false, &mut errors);
+
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromOwned, true), true, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::FromRef, true), true, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedInto, true), true, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefInto, true), true, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::OwnedIntoExisting, true), true, &mut errors);
+    validate_struct_attrs(attrs.iter_for_kind(&Kind::RefIntoExisting, true), true, &mut errors);
 
     let type_paths = attrs.attrs.iter()
         .map(|x| &x.attr.ty)
@@ -94,11 +101,19 @@ fn validate_member_error_instrs(input: &DataType, attrs: &MemberAttrs, errors: &
     }
 }
 
-fn validate_struct_attrs<'a, I: Iterator<Item = &'a TraitAttrCore>>(attrs: I, errors: &mut HashMap<String, Span>) {
+fn validate_struct_attrs<'a, I: Iterator<Item = &'a TraitAttrCore>>(attrs: I, fallible: bool, errors: &mut HashMap<String, Span>) {
     let mut unique_ident = HashSet::new();
     for attr in attrs {
         if !unique_ident.insert(&attr.ty) {
             errors.insert("Ident here must be unique.".into(), attr.ty.span);
+        }
+
+        if fallible && attr.err_ty.is_none() {
+            errors.insert("Error type should be specified for fallible instruction.".into(), attr.ty.span);
+        }
+
+        if !fallible && attr.err_ty.is_some() {
+            errors.insert("Error type should not be specified for infallible instruction.".into(), attr.err_ty.as_ref().unwrap().span);
         }
     }
 }
@@ -180,11 +195,15 @@ fn validate_dedicated_member_attrs<T, U: Fn(&T) -> Option<&TypePath>>(attrs: &Ve
 fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     let into_type_paths = struct_attrs.iter_for_kind(&Kind::OwnedInto, false)
         .chain(struct_attrs.iter_for_kind(&Kind::RefInto, false))
+        .chain(struct_attrs.iter_for_kind(&Kind::OwnedInto, true))
+        .chain(struct_attrs.iter_for_kind(&Kind::RefInto, true))
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
 
     let from_type_paths = struct_attrs.iter_for_kind(&Kind::FromOwned, false)
         .chain(struct_attrs.iter_for_kind(&Kind::FromRef, false))
+        .chain(struct_attrs.iter_for_kind(&Kind::FromOwned, true))
+        .chain(struct_attrs.iter_for_kind(&Kind::FromRef, true))
         .filter(|x| x.update.is_none())
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
@@ -227,12 +246,19 @@ fn validate_fields(input: &Struct, struct_attrs: &DataTypeAttrs, type_paths: &Ha
     }
 
     if !input.named_fields {
-        let struct_attrs = struct_attrs.iter_for_kind(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
+        let struct_attrs: Vec<(&TraitAttrCore, Kind)> = struct_attrs.iter_for_kind(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
             .chain(struct_attrs.iter_for_kind(&Kind::RefInto, false).map(|x| (x, Kind::RefInto)))
             .chain(struct_attrs.iter_for_kind(&Kind::OwnedIntoExisting, false).map(|x| (x, Kind::OwnedIntoExisting)))
             .chain(struct_attrs.iter_for_kind(&Kind::RefIntoExisting, false).map(|x| (x, Kind::RefIntoExisting)))
             .chain(struct_attrs.iter_for_kind(&Kind::FromOwned, false).map(|x| (x, Kind::FromOwned)))
-            .chain(struct_attrs.iter_for_kind(&Kind::FromRef, false).map(|x| (x, Kind::FromRef)));
+            .chain(struct_attrs.iter_for_kind(&Kind::FromRef, false).map(|x| (x, Kind::FromRef)))
+            .chain(struct_attrs.iter_for_kind(&Kind::RefInto, true).map(|x| (x, Kind::OwnedInto)))
+            .chain(struct_attrs.iter_for_kind(&Kind::RefInto, true).map(|x| (x, Kind::RefInto)))
+            .chain(struct_attrs.iter_for_kind(&Kind::OwnedIntoExisting, true).map(|x| (x, Kind::OwnedIntoExisting)))
+            .chain(struct_attrs.iter_for_kind(&Kind::RefIntoExisting, true).map(|x| (x, Kind::RefIntoExisting)))
+            .chain(struct_attrs.iter_for_kind(&Kind::FromOwned, true).map(|x| (x, Kind::FromOwned)))
+            .chain(struct_attrs.iter_for_kind(&Kind::FromRef, true).map(|x| (x, Kind::FromRef)))
+            .collect();
 
         for (struct_attr, kind) in struct_attrs {
             if struct_attr.quick_return.is_none() && struct_attr.type_hint == TypeHint::Struct {

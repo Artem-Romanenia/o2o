@@ -425,7 +425,7 @@ fn unrecognized_struct_instructions_no_bark(code_fragment: TokenStream) {
     }
 }; "struct_misplaced_ghosts_instr")]
 #[test_case(quote!{
-    #[from_owned(NamedStruct)]
+    #[try_from_owned(NamedStruct, SomeError)]
     #[o2o(allow_unknown)]
     struct NamedStructDto {
         #[ghosts_owned()]
@@ -517,8 +517,8 @@ fn more_than_one_default_instruction(code_fragment: TokenStream, err: &str) {
     ("EntityModel", true) 
 ]; "1")]
 #[test_case(quote! {
-    #[map(EntityDto)]
-    #[map(EntityModel)]
+    #[try_map(EntityDto, SomeError)]
+    #[try_map(EntityModel, SomeError)]
     #[children()]
     struct Entity {
         #[child(base.base)]
@@ -532,7 +532,7 @@ fn more_than_one_default_instruction(code_fragment: TokenStream, err: &str) {
 ]; "2")]
 #[test_case(quote! {
     #[map(EntityDto)]
-    #[map(EntityModel)]
+    #[try_map(EntityModel, SomeError)]
     #[children(EntityDto| base: Base)]
     struct Entity {
         #[child(base.base)]
@@ -559,7 +559,7 @@ fn missing_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, boo
 
 #[test_case(quote! {
     #[map(EntityDto)]
-    #[map(EntityModel)]
+    #[try_map(EntityModel, SomeError)]
     #[children()]
     struct Entity {
         #[child(base.base)]
@@ -577,7 +577,7 @@ fn missing_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, boo
 ]; "1")]
 #[test_case(quote! {
     #[map(EntityDto)]
-    #[map(EntityModel)]
+    #[try_map(EntityModel, SomeError)]
     #[children(base: Base)]
     struct Entity {
         #[child(base.base)]
@@ -664,7 +664,7 @@ fn incomplete_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, 
     ("another_val", "Entity")
 ]; "4")]
 #[test_case(quote! {
-    #[map(Entity)]
+    #[try_map(Entity, SomeError)]
     struct EntityDto {
         some_val: i32,
         #[ghost()]
@@ -675,7 +675,7 @@ fn incomplete_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, 
 ]; "5")]
 #[test_case(quote! {
     #[from(Entity)]
-    #[from(Entity2)]
+    #[try_from(Entity2, SomeError)]
     struct EntityDto {
         some_val: i32,
         #[ghost]
@@ -713,7 +713,7 @@ fn incomplete_ghost_instruction(code_fragment: TokenStream, errs: Vec<(&str, &st
     ("ref_into", "Entity", false)
 ]; "1")]
 #[test_case(quote! {
-    #[into(Entity as {})]
+    #[try_into(Entity as {}, SomeError)]
     struct EntityDto (#[from]i32);
 }, vec![
     ("owned_into", "Entity", false),
@@ -752,7 +752,7 @@ fn incomplete_ghost_instruction(code_fragment: TokenStream, errs: Vec<(&str, &st
 ]; "6")]
 #[test_case(quote! {
     #[map(Entity as {})]
-    #[from(Entity2 as {})]
+    #[try_from(Entity2 as {}, SomeError)]
     struct EntityDto (#[from(Entity2| {123})]i32);
 }, vec![
     ("from_owned", "Entity", true),
@@ -761,7 +761,7 @@ fn incomplete_ghost_instruction(code_fragment: TokenStream, errs: Vec<(&str, &st
     ("ref_into", "Entity", false),
 ]; "7")]
 #[test_case(quote! {
-    #[owned_into(StuffWrapper| return StuffWrapper { payload: @ })]
+    #[owned_try_into(StuffWrapper, SomeError| return StuffWrapper { payload: @ })]
     #[from_owned(StuffWrapper| return @.payload)]
     struct Stuff(i32);
 }, vec![]; "8")]
@@ -830,7 +830,7 @@ fn incomplete_field_attr_instruction(code_fragment: TokenStream, errs: Vec<(&str
     ("into_existing", "Entity", false)
 ]; "6")]
 #[test_case(quote! {
-    #[into_existing(Entity as {})]
+    #[try_into_existing(Entity as {}, SomeError)]
     struct EntityDto (
         #[owned_into_existing(test)]
         #[ref_into_existing]
@@ -874,7 +874,7 @@ fn incomplete_field_attr_instruction_2(code_fragment: TokenStream, errs: Vec<(&s
     }
 }, vec!["EntityDto123"]; "into_ghosts_instr")]
 #[test_case(quote! {
-    #[into(EntityDto)]
+    #[try_into(EntityDto, SomeError)]
     #[ghosts_ref(EntityDto123| ghost: {123})]
     struct Entity123 {
         test: i32
@@ -888,7 +888,7 @@ fn incomplete_field_attr_instruction_2(code_fragment: TokenStream, errs: Vec<(&s
     }
 }, vec!["EntityDto123"]; "into_ghosts_owned_instr")]
 #[test_case(quote! {
-    #[map_owned(EntityDto)]
+    #[try_map_owned(EntityDto, SomeError)]
     struct Entity {
         #[ghost(None)]
         test: Option<i32>
@@ -930,7 +930,7 @@ fn incomplete_field_attr_instruction_2(code_fragment: TokenStream, errs: Vec<(&s
     }
 }, vec!["EntityDto123"]; "from_child_instr")]
 #[test_case(quote! {
-    #[into(EntityDto)]
+    #[try_into(EntityDto, SomeError)]
     struct Entity {
         #[child(EntityDto123| test)]
         test: i32
@@ -971,7 +971,7 @@ fn incomplete_field_attr_instruction_2(code_fragment: TokenStream, errs: Vec<(&s
     }
 }, vec!["EntityDto123"]; "struct_map_map_instr")]
 #[test_case(quote! {
-    #[map(EnumDto)]
+    #[try_map(EnumDto, SomeError)]
     enum Enum {
         #[map(EnumDto123| AnotheVar)]
         Variant
@@ -1020,6 +1020,110 @@ fn dedicated_field_instruction_mismatch(code_fragment: TokenStream, errs: Vec<&s
     } else {
         assert!(output.is_ok())
     }
+}
+
+#[test_case(quote!(try_map), None; "try_map")]
+#[test_case(quote!(try_map_owned), None; "try_map_owned")]
+#[test_case(quote!(try_map_ref), None; "try_map_ref")]
+#[test_case(quote!(try_from), None; "try_from")]
+#[test_case(quote!(try_into), None; "try_into")]
+#[test_case(quote!(try_from_owned), None; "try_from_owned")]
+#[test_case(quote!(try_from_ref), None; "try_from_ref")]
+#[test_case(quote!(owned_try_into), None; "owned_try_into")]
+#[test_case(quote!(ref_try_into), None; "ref_try_into")]
+#[test_case(quote!(try_into_existing), None; "try_into_existing")]
+#[test_case(quote!(owned_try_into_existing), None; "owned_try_into_existing")]
+#[test_case(quote!(ref_try_into_existing), None; "ref_try_into_existing")]
+
+#[test_case(quote!(try_map), Some(quote!(as {})); "try_map_as")]
+#[test_case(quote!(try_map_owned), Some(quote!(as {})); "try_map_owned_as")]
+#[test_case(quote!(try_map_ref), Some(quote!(as {})); "try_map_ref_as")]
+#[test_case(quote!(try_from), Some(quote!(as {})); "try_from_as")]
+#[test_case(quote!(try_into), Some(quote!(as {})); "try_into_as")]
+#[test_case(quote!(try_from_owned), Some(quote!(as {})); "try_from_owned_as")]
+#[test_case(quote!(try_from_ref), Some(quote!(as {})); "try_from_ref_as")]
+#[test_case(quote!(owned_try_into), Some(quote!(as {})); "owned_try_into_as")]
+#[test_case(quote!(ref_try_into), Some(quote!(as {})); "ref_try_into_as")]
+#[test_case(quote!(try_into_existing), Some(quote!(as {})); "try_into_existing_as")]
+#[test_case(quote!(owned_try_into_existing), Some(quote!(as {})); "owned_try_into_existing_as")]
+#[test_case(quote!(ref_try_into_existing), Some(quote!(as {})); "ref_try_into_existing_as")]
+
+#[test_case(quote!(try_map), Some(quote!(| return true)); "try_map_return")]
+#[test_case(quote!(try_map_owned), Some(quote!(| return true)); "try_map_owned_return")]
+#[test_case(quote!(try_map_ref), Some(quote!(| return true)); "try_map_ref_return")]
+#[test_case(quote!(try_from), Some(quote!(| return true)); "try_from_return")]
+#[test_case(quote!(try_into), Some(quote!(| return true)); "try_into_return")]
+#[test_case(quote!(try_from_owned), Some(quote!(| return true)); "try_from_owned_return")]
+#[test_case(quote!(try_from_ref), Some(quote!(| return true)); "try_from_ref_return")]
+#[test_case(quote!(owned_try_into), Some(quote!(| return true)); "owned_try_into_return")]
+#[test_case(quote!(ref_try_into), Some(quote!(| return true)); "ref_try_into_return")]
+#[test_case(quote!(try_into_existing), Some(quote!(| return true)); "try_into_existing_return")]
+#[test_case(quote!(owned_try_into_existing), Some(quote!(| return true)); "owned_try_into_existing_return")]
+#[test_case(quote!(ref_try_into_existing), Some(quote!(| return true)); "ref_try_into_existing_return")]
+fn fallible_map_instruction_no_error_type(instr: TokenStream, postfix: Option<TokenStream>) {
+    let code_fragment = quote! {
+        #[#instr(EntityDto #postfix)]
+        struct Entity {
+            test: i32
+        }
+    };
+
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+    let message = get_error(output, true);
+
+    assert_eq!(message, "Error type should be specified for fallible instruction.");
+}
+
+#[test_case(quote!(map), Some(quote!(, ErrorType)); "map")]
+#[test_case(quote!(map_owned), Some(quote!(, ErrorType)); "map_owned")]
+#[test_case(quote!(map_ref), Some(quote!(, ErrorType)); "map_ref")]
+#[test_case(quote!(from), Some(quote!(, ErrorType)); "from")]
+#[test_case(quote!(into), Some(quote!(, ErrorType)); "into")]
+#[test_case(quote!(from_owned), Some(quote!(, ErrorType)); "from_owned")]
+#[test_case(quote!(from_ref), Some(quote!(, ErrorType)); "from_ref")]
+#[test_case(quote!(owned_into), Some(quote!(, ErrorType)); "owned_into")]
+#[test_case(quote!(ref_into), Some(quote!(, ErrorType)); "ref_into")]
+#[test_case(quote!(into_existing), Some(quote!(, ErrorType)); "into_existing")]
+#[test_case(quote!(owned_into_existing), Some(quote!(, ErrorType)); "owned_into_existing")]
+#[test_case(quote!(ref_into_existing), Some(quote!(, ErrorType)); "ref_into_existing")]
+#[test_case(quote!(map), Some(quote!(as {}, ErrorType)); "map_as")]
+#[test_case(quote!(map_owned), Some(quote!(as {}, ErrorType)); "map_owned_as")]
+#[test_case(quote!(map_ref), Some(quote!(as {}, ErrorType)); "map_ref_as")]
+#[test_case(quote!(from), Some(quote!(as {}, ErrorType)); "from_as")]
+#[test_case(quote!(into), Some(quote!(as {}, ErrorType)); "into_as")]
+#[test_case(quote!(from_owned), Some(quote!(as {}, ErrorType)); "from_owned_as")]
+#[test_case(quote!(from_ref), Some(quote!(as {}, ErrorType)); "from_ref_as")]
+#[test_case(quote!(owned_into), Some(quote!(as {}, ErrorType)); "owned_into_as")]
+#[test_case(quote!(ref_into), Some(quote!(as {}, ErrorType)); "ref_into_as")]
+#[test_case(quote!(into_existing), Some(quote!(as {}, ErrorType)); "into_existing_as")]
+#[test_case(quote!(owned_into_existing), Some(quote!(as {}, ErrorType)); "owned_into_existing_as")]
+#[test_case(quote!(ref_into_existing), Some(quote!(as {}, ErrorType)); "ref_into_existing_as")]
+#[test_case(quote!(map), Some(quote!(, ErrorType| return true)); "map_return")]
+#[test_case(quote!(map_owned), Some(quote!(, ErrorType| return true)); "map_owned_return")]
+#[test_case(quote!(map_ref), Some(quote!(, ErrorType| return true)); "map_ref_return")]
+#[test_case(quote!(from), Some(quote!(, ErrorType| return true)); "from_return")]
+#[test_case(quote!(into), Some(quote!(, ErrorType| return true)); "into_return")]
+#[test_case(quote!(from_owned), Some(quote!(, ErrorType| return true)); "from_owned_return")]
+#[test_case(quote!(from_ref), Some(quote!(, ErrorType| return true)); "from_ref_return")]
+#[test_case(quote!(owned_into), Some(quote!(, ErrorType| return true)); "owned_into_return")]
+#[test_case(quote!(ref_into), Some(quote!(, ErrorType| return true)); "ref_into_return")]
+#[test_case(quote!(into_existing), Some(quote!(, ErrorType| return true)); "into_existing_return")]
+#[test_case(quote!(owned_into_existing), Some(quote!(, ErrorType| return true)); "owned_into_existing_return")]
+#[test_case(quote!(ref_into_existing), Some(quote!(, ErrorType| return true)); "ref_into_existing_return")]
+fn infallible_map_instruction_error_type(instr: TokenStream, postfix: Option<TokenStream>) {
+    let code_fragment = quote! {
+        #[#instr(EntityDto #postfix)]
+        struct Entity {
+            test: i32
+        }
+    };
+
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+    let message = get_error(output, true);
+
+    assert_eq!(message, "Error type should not be specified for infallible instruction.");
 }
 
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
