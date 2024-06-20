@@ -1087,6 +1087,7 @@ fn fallible_map_instruction_no_error_type(instr: TokenStream, postfix: Option<To
 #[test_case(quote!(into_existing), Some(quote!(, ErrorType)); "into_existing")]
 #[test_case(quote!(owned_into_existing), Some(quote!(, ErrorType)); "owned_into_existing")]
 #[test_case(quote!(ref_into_existing), Some(quote!(, ErrorType)); "ref_into_existing")]
+
 #[test_case(quote!(map), Some(quote!(as {}, ErrorType)); "map_as")]
 #[test_case(quote!(map_owned), Some(quote!(as {}, ErrorType)); "map_owned_as")]
 #[test_case(quote!(map_ref), Some(quote!(as {}, ErrorType)); "map_ref_as")]
@@ -1099,6 +1100,7 @@ fn fallible_map_instruction_no_error_type(instr: TokenStream, postfix: Option<To
 #[test_case(quote!(into_existing), Some(quote!(as {}, ErrorType)); "into_existing_as")]
 #[test_case(quote!(owned_into_existing), Some(quote!(as {}, ErrorType)); "owned_into_existing_as")]
 #[test_case(quote!(ref_into_existing), Some(quote!(as {}, ErrorType)); "ref_into_existing_as")]
+
 #[test_case(quote!(map), Some(quote!(, ErrorType| return true)); "map_return")]
 #[test_case(quote!(map_owned), Some(quote!(, ErrorType| return true)); "map_owned_return")]
 #[test_case(quote!(map_ref), Some(quote!(, ErrorType| return true)); "map_ref_return")]
