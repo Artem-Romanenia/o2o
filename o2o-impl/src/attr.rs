@@ -452,7 +452,7 @@ impl TraitAttrCore {
                 self.default_case = other.default_case
             }
         }
-        return Ok(())
+        Ok(())
     }
 }
 

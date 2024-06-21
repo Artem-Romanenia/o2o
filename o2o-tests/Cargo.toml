@@ -1,6 +1,6 @@
 [package]
 name = "o2o-tests"
-version = "0.4.4"
+version = "0.4.5"
 edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 description = "Tests for 'o2o' crate"
@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Artem-Romanenia/o2o"
 
 [dependencies]
-o2o = { version = "0.4.4", path = "../" }
+o2o = { version = "0.4.5", path = "../" }
 anyhow = "1.0.86"
 
 [dev-dependencies]
