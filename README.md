@@ -137,6 +137,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Use struct update syntax (..Default::default())](#use-struct-update-syntax-defaultdefault)
   - [Define helper variables](#define-helper-variables)
   - [Quick return](#quick-return)
+  - [Repeat trait instruction params](#repeat-trait-instruction-params)
   - [Slightly complex example](#slightly-complex-example)
   - [Flatened children](#flatened-children)
   - [Tuple structs](#tuple-structs)
@@ -148,13 +149,14 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
     - [Primitive type conversions](#primitive-type-conversions)
-    - [Repeat instructions](#repeat-instructions)
+    - [Repeat member instructions](#repeat-member-instructions)
 - [Enum Examples](#enum-examples)
   - [Different variant name](#different-variant-name)
   - [Mapping to primitive types](#mapping-to-primitive-types)
     - [Using literals](#using-literals)
     - [Using patterns](#using-patterns)
     - [Using literals and patterns together](#using-literals-and-patterns-together)
+    - [Fallible conversions to primitive types](#fallible-conversions-to-primitive-types)
 - [Contributions](#contributions)
 - [License](#license)
 
@@ -857,6 +859,115 @@ struct Time {
   ```
 </details>
 
+### Repeat trait instruction params
+
+``` rust
+#[derive(o2o::o2o)]
+// Defining original 'template' instruction
+#[from_owned(std::num::ParseIntError| repeat(), return Self(@.to_string()))]
+#[from_owned(std::num::ParseFloatError)]
+#[from_owned(std::num::TryFromIntError)]
+#[from_owned(std::str::ParseBoolError)]
+struct MyError(String);
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<std::num::ParseIntError> for MyError {
+      fn from(value: std::num::ParseIntError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  impl std::convert::From<std::num::ParseFloatError> for MyError {
+      fn from(value: std::num::ParseFloatError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  impl std::convert::From<std::num::TryFromIntError> for MyError {
+      fn from(value: std::num::TryFromIntError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  impl std::convert::From<std::str::ParseBoolError> for MyError {
+      fn from(value: std::str::ParseBoolError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  ```
+</details>
+
+Repeated instructions may be skipped or ended:
+
+``` rust
+#[derive(o2o::o2o)]
+
+// Defining original 'template' instruction
+#[from_owned(std::num::ParseIntError| repeat(), return Self(@.to_string()))]
+
+// Original instruction is repeated for this conversion
+#[from_owned(std::num::ParseFloatError)]
+
+// Do not use (skip) original instruction
+#[from_owned(std::num::TryFromIntError| skip_repeat, return Self("Custom TryFromIntError message".into()))]
+
+// Original instruction is repeated for this conversion
+#[from_owned(std::str::ParseBoolError)]
+
+// Original instruction is repeated for this conversion
+#[from_owned(std::char::ParseCharError)]
+
+// Stop repeating original instruction, define and start repeating a new one
+#[from_owned(std::net::AddrParseError| stop_repeat, repeat(), return Self("other".into()))]
+
+// New instruction is repeated for this conversion
+#[from_owned(std::io::Error)] 
+struct MyError(String);
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<std::num::ParseIntError> for MyError {
+      fn from(value: std::num::ParseIntError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  impl std::convert::From<std::num::ParseFloatError> for MyError {
+      fn from(value: std::num::ParseFloatError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  impl std::convert::From<std::num::TryFromIntError> for MyError {
+      fn from(value: std::num::TryFromIntError) -> MyError {
+          Self("Custom TryFromIntError message".into())
+      }
+  }
+  impl std::convert::From<std::str::ParseBoolError> for MyError {
+      fn from(value: std::str::ParseBoolError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  impl std::convert::From<std::char::ParseCharError> for MyError {
+      fn from(value: std::char::ParseCharError) -> MyError {
+          Self(value.to_string())
+      }
+  }
+  impl std::convert::From<std::net::AddrParseError> for MyError {
+      fn from(value: std::net::AddrParseError) -> MyError {
+          Self("other".into())
+      }
+  }
+  impl std::convert::From<std::io::Error> for MyError {
+      fn from(value: std::io::Error) -> MyError {
+          Self("other".into())
+      }
+  }
+  ```
+</details>
+
 ### Slightly complex example
 
 ``` rust
@@ -1513,7 +1624,7 @@ struct EntityDto {
 
 This will work with all types that support 'as' conversion.
 
-#### Repeat instructions
+#### Repeat member instructions
 
 ``` rust
 use o2o::o2o;
@@ -1879,6 +1990,83 @@ enum Animal {
           }
       }
   }
+  ```
+</details>
+
+#### Fallible conversions to primitive types
+
+`#[literal(...)]` and `#[pattern(...)]` work well with fallible conversions:
+
+``` rust
+type StaticStr = &'static str;
+
+#[derive(o2o::o2o)]
+#[try_map_owned(i32, StaticStr| _ => Err("Unrepresentable")?)]
+enum HttpStatus {
+    #[literal(200)]Ok,
+    #[literal(201)]Created,
+    #[literal(401)]Unauthorized,
+    #[literal(403)]Forbidden,
+    #[literal(404)]NotFound,
+    #[literal(500)]InternalError
+}
+
+#[derive(o2o::o2o)]
+#[try_from_owned(i32, StaticStr| _ => Err("Unrepresentable")?)]
+enum HttpStatusFamily {
+    #[pattern(100..=199)] Information,
+    #[pattern(200..=299)] Success,
+    #[pattern(300..=399)] Redirection,
+    #[pattern(400..=499)] ClientError,
+    #[pattern(500..=599)] ServerError,
+}
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::TryFrom<i32> for HttpStatus {
+      type Error = StaticStr;
+      fn try_from(value: i32) -> Result<HttpStatus, StaticStr> {
+          Ok(match value {
+              200 => HttpStatus::Ok,
+              201 => HttpStatus::Created,
+              401 => HttpStatus::Unauthorized,
+              403 => HttpStatus::Forbidden,
+              404 => HttpStatus::NotFound,
+              500 => HttpStatus::InternalError,
+              _ => Err("Unrepresentable")?,
+          })
+      }
+  }
+  impl std::convert::TryInto<i32> for HttpStatus {
+      type Error = StaticStr;
+      fn try_into(self) -> Result<i32, StaticStr> {
+          Ok(match self {
+              HttpStatus::Ok => 200,
+              HttpStatus::Created => 201,
+              HttpStatus::Unauthorized => 401,
+              HttpStatus::Forbidden => 403,
+              HttpStatus::NotFound => 404,
+              HttpStatus::InternalError => 500,
+          })
+      }
+  }
+
+  impl std::convert::TryFrom<i32> for HttpStatusFamily {
+    type Error = StaticStr;
+    fn try_from(value: i32) -> Result<HttpStatusFamily, StaticStr> {
+        Ok(match value {
+            100..=199 => HttpStatusFamily::Information,
+            200..=299 => HttpStatusFamily::Success,
+            300..=399 => HttpStatusFamily::Redirection,
+            400..=499 => HttpStatusFamily::ClientError,
+            500..=599 => HttpStatusFamily::ServerError,
+            _ => Err("Unrepresentable")?,
+        })
+    }
+}
   ```
 </details>
 

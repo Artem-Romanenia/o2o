@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Index;
@@ -60,7 +61,7 @@ pub(crate) enum MemberInstruction {
     As(AsAttr),
     Lit(LitAttr),
     Pat(PatAttr),
-    Repeat(RepeatFor),
+    Repeat(MemberRepeatFor),
     StopRepeat,
 
     Misplaced { instr: &'static str, span: Span, own: bool },
@@ -175,7 +176,7 @@ pub(crate) struct DataTypeAttrs {
 
 impl<'a> DataTypeAttrs {
     pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &TraitAttrCore> {
-        self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind]).map(|x| &x.attr)
+        self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind]).map(|x| &x.core)
     }
 
     pub(crate) fn ghost_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&StructGhostAttrCore> {
@@ -197,37 +198,37 @@ impl<'a> DataTypeAttrs {
     }
 }
 
-type RepeatFor = [bool; 4];
-struct RepeatForWrap(RepeatFor);
+type MemberRepeatFor = [bool; 4];
+struct MemberRepeatForWrap(MemberRepeatFor);
 
-enum AttrType {
+enum MemberAttrType {
     Attr,
     Child,
     Parent,
     Ghost
 }
 
-impl Index<&AttrType> for RepeatFor {
+impl Index<&MemberAttrType> for MemberRepeatFor {
     type Output = bool;
 
-    fn index(&self, index: &AttrType) -> &Self::Output {
+    fn index(&self, index: &MemberAttrType) -> &Self::Output {
         match index {
-            AttrType::Attr => &self[0],
-            AttrType::Child => &self[1],
-            AttrType::Parent => &self[2],
-            AttrType::Ghost => &self[3],
+            MemberAttrType::Attr => &self[0],
+            MemberAttrType::Child => &self[1],
+            MemberAttrType::Parent => &self[2],
+            MemberAttrType::Ghost => &self[3],
         }
     }
 }
 
-impl Parse for RepeatForWrap {
+impl Parse for MemberRepeatForWrap {
     fn parse(input: ParseStream) -> Result<Self> {
         let types: Punctuated<Ident, Token![,]>  = Punctuated::parse_terminated(input)?;
         if types.is_empty() {
-            return Ok(RepeatForWrap([true,  true, true, true]))
+            return Ok(MemberRepeatForWrap([true,  true, true, true]))
         }
 
-        let mut repeat: RepeatFor = [false, false, false, false];
+        let mut repeat: MemberRepeatFor = [false, false, false, false];
 
         for ty in types {
             let str = ty.to_token_stream().to_string();
@@ -240,7 +241,7 @@ impl Parse for RepeatForWrap {
             };
         }
 
-        Ok(RepeatForWrap(repeat))
+        Ok(MemberRepeatForWrap(repeat))
     }
 }
 
@@ -252,7 +253,7 @@ pub(crate) struct MemberAttrs {
     pub ghost_attrs: Vec<GhostAttr>,
     pub lit_attrs: Vec<LitAttr>,
     pub pat_attrs: Vec<PatAttr>,
-    pub repeat: Option<RepeatFor>,
+    pub repeat: Option<MemberRepeatFor>,
     pub stop_repeat: bool,
 
     pub error_instrs: Vec<MemberInstruction>
@@ -328,16 +329,16 @@ impl<'a> MemberAttrs {
 
     pub(crate) fn merge(&'a mut self, other: Self) {
         if let Some(repeat) =  other.repeat  {
-            if repeat[&AttrType::Attr] {
+            if repeat[&MemberAttrType::Attr] {
                 self.attrs.extend(other.attrs);
             }
-            if repeat[&AttrType::Child] {
+            if repeat[&MemberAttrType::Child] {
                 self.child_attrs.extend(other.child_attrs);
             }
-            if repeat[&AttrType::Parent] {
+            if repeat[&MemberAttrType::Parent] {
                 self.parent_attrs.extend(other.parent_attrs);
             }
-            if repeat[&AttrType::Ghost] {
+            if repeat[&MemberAttrType::Ghost] {
                 self.ghost_attrs.extend(other.ghost_attrs);
             }
         }
@@ -351,9 +352,56 @@ pub(crate) enum TypeHint {
     Unspecified = 2
 }
 
+type TraitRepeatFor = [bool; 4];
+struct TraitRepeatForWrap(TraitRepeatFor);
+
+enum TraitAttrType {
+    Vars,
+    Update,
+    QuickReturn,
+    DefaultCase
+}
+
+impl Index<&TraitAttrType> for TraitRepeatFor {
+    type Output = bool;
+
+    fn index(&self, index: &TraitAttrType) -> &Self::Output {
+        match index {
+            TraitAttrType::Vars => &self[0],
+            TraitAttrType::Update => &self[1],
+            TraitAttrType::QuickReturn => &self[2],
+            TraitAttrType::DefaultCase => &self[3],
+        }
+    }
+}
+
+impl Parse for TraitRepeatForWrap {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let types: Punctuated<Ident, Token![,]>  = Punctuated::parse_terminated(input)?;
+        if types.is_empty() {
+            return Ok(TraitRepeatForWrap([true, true, true, true]))
+        }
+
+        let mut repeat: TraitRepeatFor = [false, false, false, false];
+
+        for ty in types {
+            let str = ty.to_token_stream().to_string();
+            match str.as_str() {
+                "vars" => repeat[0] = true,
+                "update" => repeat[1] = true,
+                "quick_return" => repeat[2] = true,
+                "default_case" => repeat[3] = true,
+                _ => return Err(Error::new(ty.span(), format!("#[repeat] of instruction type '{}' is not supported. Supported types are: 'vars', 'update', 'quick_return', 'default_case'", str))),
+            };
+        }
+
+        Ok(TraitRepeatForWrap(repeat))
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct TraitAttr {
-    pub attr: TraitAttrCore,
+    pub core: TraitAttrCore,
     pub fallible: bool,
     pub applicable_to: ApplicableTo,
 }
@@ -366,7 +414,46 @@ pub(crate) struct TraitAttrCore {
     pub init_data: Option<Punctuated<InitData, Token![,]>>,
     pub update: Option<TokenStream>,
     pub quick_return: Option<TokenStream>,
-    pub default_case: Option<TokenStream>
+    pub default_case: Option<TokenStream>,
+    pub repeat: Option<TraitRepeatFor>,
+    pub skip_repeat: bool,
+    pub stop_repeat: bool,
+}
+
+impl TraitAttrCore {
+    fn merge(&mut self, other: Self) -> Result<()> {
+        if self.skip_repeat {
+            return Ok(())
+        }
+
+        if let Some(attr_to_repeat) = other.repeat {
+            if attr_to_repeat[&TraitAttrType::Vars] {
+                if self.init_data.is_some() {
+                    Err(syn::Error::new(self.ty.span, "Vars will be overriden. Did you mean to use 'skip_repeat'?"))?
+                }
+                self.init_data = other.init_data
+            }
+            if attr_to_repeat[&TraitAttrType::Update] {
+                if self.update.is_some() {
+                    Err(syn::Error::new(self.update.span(), "Update statement will be overriden. Did you mean to use 'skip_repeat'?"))?
+                }
+                self.update = other.update
+            }
+            if attr_to_repeat[&TraitAttrType::QuickReturn] {
+                if self.quick_return.is_some() {
+                    Err(syn::Error::new(self.quick_return.span(), "Quick Return statement will be overriden. Did you mean to use 'skip_repeat'?"))?
+                }
+                self.quick_return = other.quick_return
+            }
+            if attr_to_repeat[&TraitAttrType::DefaultCase] {
+                if self.default_case.is_some() {
+                    Err(syn::Error::new(self.default_case.span(), "Default Case statement will be overriden. Did you mean to use 'skip_repeat'?"))?
+                }
+                self.default_case = other.default_case
+            }
+        }
+        return Ok(())
+    }
 }
 
 impl Parse for TraitAttrCore {
@@ -386,11 +473,39 @@ impl Parse for TraitAttrCore {
         };
 
         if !input.peek(Token![|]){
-            return Ok(TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None })
+            return Ok(TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None, repeat: None, skip_repeat: false, stop_repeat: false })
         }
 
         input.parse::<Token![|]>()?;
 
+        let stop_repeat = if input.peek(kw::stop_repeat) {
+            input.parse::<kw::stop_repeat>()?;
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+            true
+        } else {
+            false
+        };
+        let skip_repeat = if input.peek(kw::skip_repeat) {
+            input.parse::<kw::skip_repeat>()?;
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+            true
+        } else {
+            false
+        };
+        let repeat = if input.peek(kw::repeat) {
+            input.parse::<kw::repeat>()?;
+            let content;
+            parenthesized!(content in input);
+            let repeat  = Some(content.parse::<TraitRepeatForWrap>()?);
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+            repeat
+        } else { None };
         let init_data: Option<Punctuated<InitData, Token![,]>> = if input.peek(kw::vars) {
             input.parse::<kw::vars>()?;
             let content;
@@ -414,7 +529,7 @@ impl Parse for TraitAttrCore {
             try_parse_action(input, true)?
         } else { None };
 
-        Ok(TraitAttrCore { ty, err_ty, type_hint, init_data, update, quick_return, default_case })
+        Ok(TraitAttrCore { ty, err_ty, type_hint, init_data, update, quick_return, default_case, repeat: repeat.map(|x| x.0), skip_repeat, stop_repeat })
     }
 }
 
@@ -722,10 +837,32 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
     }
 
     let mut attrs = DataTypeAttrs::default();
+
+    let mut trait_attrs_to_repeat = HashMap::<(ApplicableTo, bool), TraitAttr>::new();
     
     for instr in  instrs {
         match instr {
-            DataTypeInstruction::Map(attr) => attrs.attrs.push(attr),
+            DataTypeInstruction::Map(mut trait_attr) => {
+                let k = (trait_attr.applicable_to, trait_attr.fallible);
+
+                if trait_attr.core.stop_repeat {
+                    trait_attrs_to_repeat.remove(&k);
+                }
+
+                let trait_attr_to_repeat = trait_attrs_to_repeat.get_mut(&k);
+
+                if trait_attr.core.repeat.is_some() {
+                    if trait_attr_to_repeat.is_some() && !trait_attr.core.stop_repeat {
+                        Err(syn::Error::new(trait_attr.core.ty.span, "Previous repeat() instruction must be terminated with 'stop_repeat'"))?
+                    }
+
+                    trait_attrs_to_repeat.insert(k, trait_attr.clone());
+                } else if let Some(trait_attr_to_repeat) = &trait_attr_to_repeat {
+                    trait_attr.core.merge(trait_attr_to_repeat.core.clone())?;
+                }
+
+                attrs.attrs.push(trait_attr)
+            },
             DataTypeInstruction::Ghosts(attr) => attrs.ghosts_attrs.push(attr),
             DataTypeInstruction::Where(attr) => attrs.where_attrs.push(attr),
             DataTypeInstruction::Children(attr) => attrs.children_attrs.push(attr),
@@ -791,7 +928,7 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | 
         "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => 
             Ok(DataTypeInstruction::Map(TraitAttr { 
-                attr: syn::parse2(input)?,
+                core: syn::parse2(input)?,
                 fallible: false,
                 applicable_to: [
                     appl_owned_into(instr_str),
@@ -805,7 +942,7 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "owned_try_into" | "ref_try_into" | "try_into" | "try_from_owned" | "try_from_ref" | "try_from" | 
         "try_map_owned" | "try_map_ref" | "try_map" | "owned_try_into_existing" | "ref_try_into_existing" | "try_into_existing" => {
             Ok(DataTypeInstruction::Map(TraitAttr {
-                attr: syn::parse2(input)?,
+                core: syn::parse2(input)?,
                 fallible: true,
                 applicable_to: [
                     appl_owned_into(instr_str),
@@ -895,7 +1032,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "literal" => Ok(MemberInstruction::Lit(syn::parse2(input)?)),
         "pattern" => Ok(MemberInstruction::Pat(syn::parse2(input)?)),
         "repeat" => {
-            let repeat: RepeatForWrap = syn::parse2(input)?;
+            let repeat: MemberRepeatForWrap = syn::parse2(input)?;
             Ok(MemberInstruction::Repeat(repeat.0))
         },
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),

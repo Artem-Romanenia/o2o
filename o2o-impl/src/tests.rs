@@ -1128,6 +1128,44 @@ fn infallible_map_instruction_error_type(instr: TokenStream, postfix: Option<Tok
     assert_eq!(message, "Error type should not be specified for infallible instruction.");
 }
 
+#[test_case(quote! {
+    #[from_owned(i64| repeat(), return Self(@.to_string()))]
+    #[from_owned(i32| repeat(), return Self(@.to_string()))]
+    struct Wrapper(String);
+}, "Previous repeat() instruction must be terminated with 'stop_repeat'")]
+#[test_case(quote! {
+    #[from_owned(i64| repeat(), return Self(@.to_string()))]
+    #[from_owned(i32| return Self(@.to_string()))]
+    struct Wrapper(String);
+}, "Quick Return statement will be overriden. Did you mean to use 'skip_repeat'?")]
+#[test_case(quote! {
+    #[from_owned(i64| repeat(), vars(msg: {"test".into()}), return Self(msg))]
+    #[from_owned(i32| vars(msg: {"123".into()}))]
+    struct Wrapper(String);
+}, "Vars will be overriden. Did you mean to use 'skip_repeat'?")]
+#[test_case(quote! {
+    #[from_owned(i64| repeat(vars), vars(msg: {"test".into()}), return Self(msg))]
+    #[from_owned(i32| vars(msg: {"123".into()}))]
+    struct Wrapper(String);
+}, "Vars will be overriden. Did you mean to use 'skip_repeat'?")]
+#[test_case(quote! {
+    #[from_owned(i64| repeat(quick_return), vars(msg: {"test".into()}), return Self(msg))]
+    #[from_owned(i32| vars(msg: {"123".into()}), return Self(msg))]
+    struct Wrapper(String);
+}, "Quick Return statement will be overriden. Did you mean to use 'skip_repeat'?")]
+#[test_case(quote! {
+    #[from_owned(i64| repeat(test), vars(msg: {"test".into()}), return Self(msg))]
+    #[from_owned(i32)]
+    struct Wrapper(String);
+}, "#[repeat] of instruction type 'test' is not supported. Supported types are: 'vars', 'update', 'quick_return', 'default_case'")]
+fn trait_attr_repeat(code_fragment: TokenStream, err: &str) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+    let message = get_error(output, false);
+
+    assert_eq!(message, err);
+}
+
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
     let mut err_iter = output.unwrap_err().into_iter();

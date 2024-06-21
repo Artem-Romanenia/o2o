@@ -29,7 +29,7 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     validate_struct_attrs(attrs.iter_for_kind(&Kind::RefIntoExisting, true), true, &mut errors);
 
     let type_paths = attrs.attrs.iter()
-        .map(|x| &x.attr.ty)
+        .map(|x| &x.core.ty)
         .collect::<HashSet<_>>();
 
     validate_ghost_attrs(&Kind::FromOwned, &attrs.ghosts_attrs, &type_paths, &mut errors);
