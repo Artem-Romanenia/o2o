@@ -212,14 +212,15 @@ impl<'a> DataTypeAttrs {
     }
 }
 
-type MemberRepeatFor = [bool; 4];
+type MemberRepeatFor = [bool; 5];
 struct MemberRepeatForWrap(MemberRepeatFor);
 
 enum MemberAttrType {
     Attr,
     Child,
     Parent,
-    Ghost
+    Ghost,
+    TypeHint
 }
 
 impl Index<&MemberAttrType> for MemberRepeatFor {
@@ -231,27 +232,28 @@ impl Index<&MemberAttrType> for MemberRepeatFor {
             MemberAttrType::Child => &self[1],
             MemberAttrType::Parent => &self[2],
             MemberAttrType::Ghost => &self[3],
+            MemberAttrType::TypeHint => &self[4],
         }
     }
 }
+
+const MEMBER_REPEAT_TYPES: [&str; 5] = ["map", "child", "parent", "ghost", "type_hint"];
 
 impl Parse for MemberRepeatForWrap {
     fn parse(input: ParseStream) -> Result<Self> {
         let types: Punctuated<Ident, Token![,]>  = Punctuated::parse_terminated(input)?;
         if types.is_empty() {
-            return Ok(MemberRepeatForWrap([true,  true, true, true]))
+            return Ok(MemberRepeatForWrap([true,  true, true, true, true]))
         }
 
-        let mut repeat: MemberRepeatFor = [false, false, false, false];
+        let mut repeat: MemberRepeatFor = [false, false, false, false, false];
 
         for ty in types {
             let str = ty.to_token_stream().to_string();
-            match str.as_str() {
-                "map" => repeat[0] = true,
-                "child" => repeat[1] = true,
-                "parent" => repeat[2] = true,
-                "ghost" => repeat[3] = true,
-                _ => return Err(Error::new(ty.span(), format!("#[repeat] of instruction type '{}' is not supported. Supported types are: 'map', 'child', 'parent', 'ghost'", str))),
+
+            match MEMBER_REPEAT_TYPES.iter().position(|x|*x == str.as_str()) {
+                Some(idx) => repeat[idx] = true,
+                None => return Err(Error::new(ty.span(), format!("#[repeat] of instruction type '{}' is not supported. Supported types are: {}", str, MEMBER_REPEAT_TYPES.join(", "))))
             };
         }
 
@@ -363,6 +365,9 @@ impl<'a> MemberAttrs {
             if repeat[&MemberAttrType::Ghost] {
                 self.ghost_attrs.extend(other.ghost_attrs);
             }
+            if repeat[&MemberAttrType::TypeHint] {
+                self.type_hint_attrs.extend(other.type_hint_attrs);
+            }
         }
     }
 }
@@ -404,6 +409,8 @@ impl Index<&TraitAttrType> for TraitRepeatFor {
     }
 }
 
+const TRAIT_REPEAT_TYPES: [&str; 4] = ["vars", "update", "quick_return", "default_case"];
+
 impl Parse for TraitRepeatForWrap {
     fn parse(input: ParseStream) -> Result<Self> {
         let types: Punctuated<Ident, Token![,]>  = Punctuated::parse_terminated(input)?;
@@ -415,12 +422,10 @@ impl Parse for TraitRepeatForWrap {
 
         for ty in types {
             let str = ty.to_token_stream().to_string();
-            match str.as_str() {
-                "vars" => repeat[0] = true,
-                "update" => repeat[1] = true,
-                "quick_return" => repeat[2] = true,
-                "default_case" => repeat[3] = true,
-                _ => return Err(Error::new(ty.span(), format!("#[repeat] of instruction type '{}' is not supported. Supported types are: 'vars', 'update', 'quick_return', 'default_case'", str))),
+            
+            match TRAIT_REPEAT_TYPES.iter().position(|x|*x == str.as_str()) {
+                Some(idx) => repeat[idx] = true,
+                None => return Err(Error::new(ty.span(), format!("#[repeat] of instruction type '{}' is not supported. Supported types are: {}", str, TRAIT_REPEAT_TYPES.join(", "))))
             };
         }
 
