@@ -56,11 +56,13 @@ pub(crate) enum DataTypeInstruction {
 pub(crate) enum MemberInstruction {
     Map(MemberAttr),
     Ghost(GhostAttr),
+    Ghosts(GhostsAttr),
     Child(ChildAttr),
     Parent(ParentAttr),
     As(AsAttr),
     Lit(LitAttr),
     Pat(PatAttr),
+    VariantTypeHint(VariantTypeHintAttr),
     Repeat(MemberRepeatFor),
     StopRepeat,
 
@@ -134,15 +136,23 @@ impl Kind {
     }
 }
 
-impl Display for Kind {
+pub(crate) struct FallibleKind(pub Kind, pub bool);
+
+impl Display for FallibleKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Kind::OwnedInto => f.write_str("owned_into"),
-            Kind::RefInto => f.write_str("ref_into"),
-            Kind::FromOwned => f.write_str("from_owned"),
-            Kind::FromRef => f.write_str("from_ref"),
-            Kind::OwnedIntoExisting => f.write_str("owned_into_existing"),
-            Kind::RefIntoExisting => f.write_str("ref_into_existing"),
+            FallibleKind(Kind::OwnedInto, false) => f.write_str("owned_into"),
+            FallibleKind(Kind::RefInto, false) => f.write_str("ref_into"),
+            FallibleKind(Kind::FromOwned, false) => f.write_str("from_owned"),
+            FallibleKind(Kind::FromRef, false) => f.write_str("from_ref"),
+            FallibleKind(Kind::OwnedIntoExisting, false) => f.write_str("owned_into_existing"),
+            FallibleKind(Kind::RefIntoExisting, false) => f.write_str("ref_into_existing"),
+            FallibleKind(Kind::OwnedInto, true) => f.write_str("owned_try_into"),
+            FallibleKind(Kind::RefInto, true) => f.write_str("ref_try_into"),
+            FallibleKind(Kind::FromOwned, true) => f.write_str("try_from_owned"),
+            FallibleKind(Kind::FromRef, true) => f.write_str("try_from_ref"),
+            FallibleKind(Kind::OwnedIntoExisting, true) => f.write_str("owned_try_into_existing"),
+            FallibleKind(Kind::RefIntoExisting, true) => f.write_str("ref_try_into_existing"),
         }
     }
 }
@@ -175,8 +185,12 @@ pub(crate) struct DataTypeAttrs {
 }
 
 impl<'a> DataTypeAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &TraitAttrCore> {
-        self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind]).map(|x| &x.core)
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &TraitAttr> {
+        self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind])
+    }
+
+    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &TraitAttrCore> {
+        self.iter_for_kind(kind, fallible).map(|x| &x.core)
     }
 
     pub(crate) fn ghost_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&StructGhostAttrCore> {
@@ -251,10 +265,12 @@ pub(crate) struct MemberAttrs {
     pub child_attrs: Vec<ChildAttr>,
     pub parent_attrs: Vec<ParentAttr>,
     pub ghost_attrs: Vec<GhostAttr>,
+    pub ghosts_attrs: Vec<GhostsAttr>,
     pub lit_attrs: Vec<LitAttr>,
     pub pat_attrs: Vec<PatAttr>,
     pub repeat: Option<MemberRepeatFor>,
     pub stop_repeat: bool,
+    pub type_hint_attrs: Vec<VariantTypeHintAttr>,
 
     pub error_instrs: Vec<MemberInstruction>
 }
@@ -310,6 +326,12 @@ impl<'a> MemberAttrs {
             .or_else(|| self.pat_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
+    pub(crate) fn type_hint(&'a self, container_ty: &TypePath) -> Option<&VariantTypeHintAttr>{
+        self.type_hint_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.type_hint_attrs.iter().find(|x| x.container_ty.is_none()))
+    }
+
     pub(crate) fn has_parent_attr(&'a self, container_ty: &TypePath) -> bool {
         self.parent_attrs.iter()
             .any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
@@ -347,9 +369,16 @@ impl<'a> MemberAttrs {
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum TypeHint {
-    Struct = 0,
-    Tuple = 1,
-    Unspecified = 2
+    Unit = 0,
+    Struct = 1,
+    Tuple = 2,
+    Unspecified = 3
+}
+
+impl TypeHint {
+    pub fn maybe(self, maybe: Self) -> bool {
+        self == maybe || self == TypeHint::Unspecified
+    }
 }
 
 type TraitRepeatFor = [bool; 4];
@@ -550,11 +579,13 @@ impl Parse for InitData {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct GhostsAttr {
     pub attr: StructGhostAttrCore,
     pub applicable_to: ApplicableTo,
 }
 
+#[derive(Clone)]
 pub(crate) struct StructGhostAttrCore {
     pub container_ty: Option<TypePath>,
     pub ghost_data: Punctuated<GhostData, Token![,]>,
@@ -569,6 +600,7 @@ impl Parse for StructGhostAttrCore{
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct GhostData {
     pub child_path: Option<ChildPath>,
     pub ghost_ident: Member,
@@ -807,6 +839,20 @@ impl Parse for PatAttr {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct VariantTypeHintAttr {
+    pub container_ty: Option<TypePath>,
+    pub type_hint: TypeHint
+}
+
+impl Parse for VariantTypeHintAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let container_ty = try_parse_container_ident(input, false);
+        let type_hint = try_parse_type_hint(input)?;
+        Ok(VariantTypeHintAttr { container_ty, type_hint })
+    }
+}
+
 pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs, bool)> {
     let mut bark = true;
 
@@ -902,17 +948,19 @@ pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<M
             MemberInstruction::Map(attr) => attrs.attrs.push(attr),
             MemberInstruction::Child(attr) => attrs.child_attrs.push(attr),
             MemberInstruction::Ghost(attr) => attrs.ghost_attrs.push(attr),
+            MemberInstruction::Ghosts(attr) => attrs.ghosts_attrs.push(attr),
             MemberInstruction::Parent(attr) => attrs.parent_attrs.push(attr),
             MemberInstruction::As(attr) => {
                 match input {
                     SynDataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs.attrs),
-                    SynDataTypeMember::Variant(_) => panic!("weird")
+                    SynDataTypeMember::Variant(_) => unreachable!("1")
                 };
             },
             MemberInstruction::Lit(attr) => attrs.lit_attrs.push(attr),
             MemberInstruction::Pat(attr) => attrs.pat_attrs.push(attr),
             MemberInstruction::Repeat(repeat_for) => attrs.repeat = Some(repeat_for),
             MemberInstruction::StopRepeat => attrs.stop_repeat = true,
+            MemberInstruction::VariantTypeHint(attr) => attrs.type_hint_attrs.push(attr),
             MemberInstruction::Unrecognized => (),
             _ => attrs.error_instrs.push(instr)
         };
@@ -977,6 +1025,7 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "pattern" if bark => Ok(DataTypeInstruction::Misplaced { instr: "pattern", span: instr.span(), own: own_instr }),
         "repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "repeat", span: instr.span(), own: own_instr }),
         "stop_repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "stop_repeat", span: instr.span(), own: own_instr }),
+        "type_hint" if bark => Ok(DataTypeInstruction::Misplaced { instr: "type_hint", span: instr.span(), own: own_instr }),
         _ if own_instr => Ok(DataTypeInstruction::UnrecognizedWithError { instr: instr_str.clone(), span: instr.span() }),
         _ => Ok(DataTypeInstruction::Unrecognized),
     }
@@ -1026,6 +1075,17 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
                 appl_ghost_ref(instr_str)
             ]
         })),
+        "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(MemberInstruction::Ghosts(GhostsAttr { 
+            attr: syn::parse2(input)?, 
+            applicable_to: [
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str),
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str),
+                appl_ghosts_owned(instr_str),
+                appl_ghosts_ref(instr_str)
+            ]
+        })),
         "child" => Ok(MemberInstruction::Child(syn::parse2(input)?)),
         "parent" => Ok(MemberInstruction::Parent(syn::parse2(input)?)),
         "as_type" => Ok(MemberInstruction::As(syn::parse2(input)?)),
@@ -1036,9 +1096,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
             Ok(MemberInstruction::Repeat(repeat.0))
         },
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
-        "ghosts" if bark => Ok(MemberInstruction::Misnamed { instr: "ghosts", span: instr.span(), guess_name: "ghost", own: own_instr }),
-        "ghosts_ref" if bark => Ok(MemberInstruction::Misnamed { instr: "ghosts_ref", span: instr.span(), guess_name: "ghost_ref", own: own_instr }),
-        "ghosts_owned" if bark => Ok(MemberInstruction::Misnamed { instr: "ghosts_owned", span: instr.span(), guess_name: "ghost_owned", own: own_instr }),
+        "type_hint" => Ok(MemberInstruction::VariantTypeHint(syn::parse2(input)?)),
         "children" if bark => Ok(MemberInstruction::Misnamed { instr: "children", span: instr.span(), guess_name: "child", own: own_instr }),
         "where_clause" if bark => Ok(MemberInstruction::Misplaced { instr: "where_clause", span: instr.span(), own: own_instr }),
         "allow_unknown" if bark => Ok(MemberInstruction::Misplaced { instr: "allow_unknown", span: instr.span(), own: own_instr }),
@@ -1065,7 +1123,12 @@ fn try_parse_type_hint(input: ParseStream) -> Result<TypeHint> {
         return Ok(TypeHint::Tuple)
     }
 
-    Err(input.error("Only '()' and '{}' are supported type hints."))
+    if input.peek(kw::Unit) {
+        input.parse::<kw::Unit>()?;
+        return Ok(TypeHint::Unit)
+    }
+
+    Err(input.error("Only '()', '{}', and 'Unit' are supported type hints."))
 }
 
 fn try_parse_container_ident(input: ParseStream, can_be_empty_after: bool) -> Option<TypePath> {

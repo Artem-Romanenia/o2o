@@ -1,5 +1,6 @@
 use crate::attr::{self};
 use crate::attr::{MemberAttrs, DataTypeAttrs};
+use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
@@ -11,6 +12,7 @@ pub(crate) struct Struct<'a> {
     pub generics: &'a Generics,
     pub fields: Vec<Field>,
     pub named_fields: bool,
+    pub unit: bool,
 }
 
 impl<'a> Struct<'a> {
@@ -23,6 +25,7 @@ impl<'a> Struct<'a> {
             generics: &node.generics,
             fields,
             named_fields: matches!(&data.fields, Fields::Named(_)),
+            unit: matches!(&data.fields, Fields::Unit),
         })
     }
 }
@@ -103,6 +106,7 @@ pub(crate) struct Variant {
     _idx: usize,
     pub fields: Vec<Field>,
     pub named_fields: bool,
+    pub unit: bool
 }
 
 impl<'a> Variant {
@@ -142,6 +146,7 @@ impl<'a> Variant {
             _idx: i,
             fields,
             named_fields: matches!(&variant.fields, Fields::Named(_)),
+            unit: matches!(&variant.fields, Fields::Unit),
         })
     }
 }
@@ -152,6 +157,13 @@ pub(crate) enum DataType<'a> {
 }
 
 impl<'a> DataType<'a> {
+    pub fn unit(&'a self) -> bool {
+        match self {
+            DataType::Struct(s) => s.unit,
+            DataType::Enum(_) => false,
+        }
+    }
+
     pub fn get_ident(&'a self) -> &Ident {
         match self {
             DataType::Struct(s) => s.ident,
@@ -206,6 +218,13 @@ impl<'a> DataTypeMember<'a> {
         match self {
             DataTypeMember::Field(f) => &f.attrs,
             DataTypeMember::Variant(v) => &v.attrs
+        }
+    }
+
+    pub fn get_span(&'a self) -> Span {
+        match self {
+            DataTypeMember::Field(f) => f.member.span(),
+            DataTypeMember::Variant(v) => v.ident.span()
         }
     }
 }

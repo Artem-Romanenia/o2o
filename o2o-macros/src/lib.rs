@@ -84,8 +84,8 @@ use syn::{parse_macro_input, DeriveInput};
     try_map_owned, try_map_ref, try_map,
     owned_try_into_existing, ref_try_into_existing, try_into_existing,
     child, children, parent, ghost, ghosts, where_clause, 
-    literal, pattern, o2o))]
-    // TODO: Research, are there any downsides of having that many attributes? 
+    literal, pattern, type_hint, o2o))]
+    // TODO: Research, are there any downsides to having that many attributes? 
     // (given that all but one are essentially shortcuts and can be avoided with alternative instr syntax)
 pub fn derive_o2o(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
