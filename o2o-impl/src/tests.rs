@@ -1581,6 +1581,25 @@ fn trait_attr_repeat(code_fragment: TokenStream, err: &str) {
 
 // endregion: trait_attr_repeat
 
+// region: permeating_repeat
+
+#[test_case(quote!{
+    #[map(TestDto)]
+    struct Test {
+        #[o2o(repeat(permeate()))]
+        x1: i32,
+    }
+})]
+fn permeating_repeat(code_fragment: TokenStream) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+    let message = get_error(output, true);
+
+    assert_eq!(message, "Permeating repeat instruction is only applicable to enum variant fields.");
+}
+
+// endregion: permeating_repeat
+
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
     let mut err_iter = output.unwrap_err().into_iter();

@@ -272,6 +272,12 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: 
                 }
             }
         }
+
+        if let Some(repeat_attr) = &field.attrs.repeat {
+            if repeat_attr.permeate {
+                errors.insert("Permeating repeat instruction is only applicable to enum variant fields.".into(), field.member.span());
+            }
+        }
     }
 
     for child_attr in input.fields.iter().flat_map(|x| &x.attrs.child_attrs) {

@@ -6,6 +6,12 @@ use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
 
+#[derive(Default)]
+struct Context {
+    variant_attrs_to_repeat: Option<MemberAttrs>,
+    field_attrs_to_repeat: Option<(MemberAttrs, bool)>
+}
+
 pub(crate) struct Struct<'a> {
     pub attrs: DataTypeAttrs,
     pub ident: &'a Ident,
@@ -18,7 +24,7 @@ pub(crate) struct Struct<'a> {
 impl<'a> Struct<'a> {
     pub fn from_syn(node: &'a DeriveInput, data: &'a DataStruct) -> Result<Self> {
         let (attrs, bark) = attr::get_data_type_attrs(&node.attrs)?;
-        let fields = Field::multiple_from_syn(&data.fields, bark)?;
+        let fields = Field::multiple_from_syn(&mut Default::default(), &data.fields, bark)?;
         Ok(Struct {
             attrs,
             ident: &node.ident,
@@ -38,27 +44,25 @@ pub(crate) struct Field {
 }
 
 impl<'a> Field {
-    fn multiple_from_syn(fields: &'a Fields, bark: bool) -> Result<Vec<Self>> {
-        let mut attrs_to_repeat = None;
-
+    fn multiple_from_syn(ctx: &mut Context, fields: &'a Fields, bark: bool) -> Result<Vec<Self>> {
         fields
             .iter()
             .enumerate()
-            .map(|(i, field)| {
+            .map(move |(i, field)| {
                 let mut field = Field::from_syn(i, field, bark)?;
 
                 if field.attrs.stop_repeat {
-                    attrs_to_repeat = None;
+                    ctx.field_attrs_to_repeat = None;
                 }
 
-                if field.attrs.repeat.is_some() {
-                    if attrs_to_repeat.is_some() && !field.attrs.stop_repeat {
+                if let Some(repeat_attr) = &field.attrs.repeat {
+                    if ctx.field_attrs_to_repeat.is_some() && !field.attrs.stop_repeat {
                         panic!("Previous #[repeat] instruction must be terminated with #[stop_repeat]")
                     }
 
-                    attrs_to_repeat = Some(field.attrs.clone());
-                } else if let Some(attrs_to_repeat) = &attrs_to_repeat {
-                    field.attrs.merge(attrs_to_repeat.clone());
+                    ctx.field_attrs_to_repeat = Some((field.attrs.clone(), repeat_attr.permeate));
+                } else if let Some(attrs_to_repeat) = &ctx.field_attrs_to_repeat {
+                    field.attrs.merge(attrs_to_repeat.0.clone());
                 }
 
                 Ok(field)
@@ -111,37 +115,48 @@ pub(crate) struct Variant {
 
 impl<'a> Variant {
     fn multiple_from_syn(variants: &'a Punctuated<syn::Variant, Comma>, bark: bool) -> Result<Vec<Self>> {
-        let mut attrs_to_repeat = None;
+        let mut ctx = Context {
+            variant_attrs_to_repeat: None,
+            field_attrs_to_repeat: None
+        };
 
         variants
             .iter()
             .enumerate()
-            .map(|(i, variant)| {
-                let mut field = Variant::from_syn(i, variant, bark)?;
+            .map(move |(i, variant)| {
+                let mut variant = Variant::from_syn(&mut ctx, i, variant, bark)?;
 
-                if field.attrs.stop_repeat {
-                    attrs_to_repeat = None;
+                if variant.attrs.stop_repeat {
+                    ctx.variant_attrs_to_repeat = None;
                 }
 
-                if field.attrs.repeat.is_some() {
-                    if attrs_to_repeat.is_some() && !field.attrs.stop_repeat {
+                if variant.attrs.repeat.is_some() {
+                    if ctx.variant_attrs_to_repeat.is_some() && !variant.attrs.stop_repeat {
                         panic!("Previous #[repeat] instruction must be terminated with #[stop_repeat]")
                     }
 
-                    attrs_to_repeat = Some(field.attrs.clone());
-                } else if let Some(attrs_to_repeat) = &attrs_to_repeat {
-                    field.attrs.merge(attrs_to_repeat.clone());
+                    ctx.variant_attrs_to_repeat = Some(variant.attrs.clone());
+                } else if let Some(attrs_to_repeat) = &ctx.variant_attrs_to_repeat {
+                    variant.attrs.merge(attrs_to_repeat.clone());
                 }
 
-                Ok(field)
+                Ok(variant)
             })
             .collect()
     }
 
-    fn from_syn(i: usize, variant: &'a syn::Variant, bark: bool) -> Result<Self> {
-        let fields = Field::multiple_from_syn(&variant.fields, bark)?;
+    fn from_syn(ctx: &mut Context, i: usize, variant: &'a syn::Variant, bark: bool) -> Result<Self> {
+        let fields = Field::multiple_from_syn(ctx, &variant.fields, bark)?;
+        let attrs = attr::get_member_attrs(SynDataTypeMember::Variant(variant), bark)?;
+
+        if let Some((_, permeating)) = &ctx.field_attrs_to_repeat {
+            if !permeating {
+                ctx.field_attrs_to_repeat = None;
+            }
+        }
+
         Ok(Variant {
-            attrs: attr::get_member_attrs(SynDataTypeMember::Variant(variant), bark)?,
+            attrs,
             ident: variant.ident.clone(),
             _idx: i,
             fields,

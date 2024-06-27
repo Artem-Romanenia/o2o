@@ -63,7 +63,7 @@ pub(crate) enum MemberInstruction {
     Lit(LitAttr),
     Pat(PatAttr),
     VariantTypeHint(VariantTypeHintAttr),
-    Repeat(MemberRepeatFor),
+    Repeat(MemberRepeatAttr),
     StopRepeat,
 
     Misplaced { instr: &'static str, span: Span, own: bool },
@@ -213,7 +213,6 @@ impl<'a> DataTypeAttrs {
 }
 
 type MemberRepeatFor = [bool; 5];
-struct MemberRepeatForWrap(MemberRepeatFor);
 
 enum MemberAttrType {
     Attr,
@@ -237,27 +236,47 @@ impl Index<&MemberAttrType> for MemberRepeatFor {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct MemberRepeatAttr {
+    pub permeate: bool,
+    pub repeat_for: MemberRepeatFor,
+}
+
 const MEMBER_REPEAT_TYPES: [&str; 5] = ["map", "child", "parent", "ghost", "type_hint"];
 
-impl Parse for MemberRepeatForWrap {
+impl Parse for MemberRepeatAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let types: Punctuated<Ident, Token![,]>  = Punctuated::parse_terminated(input)?;
-        if types.is_empty() {
-            return Ok(MemberRepeatForWrap([true,  true, true, true, true]))
+        let permeate = input.peek(kw::permeate);
+        if permeate {
+            input.parse::<kw::permeate>()?;
+            let _content;
+            parenthesized!(_content in input);
         }
 
-        let mut repeat: MemberRepeatFor = [false, false, false, false, false];
+        if permeate && !input.is_empty() {
+            input.parse::<Token![,]>()?;
+        }
+
+        let types: Punctuated<Ident, Token![,]>  = Punctuated::parse_terminated(input)?;
+        if types.is_empty() {
+            return Ok(MemberRepeatAttr{
+                permeate,
+                repeat_for: [true,  true, true, true, true]
+            })
+        }
+
+        let mut repeat_for: MemberRepeatFor = [false, false, false, false, false];
 
         for ty in types {
             let str = ty.to_token_stream().to_string();
 
             match MEMBER_REPEAT_TYPES.iter().position(|x|*x == str.as_str()) {
-                Some(idx) => repeat[idx] = true,
+                Some(idx) => repeat_for[idx] = true,
                 None => return Err(Error::new(ty.span(), format!("#[repeat] of instruction type '{}' is not supported. Supported types are: {}", str, MEMBER_REPEAT_TYPES.join(", "))))
             };
         }
 
-        Ok(MemberRepeatForWrap(repeat))
+        Ok(MemberRepeatAttr { permeate, repeat_for })
     }
 }
 
@@ -270,7 +289,7 @@ pub(crate) struct MemberAttrs {
     pub ghosts_attrs: Vec<GhostsAttr>,
     pub lit_attrs: Vec<LitAttr>,
     pub pat_attrs: Vec<PatAttr>,
-    pub repeat: Option<MemberRepeatFor>,
+    pub repeat: Option<MemberRepeatAttr>,
     pub stop_repeat: bool,
     pub type_hint_attrs: Vec<VariantTypeHintAttr>,
 
@@ -353,19 +372,19 @@ impl<'a> MemberAttrs {
 
     pub(crate) fn merge(&'a mut self, other: Self) {
         if let Some(repeat) =  other.repeat  {
-            if repeat[&MemberAttrType::Attr] {
+            if repeat.repeat_for[&MemberAttrType::Attr] {
                 self.attrs.extend(other.attrs);
             }
-            if repeat[&MemberAttrType::Child] {
+            if repeat.repeat_for[&MemberAttrType::Child] {
                 self.child_attrs.extend(other.child_attrs);
             }
-            if repeat[&MemberAttrType::Parent] {
+            if repeat.repeat_for[&MemberAttrType::Parent] {
                 self.parent_attrs.extend(other.parent_attrs);
             }
-            if repeat[&MemberAttrType::Ghost] {
+            if repeat.repeat_for[&MemberAttrType::Ghost] {
                 self.ghost_attrs.extend(other.ghost_attrs);
             }
-            if repeat[&MemberAttrType::TypeHint] {
+            if repeat.repeat_for[&MemberAttrType::TypeHint] {
                 self.type_hint_attrs.extend(other.type_hint_attrs);
             }
         }
@@ -1096,10 +1115,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "as_type" => Ok(MemberInstruction::As(syn::parse2(input)?)),
         "literal" => Ok(MemberInstruction::Lit(syn::parse2(input)?)),
         "pattern" => Ok(MemberInstruction::Pat(syn::parse2(input)?)),
-        "repeat" => {
-            let repeat: MemberRepeatForWrap = syn::parse2(input)?;
-            Ok(MemberInstruction::Repeat(repeat.0))
-        },
+        "repeat" => Ok(MemberInstruction::Repeat(syn::parse2(input)?)),
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
         "type_hint" => Ok(MemberInstruction::VariantTypeHint(syn::parse2(input)?)),
         "children" if bark => Ok(MemberInstruction::Misnamed { instr: "children", span: instr.span(), guess_name: "child", own: own_instr }),
