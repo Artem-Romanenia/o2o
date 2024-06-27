@@ -471,6 +471,9 @@ pub(crate) struct TraitAttrCore {
     pub repeat: Option<TraitRepeatFor>,
     pub skip_repeat: bool,
     pub stop_repeat: bool,
+    pub attribute: Option<TokenStream>,
+    pub impl_attribute: Option<TokenStream>,
+    pub inner_attribute: Option<TokenStream>,
 }
 
 impl TraitAttrCore {
@@ -482,25 +485,25 @@ impl TraitAttrCore {
         if let Some(attr_to_repeat) = other.repeat {
             if attr_to_repeat[&TraitAttrType::Vars] {
                 if self.init_data.is_some() {
-                    Err(syn::Error::new(self.ty.span, "Vars will be overriden. Did you mean to use 'skip_repeat'?"))?
+                    Err(syn::Error::new(self.ty.span, "Vars will be overriden. Did you forget to use 'skip_repeat'?"))?
                 }
                 self.init_data = other.init_data
             }
             if attr_to_repeat[&TraitAttrType::Update] {
                 if self.update.is_some() {
-                    Err(syn::Error::new(self.update.span(), "Update statement will be overriden. Did you mean to use 'skip_repeat'?"))?
+                    Err(syn::Error::new(self.update.span(), "Update statement will be overriden. Did you forget to use 'skip_repeat'?"))?
                 }
                 self.update = other.update
             }
             if attr_to_repeat[&TraitAttrType::QuickReturn] {
                 if self.quick_return.is_some() {
-                    Err(syn::Error::new(self.quick_return.span(), "Quick Return statement will be overriden. Did you mean to use 'skip_repeat'?"))?
+                    Err(syn::Error::new(self.quick_return.span(), "Quick Return statement will be overriden. Did you forget to use 'skip_repeat'?"))?
                 }
                 self.quick_return = other.quick_return
             }
             if attr_to_repeat[&TraitAttrType::DefaultCase] {
                 if self.default_case.is_some() {
-                    Err(syn::Error::new(self.default_case.span(), "Default Case statement will be overriden. Did you mean to use 'skip_repeat'?"))?
+                    Err(syn::Error::new(self.default_case.span(), "Default Case statement will be overriden. Did you forget to use 'skip_repeat'?"))?
                 }
                 self.default_case = other.default_case
             }
@@ -525,65 +528,130 @@ impl Parse for TraitAttrCore {
             None
         };
 
+        let mut attr = TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None, repeat: None, skip_repeat: false, stop_repeat: false, attribute: None, impl_attribute: None, inner_attribute: None };
+
         if !input.peek(Token![|]){
-            return Ok(TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None, repeat: None, skip_repeat: false, stop_repeat: false })
+            return Ok(attr)
         }
 
         input.parse::<Token![|]>()?;
 
-        let stop_repeat = if input.peek(kw::stop_repeat) {
-            input.parse::<kw::stop_repeat>()?;
-            if input.peek(Token![,]) {
-                input.parse::<Token![,]>()?;
-            }
-            true
-        } else {
-            false
-        };
-        let skip_repeat = if input.peek(kw::skip_repeat) {
-            input.parse::<kw::skip_repeat>()?;
-            if input.peek(Token![,]) {
-                input.parse::<Token![,]>()?;
-            }
-            true
-        } else {
-            false
-        };
-        let repeat = if input.peek(kw::repeat) {
-            input.parse::<kw::repeat>()?;
-            let content;
-            parenthesized!(content in input);
-            let repeat  = Some(content.parse::<TraitRepeatForWrap>()?);
-            if input.peek(Token![,]) {
-                input.parse::<Token![,]>()?;
-            }
-            repeat
-        } else { None };
-        let init_data: Option<Punctuated<InitData, Token![,]>> = if input.peek(kw::vars) {
-            input.parse::<kw::vars>()?;
-            let content;
-            parenthesized!(content in input);
-            let vars = Some(Punctuated::parse_separated_nonempty(&content)?);
-            if input.peek(Token![,]) {
-                input.parse::<Token![,]>()?;
-            }
-            vars
-        } else { None };
-        let update = if input.peek(Token![..]) {
-            input.parse::<Token![..]>()?;
-            try_parse_action(input, true)?
-        } else { None };
-        let quick_return = if input.peek(Token![return]) {
-            input.parse::<Token![return]>()?;
-            try_parse_action(input, true)?
-        } else { None };
-        let default_case = if input.peek(Token![_]) {
-            input.parse::<Token![_]>()?;
-            try_parse_action(input, true)?
-        } else { None };
+        while parse_trait_instruction_param(input, &mut attr)? {}
 
-        Ok(TraitAttrCore { ty, err_ty, type_hint, init_data, update, quick_return, default_case, repeat: repeat.map(|x| x.0), skip_repeat, stop_repeat })
+        Ok(attr)
     }
+}
+
+fn parse_trait_instruction_param(input: &syn::parse::ParseBuffer, attr: &mut TraitAttrCore) -> Result<bool> {
+    if input.peek(kw::stop_repeat) {
+        let a = input.parse::<kw::stop_repeat>()?;
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+        if attr.stop_repeat {
+            Err(syn::Error::new(a.span, "Instruction parameter 'stop_repeat' was already set."))?
+        } else {
+            attr.stop_repeat = true;
+            return Ok(true)
+        }
+    } else if input.peek(kw::skip_repeat) {
+        let a = input.parse::<kw::skip_repeat>()?;
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+        if attr.skip_repeat {
+            Err(syn::Error::new(a.span, "Instruction parameter 'skip_repeat' was already set."))?
+        } else {
+            attr.skip_repeat = true;
+            return Ok(true)
+        }
+    } else if input.peek(kw::repeat) {
+        let a = input.parse::<kw::repeat>()?;
+        let content;
+        parenthesized!(content in input);
+        let repeat  = content.parse::<TraitRepeatForWrap>()?;
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+        if attr.repeat.is_some() {
+            Err(syn::Error::new(a.span, "Instruction parameter 'repeat' was already set."))?
+        } else {
+            attr.repeat = Some(repeat.0);
+            return Ok(true)
+        }
+    } else if input.peek(kw::vars) {
+        let a = input.parse::<kw::vars>()?;
+        let content;
+        parenthesized!(content in input);
+        let vars = Some(Punctuated::parse_separated_nonempty(&content)?);
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+        if attr.init_data.is_some() {
+            Err(syn::Error::new(a.span, "Instruction parameter 'vars' was already set."))?
+        } else {
+            attr.init_data = vars;
+            return Ok(true)
+        }
+    } else if input.peek(Token![..]) {
+        input.parse::<Token![..]>()?;
+        attr.update = try_parse_action(input, true)?;
+        return Ok(false)
+    } else if input.peek(Token![return]) {
+        input.parse::<Token![return]>()?;
+        attr.quick_return = try_parse_action(input, true)?;
+        return Ok(false)
+    } else if input.peek(Token![_]) {
+        input.parse::<Token![_]>()?;
+        attr.default_case = try_parse_action(input, true)?;
+        return Ok(false)
+    } else if input.peek(kw::attribute) {
+        let a = input.parse::<kw::attribute>()?;
+        let content;
+        parenthesized!(content in input);
+        let attribute  = content.parse::<TokenStream>()?;
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+        if attr.attribute.is_some() {
+            Err(syn::Error::new(a.span, "Instruction parameter 'attribute' was already set."))?
+        } else {
+            attr.attribute = Some(quote!(#[ #attribute ]));
+            return Ok(true)
+        }
+    }
+    else if input.peek(kw::impl_attribute) {
+        let a = input.parse::<kw::impl_attribute>()?;
+        let content;
+        parenthesized!(content in input);
+        let attribute  = content.parse::<TokenStream>()?;
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+        if attr.impl_attribute.is_some() {
+            Err(syn::Error::new(a.span, "Instruction parameter 'impl_attribute' was already set."))?
+        } else {
+            attr.impl_attribute = Some(quote!(#[ #attribute ]));
+            return Ok(true)
+        }
+    }
+    if input.peek(kw::inner_attribute) {
+        let a = input.parse::<kw::inner_attribute>()?;
+        let content;
+        parenthesized!(content in input);
+        let attribute  = content.parse::<TokenStream>()?;
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+        }
+        if attr.inner_attribute.is_some() {
+            Err(syn::Error::new(a.span, "Instruction parameter 'inner_attribute' was already set."))?
+        } else {
+            attr.inner_attribute = Some(quote!(#![ #attribute ]));
+            return Ok(true)
+        }
+    }
+
+    Ok(false)
 }
 
 #[derive(Clone)]

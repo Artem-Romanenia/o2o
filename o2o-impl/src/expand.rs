@@ -1002,6 +1002,9 @@ fn quote_action(action: &TokenStream, field_path: Option<TokenStream>, ctx: &Imp
 }
 
 fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+    let attribute = &ctx.struct_attr.attribute;
+    let impl_attribute = &ctx.struct_attr.impl_attribute;
+    let inner_attribute = &ctx.struct_attr.inner_attribute;
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let gens = ctx.input.get_generics().to_token_stream();
@@ -1011,8 +1014,12 @@ fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
     });
     let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
+        
+        #impl_attribute
         impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
+            #attribute
             fn from(value: #r #src) -> #dst #gens {
+                #inner_attribute
                 #pre_init
                 #init
             }
@@ -1021,6 +1028,9 @@ fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
 }
 
 fn quote_try_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+    let attribute = &ctx.struct_attr.attribute;
+    let impl_attribute = &ctx.struct_attr.impl_attribute;
+    let inner_attribute = &ctx.struct_attr.inner_attribute;
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
@@ -1031,10 +1041,12 @@ fn quote_try_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
     });
     let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
+        #impl_attribute
         impl #gens std::convert::TryFrom<#r #src> for #dst #gens #where_clause {
             type Error = #err_ty;
-
+            #attribute
             fn try_from(value: #r #src) -> Result<#dst #gens, #err_ty> {
+                #inner_attribute
                 #pre_init
                 #init
             }
@@ -1043,6 +1055,9 @@ fn quote_try_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
 }
 
 fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+    let attribute = &ctx.struct_attr.attribute;
+    let impl_attribute = &ctx.struct_attr.impl_attribute;
+    let inner_attribute = &ctx.struct_attr.inner_attribute;
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let gens = ctx.input.get_generics().to_token_stream();
@@ -1053,8 +1068,11 @@ fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
     let r = ctx.kind.is_ref().then_some(quote!(&));
     match post_init {
         Some(post_init) => quote!{
+            #impl_attribute
             impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
+                #attribute
                 fn into(self) -> #dst {
+                    #inner_attribute
                     let mut obj: #dst = Default::default();
                     #init
                     #post_init
@@ -1063,8 +1081,11 @@ fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
             }
         },
         None => quote! {
+            #impl_attribute
             impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
+                #attribute
                 fn into(self) -> #dst {
+                    #inner_attribute
                     #pre_init
                     #init
                 }
@@ -1074,6 +1095,9 @@ fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
 }
 
 fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+    let attribute = &ctx.struct_attr.attribute;
+    let impl_attribute = &ctx.struct_attr.impl_attribute;
+    let inner_attribute = &ctx.struct_attr.inner_attribute;
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
@@ -1085,9 +1109,12 @@ fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
     let r = ctx.kind.is_ref().then_some(quote!(&));
     match post_init {
         Some(post_init) => quote!{
+            #impl_attribute
             impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
                 type Error = #err_ty;
+                #attribute
                 fn try_into(self) -> Result<#dst, #err_ty> {
+                    #inner_attribute
                     let mut obj: #dst = Default::default();
                     #init
                     #post_init
@@ -1096,9 +1123,12 @@ fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
             }
         },
         None => quote! {
+            #impl_attribute
             impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
                 type Error = #err_ty;
+                #attribute
                 fn try_into(self) -> Result<#dst, #err_ty> {
+                    #inner_attribute
                     #pre_init
                     #init
                 }
@@ -1108,6 +1138,9 @@ fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
 }
 
 fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+    let attribute = &ctx.struct_attr.attribute;
+    let impl_attribute = &ctx.struct_attr.impl_attribute;
+    let inner_attribute = &ctx.struct_attr.inner_attribute;
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let gens = ctx.input.get_generics().to_token_stream();
@@ -1117,8 +1150,11 @@ fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, i
     });
     let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
+        #impl_attribute
         impl #gens o2o::traits::IntoExisting<#dst> for #r #src #gens #where_clause {
+            #attribute
             fn into_existing(self, other: &mut #dst) {
+                #inner_attribute
                 #pre_init
                 #init
                 #post_init
@@ -1128,6 +1164,9 @@ fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, i
 }
 
 fn quote_try_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+    let attribute = &ctx.struct_attr.attribute;
+    let impl_attribute = &ctx.struct_attr.impl_attribute;
+    let inner_attribute = &ctx.struct_attr.inner_attribute;
     let dst = ctx.dst_ty;
     let src = ctx.src_ty;
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
@@ -1138,9 +1177,12 @@ fn quote_try_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream
     });
     let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
+        #impl_attribute
         impl #gens o2o::traits::TryIntoExisting<#dst> for #r #src #gens #where_clause {
             type Error = #err_ty;
+            #attribute
             fn try_into_existing(self, other: &mut #dst) -> Result<(), #err_ty> {
+                #inner_attribute
                 #pre_init
                 #init
                 #post_init

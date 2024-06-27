@@ -138,6 +138,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Define helper variables](#define-helper-variables)
   - [Quick return](#quick-return)
   - [Repeat trait instruction params](#repeat-trait-instruction-params)
+  - [Item attributes (attributes for `#[] impl`, `#[] fn`, `fn() { #![] }`)](#item-attributes-attributes-for--impl--fn-fn---)
   - [Slightly complex example](#slightly-complex-example)
   - [Flatened children](#flatened-children)
   - [Tuple structs](#tuple-structs)
@@ -150,6 +151,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Additional o2o instruction available via `#[o2o(...)]` syntax](#additional-o2o-instruction-available-via-o2o-syntax)
     - [Primitive type conversions](#primitive-type-conversions)
     - [Repeat member instructions](#repeat-member-instructions)
+    - ['Permeating' repeat for enum variant fields](#permeating-repeat-for-enum-variant-fields)
 - [Enum Examples](#enum-examples)
   - [Different variant name](#different-variant-name)
   - [Different enum variant field names and types](#different-enum-variant-field-names-and-types)
@@ -971,6 +973,39 @@ struct MyError(String);
   ```
 </details>
 
+### Item attributes (attributes for `#[] impl`, `#[] fn`, `fn() { #![] }`)
+
+``` rust
+struct TestDto {
+    x: i32
+}
+
+#[derive(o2o::o2o)]
+#[from_owned(TestDto| 
+    impl_attribute(cfg(any(foo, bar))),
+    attribute(inline(always)), 
+    inner_attribute(allow(unused_variables))
+)]
+struct Test {
+    x: i32,
+}
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  #[cfg(any(foo, bar))]
+  impl std::convert::From<TestDto> for Test {
+      #[inline(always)]
+      fn from(value: TestDto) -> Test {
+          #![allow(unused_variables)]
+          Test { x: value.x }
+      }
+  }
+  ```
+</details>
+
 ### Slightly complex example
 
 ``` rust
@@ -1734,6 +1769,83 @@ struct CarDto {
                       id: 321,
                   },
               },
+          }
+      }
+  }
+  ```
+</details>
+
+#### 'Permeating' repeat for enum variant fields
+
+If you want repeat to be carried on on the fields of the following variants, you can use `permeate()` inside repeat instruction:
+``` rust
+enum Enum {
+    Var1 { field: i32, field_2: i32 },
+    Var2 { field_3: i32 },
+    Var3 { field_4: i32 },
+    Var4 { field_5: i32 },
+    Var5 { str: &'static str },
+}
+
+#[derive(o2o::o2o)]
+#[map_owned(Enum)]
+enum EnumDto {
+    Var1 {
+        #[o2o(repeat(permeate()))] 
+        #[from(~ * 2)] 
+        #[into(~ / 2)] 
+
+        field: i32,
+        field_2: i32
+     },
+    Var2 { field_3: i32 },
+    Var3 { field_4: i32 },
+    Var4 { field_5: i32 },
+    Var5 { #[o2o(stop_repeat)] str: &'static str },
+}
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<Enum> for EnumDto {
+      fn from(value: Enum) -> EnumDto {
+          match value {
+              Enum::Var1 { field, field_2 } => EnumDto::Var1 {
+                  field: field * 2,
+                  field_2: field_2 * 2,
+              },
+              Enum::Var2 { field_3 } => EnumDto::Var2 {
+                  field_3: field_3 * 2,
+              },
+              Enum::Var3 { field_4 } => EnumDto::Var3 {
+                  field_4: field_4 * 2,
+              },
+              Enum::Var4 { field_5 } => EnumDto::Var4 {
+                  field_5: field_5 * 2,
+              },
+              Enum::Var5 { str } => EnumDto::Var5 { str: str },
+          }
+      }
+  }
+  impl std::convert::Into<Enum> for EnumDto {
+      fn into(self) -> Enum {
+          match self {
+              EnumDto::Var1 { field, field_2 } => Enum::Var1 {
+                  field: field / 2,
+                  field_2: field_2 / 2,
+              },
+              EnumDto::Var2 { field_3 } => Enum::Var2 {
+                  field_3: field_3 / 2,
+              },
+              EnumDto::Var3 { field_4 } => Enum::Var3 {
+                  field_4: field_4 / 2,
+              },
+              EnumDto::Var4 { field_5 } => Enum::Var4 {
+                  field_5: field_5 / 2,
+              },
+              EnumDto::Var5 { str } => Enum::Var5 { str: str },
           }
       }
   }

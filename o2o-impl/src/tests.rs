@@ -762,6 +762,70 @@ fn dedicated_field_instruction_mismatch(code_fragment: TokenStream, errs: Vec<&s
 
 // endregion: dedicated_field_instruction_mismatch
 
+#[test_case(quote!{
+    #[map(TestDto| vars(test: {123}), vars(test2: {123}))]
+    struct Test;
+}, "Instruction parameter 'vars' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| vars(test: {123}), repeat(), vars(test2: {123}))]
+    struct Test;
+}, "Instruction parameter 'vars' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| repeat(), repeat())]
+    struct Test;
+}, "Instruction parameter 'repeat' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| repeat(), vars(test: {123}), repeat())]
+    struct Test;
+}, "Instruction parameter 'repeat' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| skip_repeat, skip_repeat)]
+    struct Test;
+}, "Instruction parameter 'skip_repeat' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| skip_repeat, repeat(), skip_repeat)]
+    struct Test;
+}, "Instruction parameter 'skip_repeat' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| stop_repeat, stop_repeat)]
+    struct Test;
+}, "Instruction parameter 'stop_repeat' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| stop_repeat, repeat(), stop_repeat)]
+    struct Test;
+}, "Instruction parameter 'stop_repeat' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| attribute(test), attribute(test))]
+    struct Test;
+}, "Instruction parameter 'attribute' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| attribute(test), skip_repeat, attribute(test))]
+    struct Test;
+}, "Instruction parameter 'attribute' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| impl_attribute(test), impl_attribute(test))]
+    struct Test;
+}, "Instruction parameter 'impl_attribute' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| impl_attribute(test), skip_repeat, impl_attribute(test))]
+    struct Test;
+}, "Instruction parameter 'impl_attribute' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| inner_attribute(test), inner_attribute(test))]
+    struct Test;
+}, "Instruction parameter 'inner_attribute' was already set.")]
+#[test_case(quote!{
+    #[map(TestDto| inner_attribute(test), skip_repeat, inner_attribute(test))]
+    struct Test;
+}, "Instruction parameter 'inner_attribute' was already set.")]
+fn trait_instruction_defined_twice(code_fragment: TokenStream, err: &str) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+    let message = get_error(output, false);
+
+    assert_eq!(message, err);
+}
+
 // region: missing_children_instruction
 
 #[test_case(quote! {
@@ -1550,22 +1614,22 @@ fn infallible_map_instruction_error_type(instr: TokenStream, postfix: Option<Tok
     #[from_owned(i64| repeat(), return Self(@.to_string()))]
     #[from_owned(i32| return Self(@.to_string()))]
     struct Wrapper(String);
-}, "Quick Return statement will be overriden. Did you mean to use 'skip_repeat'?"; "2")]
+}, "Quick Return statement will be overriden. Did you forget to use 'skip_repeat'?"; "2")]
 #[test_case(quote! {
     #[from_owned(i64| repeat(), vars(msg: {"test".into()}), return Self(msg))]
     #[from_owned(i32| vars(msg: {"123".into()}))]
     struct Wrapper(String);
-}, "Vars will be overriden. Did you mean to use 'skip_repeat'?"; "3")]
+}, "Vars will be overriden. Did you forget to use 'skip_repeat'?"; "3")]
 #[test_case(quote! {
     #[from_owned(i64| repeat(vars), vars(msg: {"test".into()}), return Self(msg))]
     #[from_owned(i32| vars(msg: {"123".into()}))]
     struct Wrapper(String);
-}, "Vars will be overriden. Did you mean to use 'skip_repeat'?"; "4")]
+}, "Vars will be overriden. Did you forget to use 'skip_repeat'?"; "4")]
 #[test_case(quote! {
     #[from_owned(i64| repeat(quick_return), vars(msg: {"test".into()}), return Self(msg))]
     #[from_owned(i32| vars(msg: {"123".into()}), return Self(msg))]
     struct Wrapper(String);
-}, "Quick Return statement will be overriden. Did you mean to use 'skip_repeat'?"; "5")]
+}, "Quick Return statement will be overriden. Did you forget to use 'skip_repeat'?"; "5")]
 #[test_case(quote! {
     #[from_owned(i64| repeat(test), vars(msg: {"test".into()}), return Self(msg))]
     #[from_owned(i32)]
@@ -1599,6 +1663,157 @@ fn permeating_repeat(code_fragment: TokenStream) {
 }
 
 // endregion: permeating_repeat
+
+// region: item_attributes
+
+#[test_case(quote!{
+    #[map(TestDto| 
+        impl_attribute(impl_attribute(param)), 
+        attribute(attribute(param)), 
+        inner_attribute(inner_param(param))
+    )]
+    #[into_existing(TestDto| 
+        impl_attribute(impl_attribute(param)), 
+        attribute(attribute(param)), 
+        inner_attribute(inner_param(param))
+    )]
+    struct Test {
+        x: i32,
+    }
+},
+quote!{
+    #[impl_attribute(param)]
+    impl std::convert::From<TestDto> for Test {
+        #[attribute(param)]
+        fn from(value: TestDto) -> Test {
+            #![inner_param(param)]
+            Test { x: value.x, }
+        }
+    }
+
+    #[impl_attribute(param)]
+    impl std::convert::From<&TestDto> for Test {
+        #[attribute(param)]
+        fn from(value: &TestDto) -> Test {
+            #![inner_param(param)]
+            Test { x: value.x, }
+        }
+    }
+    #[impl_attribute(param)]
+    impl std::convert::Into<TestDto> for Test {
+        #[attribute(param)]
+        fn into(self) -> TestDto {
+            #![inner_param(param)]
+            TestDto { x: self.x, }
+        }
+    }
+    #[impl_attribute(param)]
+    impl std::convert::Into<TestDto> for &Test {
+        #[attribute(param)]
+        fn into(self) -> TestDto {
+            #![inner_param(param)]
+            TestDto { x: self.x, }
+        }
+    }
+    #[impl_attribute(param)]
+    impl o2o::traits::IntoExisting<TestDto> for Test {
+        #[attribute(param)]
+        fn into_existing(self, other: &mut TestDto) {
+            #![inner_param(param)]
+            other.x = self.x;
+        }
+    }
+    #[impl_attribute(param)]
+    impl o2o::traits::IntoExisting<TestDto> for &Test {
+        #[attribute(param)]
+        fn into_existing(self, other: &mut TestDto) {
+            #![inner_param(param)]
+            other.x = self.x;
+        }
+    }
+}; "1")]
+#[test_case(quote!{
+    #[try_map(TestDto, String| 
+        impl_attribute(impl_attribute(param)), 
+        attribute(attribute(param)), 
+        inner_attribute(inner_param(param))
+    )]
+    #[try_into_existing(TestDto, String| 
+        impl_attribute(impl_attribute(param)), 
+        attribute(attribute(param)), 
+        inner_attribute(inner_param(param))
+    )]
+    struct Test {
+        x: i32,
+    }
+},
+quote!{
+    #[impl_attribute(param)]
+    impl std::convert::TryFrom<TestDto> for Test {
+        type Error = String;
+        #[attribute(param)]
+        fn try_from(value: TestDto) -> Result<Test, String> {
+            #![inner_param(param)]
+            Ok(Test { x: value.x, })
+        }
+    }
+    #[impl_attribute(param)]
+    impl std::convert::TryFrom<&TestDto> for Test {
+        type Error = String;
+        #[attribute(param)]
+        fn try_from(value: &TestDto) -> Result<Test, String> {
+            #![inner_param(param)]
+            Ok(Test { x: value.x, })
+        }
+    }
+    #[impl_attribute(param)]
+    impl std::convert::TryInto<TestDto> for Test {
+        type Error = String;
+        #[attribute(param)]
+        fn try_into(self) -> Result<TestDto, String> {
+            #![inner_param(param)]
+            Ok(TestDto { x: self.x, })
+        }
+    }
+    #[impl_attribute(param)]
+    impl std::convert::TryInto<TestDto> for &Test {
+        type Error = String;
+        #[attribute(param)]
+        fn try_into(self) -> Result<TestDto, String> {
+            #![inner_param(param)]
+            Ok(TestDto { x: self.x, })
+        }
+    }
+    #[impl_attribute(param)]
+    impl o2o::traits::TryIntoExisting<TestDto> for Test {
+        type Error = String;
+        #[attribute(param)]
+        fn try_into_existing(self, other: &mut TestDto) -> Result<(), String> {
+            #![inner_param(param)]
+            other.x = self.x;
+            Ok(())
+        }
+    }
+    #[impl_attribute(param)]
+    impl o2o::traits::TryIntoExisting<TestDto> for &Test {
+        type Error = String;
+        #[attribute(param)]
+        fn try_into_existing(self, other: &mut TestDto) -> Result<(), String> {
+            #![inner_param(param)]
+            other.x = self.x;
+            Ok(())
+        }
+    }
+}; "2")]
+fn item_attributes(code_fragment: TokenStream, expected_output: TokenStream) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    assert!(output.is_ok());
+    assert_eq!(output.unwrap().to_string().trim(), expected_output.to_string().trim());
+}
+
+// endregion: item_attributes
 
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
