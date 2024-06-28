@@ -32,8 +32,6 @@ struct Machine {
 #[children(vehicle: Vehicle, vehicle.machine: Machine)]
 #[ghosts(vehicle.machine@id: { 321 })]
 struct CarDto {
-    number_of_doors: i8,
-
     #[o2o(repeat)] #[child(vehicle)]
     number_of_seats: i16,
     can_fly: bool,
@@ -55,6 +53,7 @@ struct CarDto {
     #[o2o(repeat(ghost))] #[ghost({123})]
     useless_param: i32,
     useless_param_2: i32,
+    #[o2o(skip_repeat)] number_of_doors: i8,
     useless_param_3: i32,
 }
 

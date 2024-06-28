@@ -64,6 +64,7 @@ pub(crate) enum MemberInstruction {
     Pat(PatAttr),
     VariantTypeHint(VariantTypeHintAttr),
     Repeat(MemberRepeatAttr),
+    SkipRepeat,
     StopRepeat,
 
     Misplaced { instr: &'static str, span: Span, own: bool },
@@ -290,6 +291,7 @@ pub(crate) struct MemberAttrs {
     pub lit_attrs: Vec<LitAttr>,
     pub pat_attrs: Vec<PatAttr>,
     pub repeat: Option<MemberRepeatAttr>,
+    pub skip_repeat: bool,
     pub stop_repeat: bool,
     pub type_hint_attrs: Vec<VariantTypeHintAttr>,
 
@@ -371,6 +373,10 @@ impl<'a> MemberAttrs {
     }
 
     pub(crate) fn merge(&'a mut self, other: Self) {
+        if self.skip_repeat {
+            return   
+        }
+
         if let Some(repeat) =  other.repeat  {
             if repeat.repeat_for[&MemberAttrType::Attr] {
                 self.attrs.extend(other.attrs);
@@ -967,8 +973,7 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
             })?;
-        } else {
-            let instr = x.path.get_ident().unwrap();
+        } else if let Some(instr) = x.path.get_ident() {
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
             instrs.push(parse_data_type_instruction(instr, p.content(), false, bark)?);
         }
@@ -1026,8 +1031,7 @@ pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<M
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
             })?;
-        } else {
-            let instr = x.path.get_ident().unwrap();
+        } else if let Some(instr) = x.path.get_ident() {
             let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
             instrs.push(parse_member_instruction(instr, p.content(), false, bark)?);
         }
@@ -1051,6 +1055,7 @@ pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<M
             MemberInstruction::Lit(attr) => attrs.lit_attrs.push(attr),
             MemberInstruction::Pat(attr) => attrs.pat_attrs.push(attr),
             MemberInstruction::Repeat(repeat_for) => attrs.repeat = Some(repeat_for),
+            MemberInstruction::SkipRepeat => attrs.skip_repeat = true,
             MemberInstruction::StopRepeat => attrs.stop_repeat = true,
             MemberInstruction::VariantTypeHint(attr) => attrs.type_hint_attrs.push(attr),
             MemberInstruction::Unrecognized => (),
@@ -1116,6 +1121,7 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "literal" if bark => Ok(DataTypeInstruction::Misplaced { instr: "literal", span: instr.span(), own: own_instr }),
         "pattern" if bark => Ok(DataTypeInstruction::Misplaced { instr: "pattern", span: instr.span(), own: own_instr }),
         "repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "repeat", span: instr.span(), own: own_instr }),
+        "skip_repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "skip_repeat", span: instr.span(), own: own_instr }),
         "stop_repeat" if bark => Ok(DataTypeInstruction::Misplaced { instr: "stop_repeat", span: instr.span(), own: own_instr }),
         "type_hint" if bark => Ok(DataTypeInstruction::Misplaced { instr: "type_hint", span: instr.span(), own: own_instr }),
         _ if own_instr => Ok(DataTypeInstruction::UnrecognizedWithError { instr: instr_str.clone(), span: instr.span() }),
@@ -1184,6 +1190,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "literal" => Ok(MemberInstruction::Lit(syn::parse2(input)?)),
         "pattern" => Ok(MemberInstruction::Pat(syn::parse2(input)?)),
         "repeat" => Ok(MemberInstruction::Repeat(syn::parse2(input)?)),
+        "skip_repeat" => Ok(MemberInstruction::SkipRepeat),
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
         "type_hint" => Ok(MemberInstruction::VariantTypeHint(syn::parse2(input)?)),
         "children" if bark => Ok(MemberInstruction::Misnamed { instr: "children", span: instr.span(), guess_name: "child", own: own_instr }),

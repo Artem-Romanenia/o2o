@@ -121,6 +121,16 @@ fn missing_map_instructions(code_fragment: TokenStream) {
 }, vec![ "Member instruction 'stop_repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]; "enum_misplaced_stop_repeat_instr")]
 #[test_case(quote! {
     #[map(EntityDto)]
+    #[skip_repeat(EntityDto)]
+    struct Entity {}
+}, vec![ "Member instruction 'skip_repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]; "struct_misplaced_skip_repeat_instr")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    #[skip_repeat(EntityDto)]
+    enum Enum {}
+}, vec![ "Member instruction 'skip_repeat' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]; "enum_misplaced_skip_repeat_instr")]
+#[test_case(quote! {
+    #[map(EntityDto)]
     #[type_hint()]
     struct Entity {}
 }, vec![ "Member instruction 'type_hint' should be used on a member. To turn this message off, use #[o2o(allow_unknown)]" ]; "struct_misplaced_type_hint_instr")]
@@ -217,6 +227,16 @@ fn missing_map_instructions(code_fragment: TokenStream) {
     #[o2o(stop_repeat(EntityDto))]
     enum Enum {}
 }, vec![ "Member instruction 'stop_repeat' should be used on a member." ]; "own_enum_misplaced_stop_repeat_instr")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    #[o2o(skip_repeat(EntityDto))]
+    struct Entity {}
+}, vec![ "Member instruction 'skip_repeat' should be used on a member." ]; "own_struct_misplaced_skip_repeat_instr")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    #[o2o(skip_repeat(EntityDto))]
+    enum Enum {}
+}, vec![ "Member instruction 'skip_repeat' should be used on a member." ]; "own_enum_misplaced_skip_repeat_instr")]
 #[test_case(quote! {
     #[o2o(map(EntityDto))]
     #[o2o(ghost(EntityDto))]
@@ -337,10 +357,20 @@ fn unrecognized_member_instructions(code_fragment: TokenStream, err: &str) {
     struct Entity {}
 }; "struct_unrecognized_instr")]
 #[test_case(quote! {
+    #[from_owned(NamedStruct)]
+    #[mapp::mapp(EntityDto)]
+    struct Entity {}
+}; "struct_unrecognized_path_instr")]
+#[test_case(quote! {
     #[from_owned(EnumDto)]
     #[mapp(EnumDto)]
     enum Enum {}
 }; "enum_unrecognized_instr")]
+#[test_case(quote! {
+    #[from_owned(EnumDto)]
+    #[mapp::mapp(EnumDto)]
+    enum Enum {}
+}; "enum_unrecognized_path_instr")]
 #[test_case(quote! {
     #[o2o(allow_unknown)]
     #[map(EntityDto)]
@@ -396,12 +426,26 @@ fn unrecognized_struct_instructions_no_bark(code_fragment: TokenStream) {
     }
 }; "struct_unknown_instr")]
 #[test_case(quote! {
+    #[from_owned(NamedStruct)]
+    struct NamedStructDto {
+        #[unknown::unknown()]
+        field: i32,
+    }
+}; "struct_unknown_path_instr")]
+#[test_case(quote! {
     #[from_owned(EnumDto)]
     enum Enum {
         #[unknown()]
         Variant,
     }
 }; "enum_unknown_instr")]
+#[test_case(quote! {
+    #[from_owned(EnumDto)]
+    enum Enum {
+        #[unkwnown::unknown()]
+        Variant,
+    }
+}; "enum_unknown_path_instr")]
 #[test_case(quote!{
     #[from_owned(NamedStruct)]
     #[o2o(allow_unknown)]
@@ -765,59 +809,67 @@ fn dedicated_field_instruction_mismatch(code_fragment: TokenStream, errs: Vec<&s
 #[test_case(quote!{
     #[map(TestDto| vars(test: {123}), vars(test2: {123}))]
     struct Test;
-}, "Instruction parameter 'vars' was already set.")]
+}, "Instruction parameter 'vars' was already set."; "1")]
 #[test_case(quote!{
     #[map(TestDto| vars(test: {123}), repeat(), vars(test2: {123}))]
     struct Test;
-}, "Instruction parameter 'vars' was already set.")]
+}, "Instruction parameter 'vars' was already set."; "2")]
 #[test_case(quote!{
     #[map(TestDto| repeat(), repeat())]
     struct Test;
-}, "Instruction parameter 'repeat' was already set.")]
+}, "Instruction parameter 'repeat' was already set."; "3")]
 #[test_case(quote!{
     #[map(TestDto| repeat(), vars(test: {123}), repeat())]
     struct Test;
-}, "Instruction parameter 'repeat' was already set.")]
+}, "Instruction parameter 'repeat' was already set."; "4")]
 #[test_case(quote!{
     #[map(TestDto| skip_repeat, skip_repeat)]
     struct Test;
-}, "Instruction parameter 'skip_repeat' was already set.")]
+}, "Instruction parameter 'skip_repeat' was already set."; "5")]
 #[test_case(quote!{
     #[map(TestDto| skip_repeat, repeat(), skip_repeat)]
     struct Test;
-}, "Instruction parameter 'skip_repeat' was already set.")]
+}, "Instruction parameter 'skip_repeat' was already set."; "6")]
 #[test_case(quote!{
     #[map(TestDto| stop_repeat, stop_repeat)]
     struct Test;
-}, "Instruction parameter 'stop_repeat' was already set.")]
+}, "Instruction parameter 'stop_repeat' was already set."; "7")]
 #[test_case(quote!{
     #[map(TestDto| stop_repeat, repeat(), stop_repeat)]
     struct Test;
-}, "Instruction parameter 'stop_repeat' was already set.")]
+}, "Instruction parameter 'stop_repeat' was already set."; "8")]
+#[test_case(quote!{
+    #[map(TestDto| skip_repeat, skip_repeat)]
+    struct Test;
+}, "Instruction parameter 'skip_repeat' was already set."; "9")]
+#[test_case(quote!{
+    #[map(TestDto| skip_repeat, repeat(), skip_repeat)]
+    struct Test;
+}, "Instruction parameter 'skip_repeat' was already set."; "10")]
 #[test_case(quote!{
     #[map(TestDto| attribute(test), attribute(test))]
     struct Test;
-}, "Instruction parameter 'attribute' was already set.")]
+}, "Instruction parameter 'attribute' was already set."; "11")]
 #[test_case(quote!{
     #[map(TestDto| attribute(test), skip_repeat, attribute(test))]
     struct Test;
-}, "Instruction parameter 'attribute' was already set.")]
+}, "Instruction parameter 'attribute' was already set."; "12")]
 #[test_case(quote!{
     #[map(TestDto| impl_attribute(test), impl_attribute(test))]
     struct Test;
-}, "Instruction parameter 'impl_attribute' was already set.")]
+}, "Instruction parameter 'impl_attribute' was already set."; "13")]
 #[test_case(quote!{
     #[map(TestDto| impl_attribute(test), skip_repeat, impl_attribute(test))]
     struct Test;
-}, "Instruction parameter 'impl_attribute' was already set.")]
+}, "Instruction parameter 'impl_attribute' was already set."; "14")]
 #[test_case(quote!{
     #[map(TestDto| inner_attribute(test), inner_attribute(test))]
     struct Test;
-}, "Instruction parameter 'inner_attribute' was already set.")]
+}, "Instruction parameter 'inner_attribute' was already set."; "15")]
 #[test_case(quote!{
     #[map(TestDto| inner_attribute(test), skip_repeat, inner_attribute(test))]
     struct Test;
-}, "Instruction parameter 'inner_attribute' was already set.")]
+}, "Instruction parameter 'inner_attribute' was already set."; "16")]
 fn trait_instruction_defined_twice(code_fragment: TokenStream, err: &str) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
