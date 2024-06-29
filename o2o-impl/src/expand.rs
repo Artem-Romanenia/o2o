@@ -1,7 +1,7 @@
 use std::{slice::Iter, iter::Peekable, collections::HashSet};
 
 use crate::{
-    ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
+    ast::{DataType, DataTypeMember, DataTypeTrait, Enum, Field, Struct, Variant},
     attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, InitData, Kind, TraitAttrCore, TypeHint}, validate::validate
 };
 use proc_macro2::{TokenStream, Span};
@@ -14,13 +14,13 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
             let input = Struct::from_syn(node, data)?;
             let input = DataType::Struct(&input);
             validate(&input)?;
-            Ok(struct_impl(input))
+            Ok(data_type_impl(input))
         },
         Data::Enum(data) => {
             let input = Enum::from_syn(node, data)?;
             let input = DataType::Enum(&input);
             validate(&input)?;
-            Ok(struct_impl(input))
+            Ok(data_type_impl(input))
         },
         _ => Err(Error::new_spanned(
             node,
@@ -29,8 +29,8 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
     }
 }
 
-struct ImplContext<'a> {
-    input: &'a DataType<'a>,
+struct ImplContext<'a, T: ?Sized> {
+    input: &'a T,
     struct_attr: &'a TraitAttrCore,
     kind: Kind,
     dst_ty: &'a TokenStream,
@@ -40,7 +40,17 @@ struct ImplContext<'a> {
     fallible: bool
 }
 
-fn struct_impl(input: DataType) -> TokenStream {
+enum FieldData<'a> {
+    Field(&'a Field),
+    GhostData(&'a GhostData)
+}
+
+enum VariantData<'a> {
+    Variant(&'a Variant),
+    GhostData(&'a GhostData)
+}
+
+fn data_type_impl(input: DataType) -> TokenStream {
     let ty = input.get_ident().to_token_stream();
     let attrs = input.get_attrs();
 
@@ -310,8 +320,8 @@ fn struct_impl(input: DataType) -> TokenStream {
     result
 }
 
-fn main_code_block_ok(ctx: &ImplContext) -> TokenStream {
-    let inner = main_code_block(ctx);
+fn struct_main_code_block_ok(ctx: &ImplContext<Struct>) -> TokenStream {
+    let inner = struct_main_code_block(ctx);
 
     if ctx.has_post_init {
         quote!(#inner)
@@ -320,47 +330,51 @@ fn main_code_block_ok(ctx: &ImplContext) -> TokenStream {
     }
 }
 
-fn main_code_block(ctx: &ImplContext) -> TokenStream {
-    match ctx.input {
-        DataType::Struct(_) => {
-            let struct_init_block = struct_init_block(ctx);
+fn enum_main_code_block_ok(ctx: &ImplContext<Enum>) -> TokenStream {
+    let inner = enum_main_code_block(ctx);
 
-            match ctx.kind {
-                Kind::FromOwned | Kind::FromRef => {
-                    let dst = ctx.dst_ty;
-                    quote!(#dst #struct_init_block)
-                },
-                Kind::OwnedInto | Kind::RefInto => {
-                    let dst = if ctx.struct_attr.ty.nameless_tuple || ctx.has_post_init { TokenStream::new() } else { ctx.dst_ty.clone() };
-                    quote!(#dst #struct_init_block)
-                },
-                Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
-            }
-        },
-        DataType::Enum(_) => {
-            let struct_init_block = struct_init_block(ctx);
-
-            match ctx.kind {
-                Kind::FromOwned | Kind::FromRef => {
-                    quote!(match value #struct_init_block)
-                },
-                Kind::OwnedInto | Kind::RefInto => {
-                    quote!(match self #struct_init_block)
-                },
-                Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
-            }
-        }
+    if ctx.has_post_init {
+        quote!(#inner)
+    } else {
+        quote!(Ok(#inner))
     }
 }
 
-fn struct_init_block<'a>(ctx: &'a ImplContext) -> TokenStream {
+fn struct_main_code_block(ctx: &ImplContext<Struct>) -> TokenStream {
+    let struct_init_block = struct_init_block(ctx);
+
+    match ctx.kind {
+        Kind::FromOwned | Kind::FromRef => {
+            let dst = ctx.dst_ty;
+            quote!(#dst #struct_init_block)
+        },
+        Kind::OwnedInto | Kind::RefInto => {
+            let dst = if ctx.struct_attr.ty.nameless_tuple || ctx.has_post_init { TokenStream::new() } else { ctx.dst_ty.clone() };
+            quote!(#dst #struct_init_block)
+        },
+        Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
+    }
+}
+
+fn enum_main_code_block(ctx: &ImplContext<Enum>) -> TokenStream {
+    let enum_init_block = enum_init_block(ctx);
+
+    match ctx.kind {
+        Kind::FromOwned | Kind::FromRef => {
+            quote!(match value #enum_init_block)
+        },
+        Kind::OwnedInto | Kind::RefInto => {
+            quote!(match self #enum_init_block)
+        },
+        Kind::OwnedIntoExisting | Kind::RefIntoExisting => enum_init_block,
+    }
+}
+
+fn struct_init_block<'a>(ctx: &'a ImplContext<Struct>) -> TokenStream {
     if (!ctx.kind.is_from() && ctx.struct_attr.type_hint == TypeHint::Unit) ||
         (ctx.kind.is_from() && ctx.input.unit()) {
         return TokenStream::new();
     }
-
-    let attrs = ctx.input.get_attrs();
-    let members = ctx.input.get_members();
 
     let mut current_path = "";
     let mut group_counter =  0;
@@ -377,14 +391,14 @@ fn struct_init_block<'a>(ctx: &'a ImplContext) -> TokenStream {
 
     let mut fields: Vec<(usize, &str, FieldData)> = vec![];
 
-    fields.extend(members.iter()
+    fields.extend(ctx.input.fields.iter()
         .map(|x| {
-            let path = x.get_attrs().child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or("");
+            let path = x.attrs.child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or("");
             unique_paths.insert(path);
-            make_tuple(path, FieldData::Field(*x))
+            make_tuple(path, FieldData::Field(x))
         }).collect::<Vec<(usize, &str, FieldData)>>());
     
-    fields.extend(attrs.ghosts_attrs.iter()
+    fields.extend(ctx.input.attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
         .filter(|x| unique_paths.insert(x.get_child_path_str(None)))
         .map(|x| {
@@ -397,14 +411,9 @@ fn struct_init_block<'a>(ctx: &'a ImplContext) -> TokenStream {
     struct_init_block_inner(&mut fields.iter().peekable(), ctx, None)
 }
 
-enum FieldData<'a> {
-    Field(DataTypeMember<'a>),
-    GhostData(&'a GhostData)
-}
-
 fn struct_init_block_inner(
     members: &mut Peekable<Iter<(usize, &str, FieldData)>>,
-    ctx: &ImplContext,
+    ctx: &ImplContext<Struct>,
     field_ctx: Option<(&ChildPath, Option<&ChildData>, usize)>
 ) -> TokenStream
 {
@@ -430,7 +439,7 @@ fn struct_init_block_inner(
     
             match field_data {
                 FieldData::Field(f) => {
-                    let attrs = f.get_attrs();
+                    let attrs = f.attrs;
                     if !ctx.kind.is_from() && (attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() || attrs.has_parent_attr(&ctx.struct_attr.ty)) {
                         members.next();
                         continue;
@@ -446,27 +455,19 @@ fn struct_init_block_inner(
                     }
     
                     let fragment = match attrs.child(&ctx.struct_attr.ty) {
-                        Some(child_attr) => 
-                            match f {
-                                DataTypeMember::Field(f) => render_child_fragment(&child_attr.child_path, members, ctx, field_ctx, type_hint, || render_struct_line(f, ctx, type_hint, idx)),
-                                DataTypeMember::Variant(_) => todo!(),
-                            }
-                        None => {
-                            members.next();
-                            match f {
-                                DataTypeMember::Field(f) => render_struct_line(f, ctx, type_hint, idx),
-                                DataTypeMember::Variant(v) => render_enum_line(v, ctx, idx),
-                            }
-                        }
+                        Some(child_attr) => render_child_fragment(&child_attr.child_path, members, ctx, field_ctx, type_hint, || render_struct_line(f, ctx, type_hint, idx)),
+                        None => render_struct_line(f, ctx, type_hint, idx),
                     };
                     fragments.push(fragment);
                     idx += 1;
                 },
                 FieldData::GhostData(ghost_data) => {
-                    let child_path = &ghost_data.child_path.as_ref().unwrap();
-                    let fragment = render_child_fragment(child_path, members, ctx, field_ctx, type_hint, TokenStream::new);
-    
-                    fragments.push(fragment);
+                    if !ctx.kind.is_from() {
+                        let child_path = &ghost_data.child_path.as_ref().unwrap();
+                        let fragment = render_child_fragment(child_path, members, ctx, field_ctx, type_hint, TokenStream::new);
+                        fragments.push(fragment);
+                    }
+
                     idx += 1;
                 }
             }
@@ -474,7 +475,7 @@ fn struct_init_block_inner(
     }
 
     if !ctx.kind.is_from() {
-        if let Some(ghost_attr) = ctx.input.get_attrs().ghost_attr(&ctx.struct_attr.ty, &ctx.kind) {
+        if let Some(ghost_attr) = ctx.input.attrs.ghosts_attr(&ctx.struct_attr.ty, &ctx.kind) {
             ghost_attr.ghost_data.iter().for_each(|x| {
                 match (&x.child_path, field_ctx) {
                     (Some(_), Some(field_ctx)) => {
@@ -494,6 +495,91 @@ fn struct_init_block_inner(
         fragments.push(quote!(..#g))
     }
 
+    if ctx.has_post_init || ctx.kind.is_into_existing() {
+        return quote!(#(#fragments)*)
+    }
+
+    match (&ctx.kind, type_hint, ctx.input.named_fields) {
+        (Kind::FromOwned | Kind::FromRef, _, true) => quote!({#(#fragments)*}),
+        (Kind::FromOwned | Kind::FromRef, _, false) => quote!((#(#fragments)*)),
+        (_, TypeHint::Struct, _) => quote!({#(#fragments)*}),
+        (_, TypeHint::Tuple, _) => quote!((#(#fragments)*)),
+        (_, TypeHint::Unspecified, true) => quote!({#(#fragments)*}),
+        (_, TypeHint::Unspecified, false) => quote!((#(#fragments)*)),
+        (_, TypeHint::Unit, _) => unreachable!("16"),
+    }
+}
+
+fn enum_init_block<'a>(ctx: &'a ImplContext<Enum>) -> TokenStream {
+    if (!ctx.kind.is_from() && ctx.struct_attr.type_hint == TypeHint::Unit) ||
+        (ctx.kind.is_from() && ctx.input.unit()) {
+        return TokenStream::new();
+    }
+
+    let mut fields: Vec<VariantData> = vec![];
+
+    fields.extend(ctx.input.variants.iter()
+        .map(|x| VariantData::Variant(x)).collect::<Vec<VariantData>>());
+    
+    fields.extend(ctx.input.attrs.ghosts_attrs.iter()
+        .flat_map(|x| &x.attr.ghost_data)
+        .map(|x| VariantData::GhostData(x)));
+
+    enum_init_block_inner(&mut fields.iter().peekable(), ctx)
+}
+
+fn enum_init_block_inner(
+    members: &mut Peekable<Iter<VariantData>>,
+    ctx: &ImplContext<Enum>,
+) -> TokenStream
+{
+    let type_hint = ctx.struct_attr.type_hint;
+
+    let mut fragments: Vec<TokenStream> = vec![];
+    let mut idx: usize = 0;
+
+    let next = members.peek();
+    if next.is_some() {
+        while let Some(member_data) = members.peek() {
+            match member_data {
+                VariantData::Variant(v) => {
+                    let attrs = v.attrs;
+                    if !ctx.kind.is_from() && (attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() || attrs.has_parent_attr(&ctx.struct_attr.ty)) {
+                        members.next();
+                        continue;
+                    }
+    
+                    if ctx.kind.is_from() {
+                        if let Some(ghost_attr) = attrs.ghost(&ctx.struct_attr.ty, &ctx.kind) {
+                            if ghost_attr.action.is_none() {
+                                members.next();
+                                continue;
+                            }
+                        }
+                    }
+    
+                    let fragment = render_enum_line(v, ctx);
+                    fragments.push(fragment);
+                    idx += 1;
+                },
+                VariantData::GhostData(ghost_data) => {
+                    // let fragment = render_enum_line(f, ctx);
+    
+                    // fragments.push(fragment);
+                    // idx += 1;
+                }
+            }
+        }
+    }
+
+    if !ctx.kind.is_from() {
+        if let Some(ghost_attr) = ctx.input.get_attrs().ghosts_attr(&ctx.struct_attr.ty, &ctx.kind) {
+            ghost_attr.ghost_data.iter().for_each(|x| {
+                fragments.push(render_ghost_line(x, ctx))
+            });
+        }
+    }
+
     if ctx.kind.is_from() {
         if let Some(default_case) = &ctx.struct_attr.default_case {
             let g = quote_action(default_case, None, ctx);
@@ -501,83 +587,59 @@ fn struct_init_block_inner(
         }
     }
 
-    if ctx.has_post_init || ctx.kind.is_into_existing() {
-        return quote!(#(#fragments)*)
-    }
-
-    match ctx.input {
-        DataType::Struct(s) => {
-            match (&ctx.kind, type_hint, s.named_fields) {
-                (Kind::FromOwned | Kind::FromRef, _, true) => quote!({#(#fragments)*}),
-                (Kind::FromOwned | Kind::FromRef, _, false) => quote!((#(#fragments)*)),
-                (_, TypeHint::Struct, _) => quote!({#(#fragments)*}),
-                (_, TypeHint::Tuple, _) => quote!((#(#fragments)*)),
-                (_, TypeHint::Unspecified, true) => quote!({#(#fragments)*}),
-                (_, TypeHint::Unspecified, false) => quote!((#(#fragments)*)),
-                (_, TypeHint::Unit, _) => unreachable!("16"),
-            }
-        },
-        DataType::Enum(_) => {
-            quote!({#(#fragments)*})
-        },
-    }
+    quote!({#(#fragments)*})
 }
 
-fn variant_destruct_block(ctx: &ImplContext<'_>) -> TokenStream {
-    match ctx.input {
-        DataType::Struct(s) => {
-            let (mut idents, type_hint) = match (s.named_fields, ctx.kind, ctx.struct_attr.type_hint) {
-                (true, Kind::OwnedInto | Kind::RefInto | Kind::OwnedIntoExisting | Kind::RefIntoExisting, _) |
-                (true, _, TypeHint::Struct | TypeHint::Unspecified) |
-                (false, Kind::FromOwned | Kind::FromRef, TypeHint::Struct) => {
-                    (s.fields.iter().filter(|x|!ctx.kind.is_from() || x.attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_none()).map(|x| {
-                        let attr = x.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
-    
-                        if !ctx.kind.is_from() || attr.is_none() {
-                            let ident = &x.member;
-                            quote!(#ident ,)
-                        } else if let Some(attr) = attr {
-                            let ident = attr.get_field_name_or(&x.member);
-                            quote!(#ident ,)
-                        } else { unreachable!("15") }
-                    }).collect(), TypeHint::Struct)
-                },
-                (_, Kind::FromOwned | Kind::FromRef, TypeHint::Unit) => (vec![], TypeHint::Unit),
-                _ => {
-                    (s.fields.iter().filter(|x|!ctx.kind.is_from() || x.attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_none()).map(|x| {
-                        let ident = format_ident!("f{}", x.idx);
-                        quote!(#ident ,)
-                    }).collect(), TypeHint::Tuple)
-                }
-            };
+fn variant_destruct_block(ctx: &ImplContext<Struct>) -> TokenStream {
+    let (mut idents, type_hint) = match (ctx.input.named_fields, ctx.kind, ctx.struct_attr.type_hint) {
+        (true, Kind::OwnedInto | Kind::RefInto | Kind::OwnedIntoExisting | Kind::RefIntoExisting, _) |
+        (true, _, TypeHint::Struct | TypeHint::Unspecified) |
+        (false, Kind::FromOwned | Kind::FromRef, TypeHint::Struct) => {
+            (ctx.input.fields.iter().filter(|x|!ctx.kind.is_from() || x.attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_none()).map(|x| {
+                let attr = x.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
 
-            if ctx.kind.is_from() {
-                idents.extend(s.attrs.ghosts_attrs.iter()
-                .flat_map(|x| &x.attr.ghost_data)
-                .map(|x| {
-                    let ident = match &x.ghost_ident {
-                        Member::Named(ident) => ident.to_token_stream(),
-                        Member::Unnamed(index) => format_ident!("f{}", index.index).to_token_stream()
-                    };
+                if !ctx.kind.is_from() || attr.is_none() {
+                    let ident = &x.member;
                     quote!(#ident ,)
-                }));
-            }
-
-            match type_hint {
-                TypeHint::Struct => quote!({#(#idents)*}),
-                TypeHint::Tuple => quote!((#(#idents)*)),
-                TypeHint::Unit => TokenStream::new(),
-                _ => unreachable!("18")
-            }
+                } else if let Some(attr) = attr {
+                    let ident = attr.get_field_name_or(&x.member);
+                    quote!(#ident ,)
+                } else { unreachable!("15") }
+            }).collect(), TypeHint::Struct)
         },
-        DataType::Enum(_) => unreachable!("2")
+        (_, Kind::FromOwned | Kind::FromRef, TypeHint::Unit) => (vec![], TypeHint::Unit),
+        _ => {
+            (ctx.input.fields.iter().filter(|x|!ctx.kind.is_from() || x.attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_none()).map(|x| {
+                let ident = format_ident!("f{}", x.idx);
+                quote!(#ident ,)
+            }).collect(), TypeHint::Tuple)
+        }
+    };
+
+    if ctx.kind.is_from() {
+        idents.extend(ctx.input.attrs.ghosts_attrs.iter()
+        .flat_map(|x| &x.attr.ghost_data)
+        .map(|x| {
+            let ident = match &x.ghost_ident {
+                Member::Named(ident) => ident.to_token_stream(),
+                Member::Unnamed(index) => format_ident!("f{}", index.index).to_token_stream()
+            };
+            quote!(#ident ,)
+        }));
+    }
+
+    match type_hint {
+        TypeHint::Struct => quote!({#(#idents)*}),
+        TypeHint::Tuple => quote!((#(#idents)*)),
+        TypeHint::Unit => TokenStream::new(),
+        _ => unreachable!("18")
     }
 }
 
 fn render_child_fragment<F: Fn() -> TokenStream>(
     child_path: &ChildPath,
     fields: &mut Peekable<Iter<(usize, &str, FieldData)>>,
-    ctx: &ImplContext,
+    ctx: &ImplContext<Struct>,
     field_ctx: Option<(&ChildPath, Option<&ChildData>, usize)>,
     type_hint: TypeHint,
     render_line: F
@@ -587,12 +649,9 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
             match ctx.kind {
                 Kind::OwnedInto | Kind::RefInto => 
                     render_child(fields, ctx, (child_path, field_ctx.2 + 1), type_hint),
-                Kind::FromOwned | Kind::FromRef => {
-                    fields.next();
-                    render_line()
-                },
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                     render_existing_child(fields, ctx, (child_path, field_ctx.2 + 1)),
+                _ => unreachable!("19")
             }
         } else {
             fields.next();
@@ -602,17 +661,14 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
         match ctx.kind {
             Kind::OwnedInto | Kind::RefInto => 
                 render_child(fields, ctx, (child_path, 0), type_hint),
-            Kind::FromOwned | Kind::FromRef => {
-                fields.next();
-                render_line()
-            },
             Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                 render_existing_child(fields, ctx, (child_path, 0)),
+            _ => unreachable!("20")
         }
     }
 }
 
-fn struct_pre_init(ctx: &ImplContext, init_data: &Option<Punctuated<InitData, Token![,]>>) -> Option<TokenStream> {
+fn struct_pre_init(ctx: &ImplContext<Struct>, init_data: &Option<Punctuated<InitData, Token![,]>>) -> Option<TokenStream> {
     if let Some(init_data) = init_data {
         let g = init_data.iter().map(|x| {
             let a = &x.ident;
@@ -626,7 +682,7 @@ fn struct_pre_init(ctx: &ImplContext, init_data: &Option<Punctuated<InitData, To
     }
 }
 
-fn struct_post_init(ctx: &ImplContext) -> Option<TokenStream> {
+fn struct_post_init(ctx: &ImplContext<Struct>) -> Option<TokenStream> {
     let mut fragments: Vec<TokenStream> = vec![];
 
     ctx.input.get_members().iter().for_each(|f| {
@@ -644,7 +700,7 @@ fn struct_post_init(ctx: &ImplContext) -> Option<TokenStream> {
     Some(quote!(#(#fragments)*))
 }
 
-fn render_parent(f: &Field, ctx: &ImplContext) -> TokenStream {
+fn render_parent(f: &Field, ctx: &ImplContext<Struct>) -> TokenStream {
     let member = &f.member;
     match (&ctx.kind, ctx.fallible) {
         (Kind::OwnedIntoExisting, false) => quote!(self.#member.into_existing(other);),
@@ -661,23 +717,18 @@ fn render_parent(f: &Field, ctx: &ImplContext) -> TokenStream {
 
 fn render_child(
     fields: &mut Peekable<Iter<(usize, &str, FieldData)>>,
-    ctx: &ImplContext,
+    ctx: &ImplContext<Struct>,
     field_ctx: (&ChildPath, usize),
     hint: TypeHint) -> TokenStream
 {
-    let input = match ctx.input {
-        DataType::Struct(s) => *s,
-        _ => unreachable!("4")
-    };
-
     let child_path = field_ctx.0;
     let path = child_path.get_child_path_str(Some(field_ctx.1));
     let child_name = child_path.child_path[field_ctx.1].to_token_stream();
-    let mut children = input.attrs.children_attr(&ctx.struct_attr.ty).unwrap().children.iter();
+    let mut children = ctx.input.attrs.children_attr(&ctx.struct_attr.ty).unwrap().children.iter();
     let child_data = children.find(|child_data| child_data.check_match(path)).unwrap();
     let ty = &child_data.ty;
     let init = struct_init_block_inner(fields, ctx, Some((field_ctx.0, Some(child_data), field_ctx.1 )));
-    match (input.named_fields, hint) {
+    match (ctx.input.named_fields, hint) {
         (true, TypeHint::Struct | TypeHint::Unspecified) => quote!(#child_name: #ty #init,),
         (true, TypeHint::Tuple) => quote!(#ty #init,),
         (false, TypeHint::Tuple | TypeHint::Unspecified) => quote!(#ty #init,),
@@ -688,18 +739,13 @@ fn render_child(
 
 fn render_existing_child(
     fields: &mut Peekable<Iter<(usize, &str, FieldData)>>,
-    ctx: &ImplContext,
+    ctx: &ImplContext<Struct>,
     field_ctx: (&ChildPath, usize)
 ) -> TokenStream
 {
-    let input = match ctx.input {
-        DataType::Struct(s) => *s,
-        _ => unreachable!("5")
-    };
-
     let child_attr = field_ctx.0;
     let path = child_attr.get_child_path_str(Some(field_ctx.1));
-    let children_attr = input.attrs.children_attr(&ctx.struct_attr.ty);
+    let children_attr = ctx.input.attrs.children_attr(&ctx.struct_attr.ty);
     let child_data = children_attr.and_then(|x| 
         x.children.iter().find(|child_data| child_data.check_match(path)));
     struct_init_block_inner(fields, ctx, Some((field_ctx.0, child_data, field_ctx.1 )))
@@ -707,7 +753,7 @@ fn render_existing_child(
 
 fn render_struct_line(
     f: &Field,
-    ctx: &ImplContext, 
+    ctx: &ImplContext<Struct>, 
     hint: TypeHint, 
     idx: usize
 ) -> TokenStream {
@@ -859,8 +905,7 @@ fn render_struct_line(
 
 fn render_enum_line(
     v: &Variant,
-    ctx: &ImplContext, 
-    _idx: usize
+    ctx: &ImplContext<Enum>,
 ) -> TokenStream {
     let attr = v.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
     let lit = v.attrs.lit(&ctx.struct_attr.ty);
@@ -889,7 +934,7 @@ fn render_enum_line(
     struct_attr.type_hint = type_hint;
 
     let new_ctx = ImplContext {
-        input: &DataType::Struct(&variant_struct),
+        input: &variant_struct,
         struct_attr: &struct_attr,
         destructured_src: true,
         ..*ctx
@@ -933,7 +978,7 @@ fn render_enum_line(
     }
 }
 
-fn render_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
+fn render_ghost_line<T>(ghost_data: &GhostData, ctx: &ImplContext<T>) -> TokenStream {
     let ch = match &ghost_data.child_path {
         Some(ghost_data) => {
             let ch = ghost_data.child_path.to_token_stream();
@@ -985,7 +1030,7 @@ fn replace_tilde_or_at_in_expr(input: &TokenStream, ident: Option<&TokenStream>,
     TokenStream::from_iter(tokens)
 }
 
-fn quote_action(action: &TokenStream, field_path: Option<TokenStream>, ctx: &ImplContext) -> TokenStream {
+fn quote_action<T>(action: &TokenStream, field_path: Option<TokenStream>, ctx: &ImplContext<T>) -> TokenStream {
     let ident = match ctx.kind {
         Kind::FromOwned | Kind::FromRef => quote!(value),
         _ => quote!(self),
@@ -1001,7 +1046,7 @@ fn quote_action(action: &TokenStream, field_path: Option<TokenStream>, ctx: &Imp
     replace_tilde_or_at_in_expr(action, Some(&ident), Some(&path))
 }
 
-fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+fn quote_from_trait(ctx: &ImplContext<dyn DataTypeTrait>, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
     let attribute = &ctx.struct_attr.attribute;
     let impl_attribute = &ctx.struct_attr.impl_attribute;
     let inner_attribute = &ctx.struct_attr.inner_attribute;
@@ -1027,7 +1072,7 @@ fn quote_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
     }
 }
 
-fn quote_try_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+fn quote_try_from_trait(ctx: &ImplContext<dyn DataTypeTrait>, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
     let attribute = &ctx.struct_attr.attribute;
     let impl_attribute = &ctx.struct_attr.impl_attribute;
     let inner_attribute = &ctx.struct_attr.inner_attribute;
@@ -1054,7 +1099,7 @@ fn quote_try_from_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
     }
 }
 
-fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+fn quote_into_trait(ctx: &ImplContext<dyn DataTypeTrait>, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let attribute = &ctx.struct_attr.attribute;
     let impl_attribute = &ctx.struct_attr.impl_attribute;
     let inner_attribute = &ctx.struct_attr.inner_attribute;
@@ -1094,7 +1139,7 @@ fn quote_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: Toke
     }
 }
 
-fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+fn quote_try_into_trait(ctx: &ImplContext<dyn DataTypeTrait>, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let attribute = &ctx.struct_attr.attribute;
     let impl_attribute = &ctx.struct_attr.impl_attribute;
     let inner_attribute = &ctx.struct_attr.inner_attribute;
@@ -1137,7 +1182,7 @@ fn quote_try_into_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: 
     }
 }
 
-fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+fn quote_into_existing_trait(ctx: &ImplContext<dyn DataTypeTrait>, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let attribute = &ctx.struct_attr.attribute;
     let impl_attribute = &ctx.struct_attr.impl_attribute;
     let inner_attribute = &ctx.struct_attr.inner_attribute;
@@ -1163,7 +1208,7 @@ fn quote_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, i
     }
 }
 
-fn quote_try_into_existing_trait(ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
+fn quote_try_into_existing_trait(ctx: &ImplContext<dyn DataTypeTrait>, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let attribute = &ctx.struct_attr.attribute;
     let impl_attribute = &ctx.struct_attr.impl_attribute;
     let inner_attribute = &ctx.struct_attr.inner_attribute;
@@ -1217,7 +1262,7 @@ impl<'a> ApplicableAttr<'a> {
         }
     }
 
-    fn get_action_or<F: Fn() -> TokenStream>(&self, field_path: Option<TokenStream>, ctx: &ImplContext, or: F) -> TokenStream {
+    fn get_action_or<T, F: Fn() -> TokenStream>(&self, field_path: Option<TokenStream>, ctx: &ImplContext<T>, or: F) -> TokenStream {
         match self {
             ApplicableAttr::Field(field_attr) => {
                 match &field_attr.action {
@@ -1229,7 +1274,7 @@ impl<'a> ApplicableAttr<'a> {
         }
     }
 
-    fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, obj: &TokenStream, field_path: F1, ctx: &ImplContext, or: F2) -> TokenStream {
+    fn get_stuff<T, F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, obj: &TokenStream, field_path: F1, ctx: &ImplContext<T>, or: F2) -> TokenStream {
         match self {
             ApplicableAttr::Field(field_attr) => {
                 match (&field_attr.member, &field_attr.action) {

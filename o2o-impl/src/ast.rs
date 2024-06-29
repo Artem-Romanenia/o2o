@@ -36,6 +36,28 @@ impl<'a> Struct<'a> {
     }
 }
 
+impl<'a> DataTypeTrait<'a> for Struct<'a> {
+    fn unit(&'a self) -> bool {
+        self.unit
+    }
+
+    fn get_ident(&'a self) -> &Ident {
+        &self.ident
+    }
+
+    fn get_attrs(&'a self) -> &'a DataTypeAttrs {
+        &self.attrs
+    }
+
+    fn get_members(&'a self) -> Vec<DataTypeMember> {
+        self.fields.iter().map(DataTypeMember::Field).collect()
+    }
+
+    fn get_generics(&'a self) -> &'a Generics {
+        self.generics
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct Field {
     pub attrs: MemberAttrs,
@@ -89,6 +111,28 @@ pub(crate) struct Enum<'a> {
     pub ident: &'a Ident,
     pub generics: &'a Generics,
     pub variants: Vec<Variant>
+}
+
+impl<'a> DataTypeTrait<'a> for Enum<'a> {
+    fn unit(&'a self) -> bool {
+        false
+    }
+
+    fn get_ident(&'a self) -> &Ident {
+        &self.ident
+    }
+
+    fn get_attrs(&'a self) -> &'a DataTypeAttrs {
+        &self.attrs
+    }
+
+    fn get_members(&'a self) -> Vec<DataTypeMember> {
+        self.variants.iter().map(DataTypeMember::Variant).collect()
+    }
+
+    fn get_generics(&'a self) -> &'a Generics {
+        self.generics
+    }
 }
 
 impl<'a> Enum<'a> {
@@ -164,6 +208,14 @@ impl<'a> Variant {
             unit: matches!(&variant.fields, Fields::Unit),
         })
     }
+}
+
+pub(crate) trait DataTypeTrait<'a> {
+    fn unit(&'a self) -> bool;
+    fn get_ident(&'a self) -> &Ident;
+    fn get_attrs(&'a self) -> &'a DataTypeAttrs;
+    fn get_members(&'a self) -> Vec<DataTypeMember>;
+    fn get_generics(&'a self) -> &'a Generics;
 }
 
 pub(crate) enum DataType<'a> {
