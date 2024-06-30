@@ -1,7 +1,7 @@
 use std::{slice::Iter, iter::Peekable, collections::HashSet};
 
 use crate::{
-    ast::{DataType, DataTypeMember, DataTypeTrait, Enum, Field, Struct, Variant},
+    ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
     attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, InitData, Kind, TraitAttrCore, TypeHint}, validate::validate
 };
 use proc_macro2::{TokenStream, Span};
@@ -62,8 +62,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
 
     let main_code_block_ok = |x: &DataType, ctx: &ImplContext| {
         match x {
-            DataType::Struct(s) => struct_main_code_block_ok((s, ctx)),
-            DataType::Enum(e) => enum_main_code_block_ok((e, ctx))
+            DataType::Struct(s) => main_code_block_ok(ctx, struct_main_code_block((s, ctx))),
+            DataType::Enum(e) => main_code_block_ok(ctx, enum_main_code_block((e, ctx)))
         }
     };
 
@@ -321,19 +321,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
     result
 }
 
-fn struct_main_code_block_ok((input, ctx): (&Struct, &ImplContext)) -> TokenStream {
-    let inner = struct_main_code_block((input, ctx));
-
-    if ctx.has_post_init {
-        quote!(#inner)
-    } else {
-        quote!(Ok(#inner))
-    }
-}
-
-fn enum_main_code_block_ok((input, ctx): (&Enum, &ImplContext)) -> TokenStream {
-    let inner = enum_main_code_block((input, ctx));
-
+fn main_code_block_ok(ctx: &ImplContext, inner: TokenStream) -> TokenStream {
     if ctx.has_post_init {
         quote!(#inner)
     } else {
@@ -373,7 +361,7 @@ fn enum_main_code_block((input, ctx): (&Enum, &ImplContext)) -> TokenStream {
 
 fn struct_init_block<'a>((input, ctx): (&'a Struct, &'a ImplContext)) -> TokenStream {
     if (!ctx.kind.is_from() && ctx.struct_attr.type_hint == TypeHint::Unit) ||
-        (ctx.kind.is_from() && input.unit()) {
+        (ctx.kind.is_from() && input.unit) {
         return TokenStream::new();
     }
 
@@ -456,19 +444,19 @@ fn struct_init_block_inner(
                     }
     
                     let fragment = match attrs.child(&ctx.struct_attr.ty) {
-                        Some(child_attr) => render_child_fragment(&child_attr.child_path, members, (input, ctx), field_ctx, type_hint, || render_struct_line(f, (input, ctx), type_hint, idx)),
-                        None => render_struct_line(f, (input, ctx), type_hint, idx),
+                        Some(child_attr) => render_child_fragment(&child_attr.child_path, members, (input, ctx), field_ctx, type_hint, || render_struct_line(f, ctx, type_hint, idx)),
+                        None => {
+                            members.next();
+                            render_struct_line(f, ctx, type_hint, idx)
+                        },
                     };
                     fragments.push(fragment);
                     idx += 1;
                 },
                 FieldData::GhostData(ghost_data) => {
-                    if !ctx.kind.is_from() {
-                        let child_path = &ghost_data.child_path.as_ref().unwrap();
-                        let fragment = render_child_fragment(child_path, members, (input, ctx), field_ctx, type_hint, TokenStream::new);
-                        fragments.push(fragment);
-                    }
-
+                    let child_path = &ghost_data.child_path.as_ref().unwrap();
+                    let fragment = render_child_fragment(child_path, members, (input, ctx), field_ctx, type_hint, TokenStream::new);
+                    fragments.push(fragment);
                     idx += 1;
                 }
             }
@@ -511,20 +499,15 @@ fn struct_init_block_inner(
     }
 }
 
-fn enum_init_block<'a>((input, ctx): (&Enum, &ImplContext)) -> TokenStream {
-    if (!ctx.kind.is_from() && ctx.struct_attr.type_hint == TypeHint::Unit) ||
-        (ctx.kind.is_from() && input.unit()) {
-        return TokenStream::new();
-    }
-
+fn enum_init_block((input, ctx): (&Enum, &ImplContext)) -> TokenStream {
     let mut fields: Vec<VariantData> = vec![];
 
     fields.extend(input.variants.iter()
-        .map(|x| VariantData::Variant(x)).collect::<Vec<VariantData>>());
+        .map(VariantData::Variant).collect::<Vec<VariantData>>());
     
     fields.extend(input.attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
-        .map(|x| VariantData::GhostData(x)));
+        .map(VariantData::GhostData));
 
     enum_init_block_inner(&mut fields.iter().peekable(), (input, ctx))
 }
@@ -534,10 +517,7 @@ fn enum_init_block_inner(
     (input, ctx): (&Enum, &ImplContext),
 ) -> TokenStream
 {
-    let type_hint = ctx.struct_attr.type_hint;
-
     let mut fragments: Vec<TokenStream> = vec![];
-    let mut idx: usize = 0;
 
     let next = members.peek();
     if next.is_some() {
@@ -559,22 +539,17 @@ fn enum_init_block_inner(
                         }
                     }
     
-                    let fragment = render_enum_line(v, (input, ctx));
+                    members.next();
+                    let fragment = render_enum_line(v, ctx);
                     fragments.push(fragment);
-                    idx += 1;
                 },
-                VariantData::GhostData(ghost_data) => {
-                    // let fragment = render_enum_line(f, ctx);
-    
-                    // fragments.push(fragment);
-                    // idx += 1;
-                }
+                VariantData::GhostData(_) => todo!()
             }
         }
     }
 
     if !ctx.kind.is_from() {
-        if let Some(ghost_attr) = input.get_attrs().ghosts_attr(&ctx.struct_attr.ty, &ctx.kind) {
+        if let Some(ghost_attr) = input.attrs.ghosts_attr(&ctx.struct_attr.ty, &ctx.kind) {
             ghost_attr.ghost_data.iter().for_each(|x| {
                 fragments.push(render_ghost_line(x, ctx))
             });
@@ -652,7 +627,10 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
                     render_child(fields, (input, ctx), (child_path, field_ctx.2 + 1), type_hint),
                 Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                     render_existing_child(fields, (input, ctx), (child_path, field_ctx.2 + 1)),
-                _ => unreachable!("19")
+                Kind::FromOwned | Kind::FromRef => {
+                    fields.next();
+                    render_line()
+                },
             }
         } else {
             fields.next();
@@ -664,7 +642,10 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
                 render_child(fields, (input, ctx), (child_path, 0), type_hint),
             Kind::OwnedIntoExisting | Kind::RefIntoExisting =>
                 render_existing_child(fields, (input, ctx), (child_path, 0)),
-            _ => unreachable!("20")
+            Kind::FromOwned | Kind::FromRef => {
+                fields.next();
+                render_line()
+            }
         }
     }
 }
@@ -754,7 +735,7 @@ fn render_existing_child(
 
 fn render_struct_line(
     f: &Field,
-    (input, ctx): (&Struct, &ImplContext), 
+    ctx: &ImplContext, 
     hint: TypeHint, 
     idx: usize
 ) -> TokenStream {
@@ -906,7 +887,7 @@ fn render_struct_line(
 
 fn render_enum_line(
     v: &Variant,
-    (input, ctx): (&Enum, &ImplContext),
+    ctx: &ImplContext,
 ) -> TokenStream {
     let attr = v.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
     let lit = v.attrs.lit(&ctx.struct_attr.ty);
