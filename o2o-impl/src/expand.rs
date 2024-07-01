@@ -418,48 +418,45 @@ fn struct_init_block_inner(
     let mut fragments: Vec<TokenStream> = vec![];
     let mut idx: usize = 0;
 
-    let next = members.peek();
-    if next.is_some() {
-        while let Some((_, key, field_data)) = members.peek() {
-            if let Some(field_ctx) = field_ctx {
-                if !key.starts_with(field_ctx.0.get_child_path_str(Some(field_ctx.2))) {
-                    break;
-                }
+    while let Some((_, key, field_data)) = members.peek() {
+        if let Some(field_ctx) = field_ctx {
+            if !key.starts_with(field_ctx.0.get_child_path_str(Some(field_ctx.2))) {
+                break;
             }
-    
-            match field_data {
-                FieldData::Field(f) => {
-                    let attrs = &f.attrs;
-                    if !ctx.kind.is_from() && (attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() || attrs.has_parent_attr(&ctx.struct_attr.ty)) {
-                        members.next();
-                        continue;
-                    }
-    
-                    if ctx.kind.is_from() {
-                        if let Some(ghost_attr) = attrs.ghost(&ctx.struct_attr.ty, &ctx.kind) {
-                            if ghost_attr.action.is_none() {
-                                members.next();
-                                continue;
-                            }
+        }
+
+        match field_data {
+            FieldData::Field(f) => {
+                let attrs = &f.attrs;
+                if !ctx.kind.is_from() && (attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() || attrs.has_parent_attr(&ctx.struct_attr.ty)) {
+                    members.next();
+                    continue;
+                }
+
+                if ctx.kind.is_from() {
+                    if let Some(ghost_attr) = attrs.ghost(&ctx.struct_attr.ty, &ctx.kind) {
+                        if ghost_attr.action.is_none() {
+                            members.next();
+                            continue;
                         }
                     }
-    
-                    let fragment = match attrs.child(&ctx.struct_attr.ty) {
-                        Some(child_attr) => render_child_fragment(&child_attr.child_path, members, input, ctx, field_ctx, type_hint, || render_struct_line(f, ctx, type_hint, idx)),
-                        None => {
-                            members.next();
-                            render_struct_line(f, ctx, type_hint, idx)
-                        },
-                    };
-                    fragments.push(fragment);
-                    idx += 1;
-                },
-                FieldData::GhostData(ghost_data) => {
-                    let child_path = &ghost_data.child_path.as_ref().unwrap();
-                    let fragment = render_child_fragment(child_path, members, input, ctx, field_ctx, type_hint, TokenStream::new);
-                    fragments.push(fragment);
-                    idx += 1;
                 }
+
+                let fragment = match attrs.child(&ctx.struct_attr.ty) {
+                    Some(child_attr) => render_child_fragment(&child_attr.child_path, members, input, ctx, field_ctx, type_hint, || render_struct_line(f, ctx, type_hint, idx)),
+                    None => {
+                        members.next();
+                        render_struct_line(f, ctx, type_hint, idx)
+                    },
+                };
+                fragments.push(fragment);
+                idx += 1;
+            },
+            FieldData::GhostData(ghost_data) => {
+                let child_path = &ghost_data.child_path.as_ref().unwrap();
+                let fragment = render_child_fragment(child_path, members, input, ctx, field_ctx, type_hint, TokenStream::new);
+                fragments.push(fragment);
+                idx += 1;
             }
         }
     }
@@ -521,32 +518,29 @@ fn enum_init_block_inner(
 {
     let mut fragments: Vec<TokenStream> = vec![];
 
-    let next = members.peek();
-    if next.is_some() {
-        while let Some(member_data) = members.peek() {
-            match member_data {
-                VariantData::Variant(v) => {
-                    let attrs = &v.attrs;
-                    if !ctx.kind.is_from() && (attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() || attrs.has_parent_attr(&ctx.struct_attr.ty)) {
-                        members.next();
-                        continue;
-                    }
-    
-                    if ctx.kind.is_from() {
-                        if let Some(ghost_attr) = attrs.ghost(&ctx.struct_attr.ty, &ctx.kind) {
-                            if ghost_attr.action.is_none() {
-                                members.next();
-                                continue;
-                            }
+    while let Some(member_data) = members.peek() {
+        match member_data {
+            VariantData::Variant(v) => {
+                let attrs = &v.attrs;
+                if !ctx.kind.is_from() && (attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() || attrs.has_parent_attr(&ctx.struct_attr.ty)) {
+                    members.next();
+                    continue;
+                }
+
+                if ctx.kind.is_from() {
+                    if let Some(ghost_attr) = attrs.ghost(&ctx.struct_attr.ty, &ctx.kind) {
+                        if ghost_attr.action.is_none() {
+                            members.next();
+                            continue;
                         }
                     }
-    
-                    members.next();
-                    let fragment = render_enum_line(v, ctx);
-                    fragments.push(fragment);
-                },
-                VariantData::GhostData(_) => todo!()
-            }
+                }
+
+                members.next();
+                let fragment = render_enum_line(v, ctx);
+                fragments.push(fragment);
+            },
+            VariantData::GhostData(_) => todo!()
         }
     }
 
