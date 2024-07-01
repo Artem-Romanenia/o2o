@@ -55,15 +55,15 @@ fn data_type_impl(input: DataType) -> TokenStream {
 
     let main_code_block = |x: &DataType, ctx: &ImplContext| {
         match x {
-            DataType::Struct(s) => struct_main_code_block(s, ctx),
-            DataType::Enum(e) => enum_main_code_block(e, ctx)
+            DataType::Struct(s) => main_code_block(&ctx, || struct_main_code_block(s, ctx)),
+            DataType::Enum(e) => main_code_block(&ctx, || enum_main_code_block(e, ctx))
         }
     };
 
     let main_code_block_ok = |x: &DataType, ctx: &ImplContext| {
         match x {
-            DataType::Struct(s) => main_code_block_ok(ctx, struct_main_code_block(s, ctx)),
-            DataType::Enum(e) => main_code_block_ok(ctx, enum_main_code_block(e, ctx))
+            DataType::Struct(s) => main_code_block_ok(ctx, || struct_main_code_block(s, ctx)),
+            DataType::Enum(e) => main_code_block_ok(ctx, || enum_main_code_block(e, ctx))
         }
     };
 
@@ -79,9 +79,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_from_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx))
-        }
         quote_from_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx))
     });
 
@@ -97,9 +94,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_try_from_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx))
-        }
         quote_try_from_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx))
     });
 
@@ -115,9 +109,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_from_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx))
-        }
         quote_from_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx))
     });
 
@@ -133,9 +124,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_try_from_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx))
-        }
         quote_try_from_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx))
     });
 
@@ -151,9 +139,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_into_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_into_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
@@ -171,9 +156,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_try_into_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_try_into_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx), post_init)
@@ -191,9 +173,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_into_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_into_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
@@ -211,9 +190,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
         };
 
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        if let Some(quick_return) = &struct_attr.quick_return {
-            return quote_try_into_trait(&input, &ctx, pre_init, quote_action(quick_return, None, &ctx), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_try_into_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx), post_init)
@@ -230,11 +206,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        //TODO: Consider removing quick returns for into_existing because they are confusing
-        if let Some(quick_return) = &struct_attr.quick_return {
-            let action = quote_action(quick_return, None, &ctx);
-            return quote_into_existing_trait(&input, &ctx, pre_init, quote!(*other = #action;), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
@@ -251,11 +222,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             fallible: true,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        //TODO: Consider removing quick returns for into_existing because they are confusing
-        if let Some(quick_return) = &struct_attr.quick_return {
-            let action = quote_action(quick_return, None, &ctx);
-            return quote_try_into_existing_trait(&input, &ctx, pre_init, quote!(*other = #action;), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_try_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
@@ -272,11 +238,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        //TODO: Consider removing quick returns for into_existing because they are confusing
-        if let Some(quick_return) = &struct_attr.quick_return {
-            let action = quote_action(quick_return, None, &ctx);
-            return quote_into_existing_trait(&input, &ctx, pre_init, quote!(*other = #action;), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
@@ -293,11 +254,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             fallible: true,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        //TODO: Consider removing quick returns for into_existing because they are confusing
-        if let Some(quick_return) = &struct_attr.quick_return {
-            let action = quote_action(quick_return, None, &ctx);
-            return quote_try_into_existing_trait(&input, &ctx, pre_init, quote!(*other = #action;), None)
-        }
         let post_init = struct_post_init(&input, &ctx);
         ctx.has_post_init = post_init.is_some();
         quote_try_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
@@ -321,9 +277,33 @@ fn data_type_impl(input: DataType) -> TokenStream {
     result
 }
 
-fn main_code_block_ok(ctx: &ImplContext, inner: TokenStream) -> TokenStream {
+fn main_code_block<F: Fn() -> TokenStream>(ctx: &ImplContext, inner: F) -> TokenStream {
+    if let Some(quick_return) = &ctx.struct_attr.quick_return {
+        //TODO: Consider removing quick returns for into_existing because they are confusing
+        if ctx.kind.is_into_existing() {
+            let action = quote_action(quick_return, None, &ctx);
+            return quote!(*other = #action;)
+        }
+        return quote_action(quick_return, None, &ctx)
+    }
+
+    inner()
+}
+
+fn main_code_block_ok<F: Fn() -> TokenStream>(ctx: &ImplContext, inner: F) -> TokenStream {
+    if let Some(quick_return) = &ctx.struct_attr.quick_return {
+        //TODO: Consider removing quick returns for into_existing because they are confusing
+        if ctx.kind.is_into_existing() {
+            let action = quote_action(quick_return, None, &ctx);
+            return quote!(*other = #action;)
+        }
+        return quote_action(quick_return, None, &ctx)
+    }
+
+    let inner = inner();
+
     if ctx.has_post_init {
-        quote!(#inner)
+        inner
     } else {
         quote!(Ok(#inner))
     }
