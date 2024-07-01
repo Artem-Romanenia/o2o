@@ -172,13 +172,6 @@ pub(crate) enum DataType<'a> {
 }
 
 impl<'a> DataType<'a> {
-    pub fn unit(&'a self) -> bool {
-        match self {
-            DataType::Struct(s) => s.unit,
-            DataType::Enum(_) => false,
-        }
-    }
-
     pub fn get_ident(&'a self) -> &Ident {
         match self {
             DataType::Struct(s) => s.ident,
