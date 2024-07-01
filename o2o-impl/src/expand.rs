@@ -496,7 +496,7 @@ fn struct_init_block_inner(
         (_, TypeHint::Tuple, _) => quote!((#(#fragments)*)),
         (_, TypeHint::Unspecified, true) => quote!({#(#fragments)*}),
         (_, TypeHint::Unspecified, false) => quote!((#(#fragments)*)),
-        (_, TypeHint::Unit, _) => unreachable!("16"),
+        (_, TypeHint::Unit, _) => unreachable!("2"),
     }
 }
 
@@ -582,7 +582,7 @@ fn variant_destruct_block(input: &Struct, ctx: &ImplContext,) -> TokenStream {
                 } else if let Some(attr) = attr {
                     let ident = attr.get_field_name_or(&x.member);
                     quote!(#ident ,)
-                } else { unreachable!("15") }
+                } else { unreachable!("3") }
             }).collect(), TypeHint::Struct)
         },
         (_, Kind::FromOwned | Kind::FromRef, TypeHint::Unit) => (vec![], TypeHint::Unit),
@@ -610,7 +610,7 @@ fn variant_destruct_block(input: &Struct, ctx: &ImplContext,) -> TokenStream {
         TypeHint::Struct => quote!({#(#idents)*}),
         TypeHint::Tuple => quote!((#(#idents)*)),
         TypeHint::Unit => TokenStream::new(),
-        _ => unreachable!("18")
+        _ => unreachable!("4")
     }
 }
 
@@ -696,7 +696,7 @@ fn render_parent(f: &Field, ctx: &ImplContext) -> TokenStream {
         (Kind::RefIntoExisting, true) => quote!((&(self.#member)).try_into_existing(other)?;),
         (Kind::OwnedInto, true) => quote!(self.#member.try_into_existing(&mut obj)?;),
         (Kind::RefInto, true) => quote!((&(self.#member)).try_into_existing(&mut obj)?;),
-        _ => unreachable!("3")
+        _ => unreachable!("5")
     }
 }
 
@@ -719,7 +719,7 @@ fn render_child(
         (true, TypeHint::Tuple) => quote!(#ty #init,),
         (false, TypeHint::Tuple | TypeHint::Unspecified) => quote!(#ty #init,),
         (false, TypeHint::Struct) => quote!(#child_name: #ty #init,),
-        (_, TypeHint::Unit) => unreachable!("17")
+        (_, TypeHint::Unit) => unreachable!("15")
     }
 }
 
@@ -890,10 +890,7 @@ fn render_struct_line(
     }
 }
 
-fn render_enum_line(
-    v: &Variant,
-    ctx: &ImplContext,
-) -> TokenStream {
+fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
     let attr = v.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
     let lit = v.attrs.lit(&ctx.struct_attr.ty);
     let pat = v.attrs.pat(&ctx.struct_attr.ty);
@@ -1032,20 +1029,36 @@ fn quote_action(action: &TokenStream, field_path: Option<TokenStream>, ctx: &Imp
     replace_tilde_or_at_in_expr(action, Some(&ident), Some(&path))
 }
 
+struct QuoteTraitParams<'a> {
+    pub attribute: Option<&'a TokenStream>,
+    pub impl_attribute: Option<&'a TokenStream>,
+    pub inner_attribute: Option<&'a TokenStream>,
+    pub dst: &'a TokenStream,
+    pub src: &'a TokenStream,
+    pub gens: TokenStream,
+    pub where_clause: Option<TokenStream>,
+    pub r: Option<TokenStream>,
+}
+
+fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
+    QuoteTraitParams { 
+        attribute: ctx.struct_attr.attribute.as_ref(), 
+        impl_attribute: ctx.struct_attr.impl_attribute.as_ref(), 
+        inner_attribute: ctx.struct_attr.inner_attribute.as_ref(), 
+        dst: ctx.dst_ty, 
+        src: ctx.src_ty, 
+        gens: input.get_generics().to_token_stream(), 
+        where_clause: input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
+            let where_clause = x.where_clause.to_token_stream();
+            quote!(where #where_clause)
+        }), 
+        r: ctx.kind.is_ref().then_some(quote!(&)) 
+    }
+}
+
 fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
-    let attribute = &ctx.struct_attr.attribute;
-    let impl_attribute = &ctx.struct_attr.impl_attribute;
-    let inner_attribute = &ctx.struct_attr.inner_attribute;
-    let dst = ctx.dst_ty;
-    let src = ctx.src_ty;
-    let gens = input.get_generics().to_token_stream();
-    let where_clause  = input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
-        let where_clause = x.where_clause.to_token_stream();
-        quote!(where #where_clause)
-    });
-    let r = ctx.kind.is_ref().then_some(quote!(&));
+    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     quote! {
-        
         #impl_attribute
         impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
             #attribute
@@ -1059,18 +1072,8 @@ fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 }
 
 fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
-    let attribute = &ctx.struct_attr.attribute;
-    let impl_attribute = &ctx.struct_attr.impl_attribute;
-    let inner_attribute = &ctx.struct_attr.inner_attribute;
-    let dst = ctx.dst_ty;
-    let src = ctx.src_ty;
+    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
-    let gens = input.get_generics().to_token_stream();
-    let where_clause  = input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
-        let where_clause = x.where_clause.to_token_stream();
-        quote!(where #where_clause)
-    });
-    let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
         #impl_attribute
         impl #gens std::convert::TryFrom<#r #src> for #dst #gens #where_clause {
@@ -1086,17 +1089,7 @@ fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 }
 
 fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let attribute = &ctx.struct_attr.attribute;
-    let impl_attribute = &ctx.struct_attr.impl_attribute;
-    let inner_attribute = &ctx.struct_attr.inner_attribute;
-    let dst = ctx.dst_ty;
-    let src = ctx.src_ty;
-    let gens = input.get_generics().to_token_stream();
-    let where_clause  = input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x|{
-        let where_clause = x.where_clause.to_token_stream();
-        quote!(where #where_clause)
-    });
-    let r = ctx.kind.is_ref().then_some(quote!(&));
+    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     match post_init {
         Some(post_init) => quote!{
             #impl_attribute
@@ -1126,18 +1119,8 @@ fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 }
 
 fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let attribute = &ctx.struct_attr.attribute;
-    let impl_attribute = &ctx.struct_attr.impl_attribute;
-    let inner_attribute = &ctx.struct_attr.inner_attribute;
-    let dst = ctx.dst_ty;
-    let src = ctx.src_ty;
+    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
-    let gens = input.get_generics().to_token_stream();
-    let where_clause  = input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x|{
-        let where_clause = x.where_clause.to_token_stream();
-        quote!(where #where_clause)
-    });
-    let r = ctx.kind.is_ref().then_some(quote!(&));
     match post_init {
         Some(post_init) => quote!{
             #impl_attribute
@@ -1169,17 +1152,7 @@ fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 }
 
 fn quote_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let attribute = &ctx.struct_attr.attribute;
-    let impl_attribute = &ctx.struct_attr.impl_attribute;
-    let inner_attribute = &ctx.struct_attr.inner_attribute;
-    let dst = ctx.dst_ty;
-    let src = ctx.src_ty;
-    let gens = input.get_generics().to_token_stream();
-    let where_clause  = input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x|{
-        let where_clause = x.where_clause.to_token_stream();
-            quote!(where #where_clause)
-    });
-    let r = ctx.kind.is_ref().then_some(quote!(&));
+    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     quote! {
         #impl_attribute
         impl #gens o2o::traits::IntoExisting<#dst> for #r #src #gens #where_clause {
@@ -1195,18 +1168,8 @@ fn quote_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Opti
 }
 
 fn quote_try_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let attribute = &ctx.struct_attr.attribute;
-    let impl_attribute = &ctx.struct_attr.impl_attribute;
-    let inner_attribute = &ctx.struct_attr.inner_attribute;
-    let dst = ctx.dst_ty;
-    let src = ctx.src_ty;
+    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
-    let gens = input.get_generics().to_token_stream();
-    let where_clause  = input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x|{
-        let where_clause = x.where_clause.to_token_stream();
-            quote!(where #where_clause)
-    });
-    let r = ctx.kind.is_ref().then_some(quote!(&));
     quote! {
         #impl_attribute
         impl #gens o2o::traits::TryIntoExisting<#dst> for #r #src #gens #where_clause {
