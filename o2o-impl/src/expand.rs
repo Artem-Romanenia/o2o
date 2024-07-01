@@ -1030,9 +1030,9 @@ fn quote_action(action: &TokenStream, field_path: Option<TokenStream>, ctx: &Imp
 }
 
 struct QuoteTraitParams<'a> {
-    pub attribute: Option<&'a TokenStream>,
-    pub impl_attribute: Option<&'a TokenStream>,
-    pub inner_attribute: Option<&'a TokenStream>,
+    pub attr: Option<&'a TokenStream>,
+    pub impl_attr: Option<&'a TokenStream>,
+    pub inner_attr: Option<&'a TokenStream>,
     pub dst: &'a TokenStream,
     pub src: &'a TokenStream,
     pub gens: TokenStream,
@@ -1042,9 +1042,9 @@ struct QuoteTraitParams<'a> {
 
 fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
     QuoteTraitParams { 
-        attribute: ctx.struct_attr.attribute.as_ref(), 
-        impl_attribute: ctx.struct_attr.impl_attribute.as_ref(), 
-        inner_attribute: ctx.struct_attr.inner_attribute.as_ref(), 
+        attr: ctx.struct_attr.attribute.as_ref(), 
+        impl_attr: ctx.struct_attr.impl_attribute.as_ref(), 
+        inner_attr: ctx.struct_attr.inner_attribute.as_ref(), 
         dst: ctx.dst_ty, 
         src: ctx.src_ty, 
         gens: input.get_generics().to_token_stream(), 
@@ -1057,13 +1057,13 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
 }
 
 fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
-    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     quote! {
-        #impl_attribute
+        #impl_attr
         impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
-            #attribute
+            #attr
             fn from(value: #r #src) -> #dst #gens {
-                #inner_attribute
+                #inner_attr
                 #pre_init
                 #init
             }
@@ -1072,15 +1072,15 @@ fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 }
 
 fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
-    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
     quote! {
-        #impl_attribute
+        #impl_attr
         impl #gens std::convert::TryFrom<#r #src> for #dst #gens #where_clause {
             type Error = #err_ty;
-            #attribute
+            #attr
             fn try_from(value: #r #src) -> Result<#dst #gens, #err_ty> {
-                #inner_attribute
+                #inner_attr
                 #pre_init
                 #init
             }
@@ -1089,14 +1089,14 @@ fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 }
 
 fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     match post_init {
         Some(post_init) => quote!{
-            #impl_attribute
+            #impl_attr
             impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
-                #attribute
+                #attr
                 fn into(self) -> #dst {
-                    #inner_attribute
+                    #inner_attr
                     let mut obj: #dst = Default::default();
                     #init
                     #post_init
@@ -1105,11 +1105,11 @@ fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
             }
         },
         None => quote! {
-            #impl_attribute
+            #impl_attr
             impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
-                #attribute
+                #attr
                 fn into(self) -> #dst {
-                    #inner_attribute
+                    #inner_attr
                     #pre_init
                     #init
                 }
@@ -1119,16 +1119,16 @@ fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 }
 
 fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
     match post_init {
         Some(post_init) => quote!{
-            #impl_attribute
+            #impl_attr
             impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
                 type Error = #err_ty;
-                #attribute
+                #attr
                 fn try_into(self) -> Result<#dst, #err_ty> {
-                    #inner_attribute
+                    #inner_attr
                     let mut obj: #dst = Default::default();
                     #init
                     #post_init
@@ -1137,12 +1137,12 @@ fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
             }
         },
         None => quote! {
-            #impl_attribute
+            #impl_attr
             impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
                 type Error = #err_ty;
-                #attribute
+                #attr
                 fn try_into(self) -> Result<#dst, #err_ty> {
-                    #inner_attribute
+                    #inner_attr
                     #pre_init
                     #init
                 }
@@ -1152,13 +1152,13 @@ fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 }
 
 fn quote_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     quote! {
-        #impl_attribute
+        #impl_attr
         impl #gens o2o::traits::IntoExisting<#dst> for #r #src #gens #where_clause {
-            #attribute
+            #attr
             fn into_existing(self, other: &mut #dst) {
-                #inner_attribute
+                #inner_attr
                 #pre_init
                 #init
                 #post_init
@@ -1168,15 +1168,15 @@ fn quote_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Opti
 }
 
 fn quote_try_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attribute, impl_attribute, inner_attribute, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
     quote! {
-        #impl_attribute
+        #impl_attr
         impl #gens o2o::traits::TryIntoExisting<#dst> for #r #src #gens #where_clause {
             type Error = #err_ty;
-            #attribute
+            #attr
             fn try_into_existing(self, other: &mut #dst) -> Result<(), #err_ty> {
-                #inner_attribute
+                #inner_attr
                 #pre_init
                 #init
                 #post_init
