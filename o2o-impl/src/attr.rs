@@ -693,7 +693,7 @@ impl Parse for StructGhostAttrCore{
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(StructGhostAttrCore { 
             container_ty: try_parse_container_ident(input, false),
-            ghost_data: Punctuated::parse_separated_nonempty(input)?,
+            ghost_data: Punctuated::parse_terminated(input)?,
         })
     }
 }
@@ -701,8 +701,23 @@ impl Parse for StructGhostAttrCore{
 #[derive(Clone)]
 pub(crate) struct GhostData {
     pub child_path: Option<ChildPath>,
-    pub ghost_ident: Member,
+    pub ghost_ident: GhostIdent,
     pub action: TokenStream,
+}
+
+#[derive(Clone)]
+pub(crate) enum GhostIdent {
+    Member(Member),
+    Destruction(TokenStream)
+}
+
+impl GhostIdent {
+    pub(crate) fn get_ident(&self) -> &Member {
+        match self {
+            GhostIdent::Member(member) => member,
+            GhostIdent::Destruction(_) => unreachable!("16")
+        }
+    }
 }
 
 impl GhostData {
@@ -736,8 +751,24 @@ impl Parse for GhostData {
             input.parse::<Token![@]>()?;
             child_path
         } else { None };
-        let ghost_ident = input.parse()?;
+        let ghost_ident = if input.peek2(Token![:]) {
+            GhostIdent::Member(input.parse()?)
+        } else if input.peek2(Brace) {
+            let ident: Ident = input.parse()?;
+            let content;
+            braced!(content in input);
+            let destr: TokenStream = content.parse()?;
+            GhostIdent::Destruction(quote!(#ident {#destr}))
+        } else {
+            let ident: Ident = input.parse()?;
+            let content;
+            parenthesized!(content in input);
+            let destr: TokenStream = content.parse()?;
+            GhostIdent::Destruction(quote!(#ident (#destr)))
+        };
+
         input.parse::<Token![:]>()?;
+        
         Ok(GhostData {
             child_path,
             ghost_ident,
@@ -1272,7 +1303,7 @@ fn peek_container_path(input: ParseStream, can_be_empty: bool) -> bool {
 }
 
 fn peek_ghost_field_name(input: ParseStream) -> bool {
-    peek_member(input) && input.peek2(Token![:])
+    peek_member(input) && (input.peek2(Token![:]) || input.peek2(Brace) || input.peek2(Paren))
 }
 
 fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token![,]>> {

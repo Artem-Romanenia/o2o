@@ -2,7 +2,7 @@ use std::{slice::Iter, iter::Peekable, collections::HashSet};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
-    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, InitData, Kind, TraitAttrCore, TypeHint}, validate::validate
+    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, InitData, Kind, TraitAttrCore, TypeHint}, validate::validate
 };
 use proc_macro2::{TokenStream, Span};
 use syn::{punctuated::Punctuated, Data, DeriveInput, Error, Index, Member, Result, Token};
@@ -55,8 +55,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
 
     let main_code_block = |x: &DataType, ctx: &ImplContext| {
         match x {
-            DataType::Struct(s) => main_code_block(&ctx, || struct_main_code_block(s, ctx)),
-            DataType::Enum(e) => main_code_block(&ctx, || enum_main_code_block(e, ctx))
+            DataType::Struct(s) => main_code_block(ctx, || struct_main_code_block(s, ctx)),
+            DataType::Enum(e) => main_code_block(ctx, || enum_main_code_block(e, ctx))
         }
     };
 
@@ -281,10 +281,10 @@ fn main_code_block<F: Fn() -> TokenStream>(ctx: &ImplContext, inner: F) -> Token
     if let Some(quick_return) = &ctx.struct_attr.quick_return {
         //TODO: Consider removing quick returns for into_existing because they are confusing
         if ctx.kind.is_into_existing() {
-            let action = quote_action(quick_return, None, &ctx);
+            let action = quote_action(quick_return, None, ctx);
             return quote!(*other = #action;)
         }
-        return quote_action(quick_return, None, &ctx)
+        return quote_action(quick_return, None, ctx)
     }
 
     inner()
@@ -294,10 +294,10 @@ fn main_code_block_ok<F: Fn() -> TokenStream>(ctx: &ImplContext, inner: F) -> To
     if let Some(quick_return) = &ctx.struct_attr.quick_return {
         //TODO: Consider removing quick returns for into_existing because they are confusing
         if ctx.kind.is_into_existing() {
-            let action = quote_action(quick_return, None, &ctx);
+            let action = quote_action(quick_return, None, ctx);
             return quote!(*other = #action;)
         }
-        return quote_action(quick_return, None, &ctx)
+        return quote_action(quick_return, None, ctx)
     }
 
     let inner = inner();
@@ -502,12 +502,12 @@ fn enum_init_block_inner(
         match member_data {
             VariantData::Variant(v) => {
                 let attrs = &v.attrs;
-                if !ctx.kind.is_from() && (attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() || attrs.has_parent_attr(&ctx.struct_attr.ty)) {
+                if ctx.kind.is_from() && attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some() {
                     members.next();
                     continue;
                 }
 
-                if ctx.kind.is_from() {
+                if !ctx.kind.is_from() {
                     if let Some(ghost_attr) = attrs.ghost(&ctx.struct_attr.ty, &ctx.kind) {
                         if ghost_attr.action.is_none() {
                             members.next();
@@ -520,20 +520,20 @@ fn enum_init_block_inner(
                 let fragment = render_enum_line(v, ctx);
                 fragments.push(fragment);
             },
-            VariantData::GhostData(_) => todo!()
+            VariantData::GhostData(ghost_data) => {
+                members.next();
+                let fragment = render_enum_ghost_line(ghost_data, ctx);
+                fragments.push(fragment);
+            }
         }
     }
 
-    if !ctx.kind.is_from() {
-        if let Some(ghost_attr) = input.attrs.ghosts_attr(&ctx.struct_attr.ty, &ctx.kind) {
-            ghost_attr.ghost_data.iter().for_each(|x| {
-                fragments.push(render_ghost_line(x, ctx))
-            });
-        }
-    }
-
-    if ctx.kind.is_from() {
-        if let Some(default_case) = &ctx.struct_attr.default_case {
+    if let Some(default_case) = &ctx.struct_attr.default_case {
+        if ctx.kind.is_from() && (
+            input.variants.iter().any(|v|v.attrs.lit(&ctx.struct_attr.ty).is_some() || v.attrs.pat(&ctx.struct_attr.ty).is_some()) 
+            || input.attrs.ghosts_attr(&ctx.struct_attr.ty, &ctx.kind).is_some())
+        || !ctx.kind.is_from() && input.variants.iter().any(|v|v.attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some())
+        {
             let g = quote_action(default_case, None, ctx);
             fragments.push(quote!(_ #g))
         }
@@ -572,7 +572,8 @@ fn variant_destruct_block(input: &Struct, ctx: &ImplContext,) -> TokenStream {
         idents.extend(input.attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
         .map(|x| {
-            let ident = match &x.ghost_ident {
+            let ghost_ident = x.ghost_ident.get_ident();
+            let ident = match ghost_ident {
                 Member::Named(ident) => ident.to_token_stream(),
                 Member::Unnamed(index) => format_ident!("f{}", index.index).to_token_stream()
             };
@@ -898,7 +899,15 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
     };
 
     let empty_fields = variant_struct.fields.is_empty();
-    let destr = if empty_fields && (!new_ctx.kind.is_from() || type_hint.maybe(TypeHint::Unit)) { TokenStream::new() } else { variant_destruct_block(&variant_struct, &new_ctx) };
+    let destr = if empty_fields && (!new_ctx.kind.is_from() || type_hint.maybe(TypeHint::Unit)) { 
+        TokenStream::new() 
+    } else if empty_fields && new_ctx.kind.is_from() && type_hint == TypeHint::Tuple {
+        quote!((..))
+    } else if empty_fields && new_ctx.kind.is_from() && type_hint == TypeHint::Struct {
+        quote!({..})
+    } else { 
+        variant_destruct_block(&variant_struct, &new_ctx) 
+    };
     let init = if empty_fields && type_hint.maybe(TypeHint::Unit) { TokenStream::new() } else { struct_init_block(&variant_struct, &new_ctx) };
 
     match (v.named_fields, attr, lit, pat, &ctx.kind) {
@@ -907,13 +916,14 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
         },
         (_, Some(attr), None, None, Kind::FromOwned | Kind::FromRef) => {
             let member = Member::Named(ident.clone());
+            let right_side = attr.get_action_or(Some(quote!(#dst)), ctx, || quote!(#dst::#ident #init));
             let ident2 = attr.get_field_name_or(&member);
-            quote!(#src::#ident2 #destr => #dst::#ident #init,)
+            quote!(#src::#ident2 #destr => #right_side,)
         },
         (_, Some(attr), None, None, Kind::OwnedInto | Kind::RefInto) => {
             let member = Member::Named(ident.clone());
-            let ident2 = attr.get_field_name_or(&member);
-            quote!(#src::#ident #destr => #dst::#ident2 #init,)
+            let right_side = attr.get_stuff(&quote!(#dst::), |x| quote!(#x #init), ctx, || &member);
+            quote!(#src::#ident #destr => #right_side,)
         },
         (_, None, Some(lit), None, Kind::FromOwned | Kind::FromRef) => {
             let left_side = &lit.tokens;
@@ -944,7 +954,8 @@ fn render_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
         None => TokenStream::new()
     };
     let right_side = quote_action(&ghost_data.action, None, ctx);
-    match (&ghost_data.ghost_ident, &ctx.kind) {
+    let ghost_ident = &ghost_data.ghost_ident.get_ident();
+    match (ghost_ident, &ctx.kind) {
         (Member::Named(ident), Kind::OwnedInto | Kind::RefInto) => quote!(#ident: #right_side,),
         (Member::Unnamed(_), Kind::OwnedInto | Kind::RefInto) => quote!(#right_side,),
         (Member::Named(ident), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => quote!(other.#ch #ident = #right_side;),
@@ -953,13 +964,31 @@ fn render_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
     }
 }
 
-fn replace_tilde_or_at_in_expr(input: &TokenStream, ident: Option<&TokenStream>, path: Option<&TokenStream>) -> TokenStream {
+fn render_enum_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
+    let src = ctx.src_ty;
+    let right_side = quote_action(&ghost_data.action, None, ctx);
+
+    match &ghost_data.ghost_ident {
+        GhostIdent::Member(ghost_ident) => match (ghost_ident, ctx.kind.is_from()) {
+            (Member::Unnamed(_), _) => unreachable!("17"),
+            (Member::Named(ident), true) => quote!(#src::#ident => #right_side,),
+            (_, false) => TokenStream::new(),
+        }, 
+        GhostIdent::Destruction(destr) => if ctx.kind.is_from() {
+            quote!(#src::#destr => #right_side,)
+        } else {
+            TokenStream::new()
+        }
+    }
+}
+
+fn replace_tilde_or_at_in_expr(input: &TokenStream, at_tokens: Option<&TokenStream>, tilde_tokens: Option<&TokenStream>) -> TokenStream {
     let mut tokens = Vec::new();
 
     input.clone().into_iter().for_each(|x| {
         let f = match x {
             proc_macro2::TokenTree::Group(group) => {
-                let inner = replace_tilde_or_at_in_expr(&group.stream(), ident, path);
+                let inner = replace_tilde_or_at_in_expr(&group.stream(), at_tokens, tilde_tokens);
                 match group.delimiter() {
                     proc_macro2::Delimiter::Parenthesis => quote!(( #inner )),
                     proc_macro2::Delimiter::Brace => quote!({ #inner }),
@@ -971,9 +1000,9 @@ fn replace_tilde_or_at_in_expr(input: &TokenStream, ident: Option<&TokenStream>,
                 let ch = punct.as_char();
 
                 if ch == '~' {
-                    quote!(#path)
+                    quote!(#tilde_tokens)
                 } else if ch == '@' {
-                    quote!(#ident)
+                    quote!(#at_tokens)
                 } else {
                     quote!(#punct)
                 }
