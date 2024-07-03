@@ -29,13 +29,26 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum ImplType {
+    Struct,
+    Enum,
+    Variant
+}
+
+impl ImplType {
+    fn is_variant(self) -> bool {
+        self == ImplType::Variant
+    }
+}
+
 struct ImplContext<'a> {
     struct_attr: &'a TraitAttrCore,
     kind: Kind,
     dst_ty: &'a TokenStream,
     src_ty: &'a TokenStream,
     has_post_init: bool,
-    destructured_src: bool,
+    impl_type: ImplType,
     fallible: bool
 }
 
@@ -67,6 +80,11 @@ fn data_type_impl(input: DataType) -> TokenStream {
         }
     };
 
+    let impl_type = match input {
+        DataType::Struct(_) => ImplType::Struct,
+        DataType::Enum(_) => ImplType::Enum
+    };
+
     let from_owned_impls = attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|struct_attr| {
         let ctx = ImplContext {
             struct_attr,
@@ -74,7 +92,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: false,
         };
 
@@ -89,7 +107,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: true,
         };
 
@@ -104,7 +122,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: false,
         };
 
@@ -119,7 +137,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: true,
         };
 
@@ -134,7 +152,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: false,
         };
 
@@ -151,7 +169,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: true,
         };
 
@@ -168,7 +186,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: false,
         };
 
@@ -185,7 +203,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: true,
         };
 
@@ -202,7 +220,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -218,7 +236,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: true,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -234,7 +252,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: false,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -250,7 +268,7 @@ fn data_type_impl(input: DataType) -> TokenStream {
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
             has_post_init: false,
-            destructured_src: false,
+            impl_type,
             fallible: true,
         };
         let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
@@ -730,7 +748,7 @@ fn render_struct_line(
         }
     };
 
-    let obj = if ctx.destructured_src { TokenStream::new() } else {
+    let obj = if ctx.impl_type.is_variant() { TokenStream::new() } else {
         match ctx.kind {
             Kind::OwnedInto => quote!(self.),
             Kind::RefInto => quote!(self.),
@@ -768,7 +786,7 @@ fn render_struct_line(
             },
         (syn::Member::Named(ident), None, Kind::FromOwned | Kind::FromRef, TypeHint::Tuple) => {
             let index = Member::Unnamed(Index { index: f.idx as u32, span: Span::call_site() });
-            let field_path = if ctx.destructured_src { get_field_path(&Member::Named(format_ident!("f{}", index))) } else { get_field_path(&index) };
+            let field_path = if ctx.impl_type.is_variant() { get_field_path(&Member::Named(format_ident!("f{}", index))) } else { get_field_path(&index) };
             quote!(#ident: #obj #field_path,)
         },
         (syn::Member::Unnamed(index), None, Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple | TypeHint::Unspecified) =>
@@ -776,7 +794,7 @@ fn render_struct_line(
                 let index2 = Member::Unnamed(Index { index: idx as u32, span: Span::call_site() });
                 quote!(obj.#index2 = #obj #index;)
             } else { 
-                let index = if ctx.destructured_src { format_ident!("f{}", index.index).to_token_stream() } else { index.to_token_stream() };
+                let index = if ctx.impl_type.is_variant() { format_ident!("f{}", index.index).to_token_stream() } else { index.to_token_stream() };
                 quote!(#obj #index,)
             },
         (syn::Member::Unnamed(index), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple | TypeHint::Unspecified) => {
@@ -792,7 +810,7 @@ fn render_struct_line(
                     (false, false) => quote!((&value).into(),),
                 }
             } else {
-                let field_path = if ctx.destructured_src { get_field_path(&Member::Named(format_ident!("f{}", index.index))) } else { get_field_path(&f.member) };
+                let field_path = if ctx.impl_type.is_variant() { get_field_path(&Member::Named(format_ident!("f{}", index.index))) } else { get_field_path(&f.member) };
                 quote!(#obj #field_path,)
             },
         (syn::Member::Unnamed(_), None, _, TypeHint::Struct) => {
@@ -832,11 +850,11 @@ fn render_struct_line(
         },
         (syn::Member::Named(ident), Some(attr), Kind::FromOwned | Kind::FromRef, TypeHint::Tuple) => {
             let or = Member::Named(format_ident!("f{}", f.idx));
-            let right_side = attr.get_stuff(&obj, get_field_path, ctx, || if ctx.destructured_src { &or } else { &f.member});
+            let right_side = attr.get_stuff(&obj, get_field_path, ctx, || if ctx.impl_type.is_variant() { &or } else { &f.member});
             quote!(#ident: #right_side,)
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple | TypeHint::Unspecified) => {
-            let index = if ctx.destructured_src { Some(format_ident!("f{}", index.index).to_token_stream()) } else { Some(index.to_token_stream()) };
+            let index = if ctx.impl_type.is_variant() { Some(format_ident!("f{}", index.index).to_token_stream()) } else { Some(index.to_token_stream()) };
             let right_side = attr.get_action_or(index.clone(), ctx, || quote!(#obj #index));
             quote!(#right_side,)
         },
@@ -847,7 +865,7 @@ fn render_struct_line(
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Struct) => {
             let field_name = attr.get_ident();
-            let or = if ctx.destructured_src { format_ident!("f{}", index.index).to_token_stream() } else { index.to_token_stream() };
+            let or = if ctx.impl_type.is_variant() { format_ident!("f{}", index.index).to_token_stream() } else { index.to_token_stream() };
             let right_side = attr.get_action_or(Some(or.clone()), ctx, || quote!(#obj #or));
             if ctx.has_post_init { quote!(obj.#field_name = #right_side;) } else { quote!(#field_name: #right_side,) }
         },
@@ -858,7 +876,7 @@ fn render_struct_line(
         },
         (syn::Member::Unnamed(index), Some(attr), Kind::FromOwned | Kind::FromRef, _) => {
             let or = Member::Named(format_ident!("f{}", index.index));
-            let right_side = attr.get_stuff(&obj, get_field_path, ctx, || if ctx.destructured_src { &or } else { &f.member});
+            let right_side = attr.get_stuff(&obj, get_field_path, ctx, || if ctx.impl_type.is_variant() { &or } else { &f.member});
             quote!(#right_side,)
         },
         (_, _, Kind::OwnedInto | Kind::RefInto | Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Unit) => TokenStream::new()
@@ -894,7 +912,7 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
 
     let new_ctx = ImplContext {
         struct_attr: &struct_attr,
-        destructured_src: true,
+        impl_type: ImplType::Variant,
         ..*ctx
     };
 
@@ -908,7 +926,7 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
     } else { 
         variant_destruct_block(&variant_struct, &new_ctx) 
     };
-    let init = if empty_fields && type_hint.maybe(TypeHint::Unit) { TokenStream::new() } else { struct_init_block(&variant_struct, &new_ctx) };
+    let init = if attr.as_ref().is_some_and(|x|x.has_action()) || empty_fields && type_hint.maybe(TypeHint::Unit) { TokenStream::new() } else { struct_init_block(&variant_struct, &new_ctx) };
 
     match (v.named_fields, attr, lit, pat, &ctx.kind) {
         (_, None, None, None, _) => {
@@ -916,7 +934,7 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
         },
         (_, Some(attr), None, None, Kind::FromOwned | Kind::FromRef) => {
             let member = Member::Named(ident.clone());
-            let right_side = attr.get_action_or(Some(quote!(#dst)), ctx, || quote!(#dst::#ident #init));
+            let right_side = attr.get_action_or(Some(quote!(#ident)), ctx, || quote!(#dst::#ident #init));
             let ident2 = attr.get_field_name_or(&member);
             quote!(#src::#ident2 #destr => #right_side,)
         },
@@ -1016,18 +1034,16 @@ fn replace_tilde_or_at_in_expr(input: &TokenStream, at_tokens: Option<&TokenStre
     TokenStream::from_iter(tokens)
 }
 
-fn quote_action(action: &TokenStream, field_path: Option<TokenStream>, ctx: &ImplContext) -> TokenStream {
+fn quote_action(action: &TokenStream, tilde_postfix: Option<TokenStream>, ctx: &ImplContext) -> TokenStream {
+    let dst = ctx.dst_ty;
     let ident = match ctx.kind {
         Kind::FromOwned | Kind::FromRef => quote!(value),
         _ => quote!(self),
     };
-    let path = if ctx.destructured_src {
-        quote!(#field_path)
-    } else {
-        match ctx.kind {
-            Kind::FromOwned | Kind::FromRef => quote!(value.#field_path),
-            _ => quote!(self.#field_path),
-        }
+    let path = match ctx.impl_type {
+        ImplType::Struct => quote!(#ident.#tilde_postfix),
+        ImplType::Enum => quote!(#dst::#tilde_postfix),
+        ImplType::Variant => quote!(#tilde_postfix),
     };
     replace_tilde_or_at_in_expr(action, Some(&ident), Some(&path))
 }
@@ -1202,6 +1218,13 @@ impl<'a> ApplicableAttr<'a> {
         }
     }
 
+    fn has_action(&self) -> bool {
+        match self {
+            ApplicableAttr::Field(f) => f.action.is_some(),
+            ApplicableAttr::Ghost(g) => g.action.is_some(),
+        }
+    }
+
     fn get_field_name_or(&'a self, field: &'a Member) -> &'a Member {
         match self {
             ApplicableAttr::Field(field_attr) => {
@@ -1232,7 +1255,7 @@ impl<'a> ApplicableAttr<'a> {
                 match (&field_attr.member, &field_attr.action) {
                     (Some(ident), Some(action)) => {
                         if let Member::Unnamed(index) = ident {
-                            if ctx.destructured_src { 
+                            if ctx.impl_type.is_variant() { 
                                 let ident = Member::Named(format_ident!("f{}", index.index));
                                 quote_action(action, Some(field_path(&ident)), ctx) 
                             } else { quote_action(action, Some(field_path(ident)), ctx)}
