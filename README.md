@@ -156,6 +156,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Different variant name](#different-variant-name)
   - [Different enum variant field names and types](#different-enum-variant-field-names-and-types)
   - [Enum variant type hint](#enum-variant-type-hint)
+  - [Enum ghost variants](#enum-ghost-variants)
   - [Enum variant ghost fields](#enum-variant-ghost-fields)
   - [Mapping to primitive types](#mapping-to-primitive-types)
     - [Using literals](#using-literals)
@@ -1954,6 +1955,30 @@ enum EnumWithDataDto {
   ```
 </details>
 
+Alternatively, this can be done this way:
+
+``` rust
+enum EnumWithData {
+    Item1(i32, i16),
+    Item2 { str: String, i: i32 },
+}
+
+#[derive(o2o::o2o)]
+#[from_owned(EnumWithData)]
+#[owned_try_into(EnumWithData, std::num::ParseIntError)]
+enum EnumWithDataDto {
+    // When applied to enum variants, ~ replaces 'RightSideEnum::VariantName'
+    #[from(~(f0.to_string(), f1))] // ~ is 'EnumWithDataDto::Item1'
+    #[into(~(f0.parse::<i32>()?, f1))] // ~ is 'EnumWithData::Item1'
+    Item1(String, i16),
+    #[from(~{ str, i_str: i.to_string()})] 
+    #[into(~{ str, i: i_str.parse::<i32>()? })]
+    Item2 { str: String, #[map(i)]i_str: String },
+}
+```
+
+This example will produce exactly the same code as the example above.
+
 ### Enum variant type hint
 
 Mapping to a unit enum variant:
@@ -1986,6 +2011,40 @@ enum EnumDto {
               Enum::Var1 => EnumDto::Var1,
               Enum::Var2(f0, f1) => EnumDto::Var2,
               Enum::Var3 { _field, _str_field } => EnumDto::Var3,
+          }
+      }
+  }
+  ```
+</details>
+
+Reversed example:
+
+``` rust
+enum Enum {
+    Var1,
+    Var2(i32, String),
+    Var3 { _field: i32, _str_field: String }
+}
+
+#[derive(o2o::o2o)]
+#[from(Enum)]
+enum EnumDto {
+    Var1,
+    #[type_hint(as ())] Var2,
+    #[type_hint(as {})] Var3
+}
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<Enum> for EnumDto {
+      fn from(value: Enum) -> EnumDto {
+          match value {
+              Enum::Var1 => EnumDto::Var1,
+              Enum::Var2(..) => EnumDto::Var2,
+              Enum::Var3 { .. } => EnumDto::Var3,
           }
       }
   }
@@ -2036,6 +2095,94 @@ enum EnumDto {
               Enum::Var1 => EnumDto::Var1,
               Enum::Var2 { field } => EnumDto::Var2(field),
               Enum::Var3(f0) => EnumDto::Var3 { str_field: f0 },
+          }
+      }
+  }
+  ```
+</details>
+
+### Enum ghost variants
+
+``` rust
+enum Enum {
+    Var1,
+    Var2(i32, String),
+}
+
+#[derive(o2o::o2o)]
+#[from_owned(Enum)]
+#[owned_try_into(Enum, String)]
+enum EnumDto {
+    Var1,
+    Var2(i32, String),
+    #[ghost({Err(format!("unknown: {}", _str_field))?})]
+    Var3 { _field: i32, _str_field: String }
+}
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::From<Enum> for EnumDto {
+      fn from(value: Enum) -> EnumDto {
+          match value {
+              Enum::Var1 => EnumDto::Var1,
+              Enum::Var2(f0, f1) => EnumDto::Var2(f0, f1),
+          }
+      }
+  }
+  impl std::convert::TryInto<Enum> for EnumDto {
+      type Error = String;
+      fn try_into(self) -> Result<Enum, String> {
+          Ok(match self {
+              EnumDto::Var1 => Enum::Var1,
+              EnumDto::Var2(f0, f1) => Enum::Var2(f0, f1),
+              EnumDto::Var3 { _field, _str_field } => Err(format!("unknown: {}", _str_field))?,
+          })
+      }
+  }
+  ```
+</details>
+
+Reverse case:
+
+``` rust
+#[derive(o2o::o2o)]
+#[try_from_owned(EnumDto, String)]
+#[owned_into(EnumDto)]
+#[ghosts(Var3 { _str_field, .. }: {Err(format!("Unknown: {}", _str_field))?})]
+enum Enum {
+    Var1,
+    Var2(i32, String),
+}
+
+enum EnumDto {
+    Var1,
+    Var2(i32, String),
+    Var3 { _field: i32, _str_field: String }
+}
+```
+
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl std::convert::TryFrom<EnumDto> for Enum {
+      type Error = String;
+      fn try_from(value: EnumDto) -> Result<Enum, String> {
+          Ok(match value {
+              EnumDto::Var1 => Enum::Var1,
+              EnumDto::Var2(f0, f1) => Enum::Var2(f0, f1),
+              EnumDto::Var3 { _str_field, .. } => Err(format!("Unknown: {}", _str_field))?,
+          })
+      }
+  }
+  impl std::convert::Into<EnumDto> for Enum {
+      fn into(self) -> EnumDto {
+          match self {
+              Enum::Var1 => EnumDto::Var1,
+              Enum::Var2(f0, f1) => EnumDto::Var2(f0, f1),
           }
       }
   }
