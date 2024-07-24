@@ -1109,29 +1109,27 @@ fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 
 fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
-    match post_init {
-        Some(post_init) => quote!{
-            #impl_attr
-            impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
-                #attr
-                fn into(self) -> #dst {
-                    #inner_attr
-                    let mut obj: #dst = Default::default();
-                    #init
-                    #post_init
-                    obj
-                }
-            }
+
+    let body = match post_init {
+        Some(post_init) => quote! {
+            let mut obj: #dst = Default::default();
+            #init
+            #post_init
+            obj
         },
         None => quote! {
-            #impl_attr
-            impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
-                #attr
-                fn into(self) -> #dst {
-                    #inner_attr
-                    #pre_init
-                    #init
-                }
+            #pre_init
+            #init
+        },
+    };
+
+    quote!{
+        #impl_attr
+        impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
+            #attr
+            fn into(self) -> #dst {
+                #inner_attr
+                #body
             }
         }
     }
@@ -1140,31 +1138,28 @@ fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
     let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
-    match post_init {
-        Some(post_init) => quote!{
-            #impl_attr
-            impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
-                type Error = #err_ty;
-                #attr
-                fn try_into(self) -> Result<#dst, #err_ty> {
-                    #inner_attr
-                    let mut obj: #dst = Default::default();
-                    #init
-                    #post_init
-                    Ok(obj)
-                }
-            }
+
+    let body = match post_init {
+        Some(post_init) => quote! {
+            let mut obj: #dst = Default::default();
+            #init
+            #post_init
+            Ok(obj)
         },
         None => quote! {
-            #impl_attr
-            impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
-                type Error = #err_ty;
-                #attr
-                fn try_into(self) -> Result<#dst, #err_ty> {
-                    #inner_attr
-                    #pre_init
-                    #init
-                }
+            #pre_init
+            #init
+        },
+    };
+
+    quote! {
+        #impl_attr
+        impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
+            type Error = #err_ty;
+            #attr
+            fn try_into(self) -> Result<#dst, #err_ty> {
+                #inner_attr
+                #body
             }
         }
     }

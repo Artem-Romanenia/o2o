@@ -5,10 +5,10 @@ use std::ops::Index;
 
 use proc_macro2::{TokenStream, Span};
 use quote::{quote, ToTokens};
-use syn::parse::{ParseStream, Parse};
+use syn::parse::{ParseStream, Parse, ParseBuffer};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::token::{Brace, Paren};
+use syn::token::{Brace, Paren, Comma};
 use syn::{Attribute, Ident, Result, Token, Member, parenthesized, braced, WherePredicate, Error};
 
 use crate::ast::SynDataTypeMember;
@@ -548,57 +548,44 @@ impl Parse for TraitAttrCore {
     }
 }
 
+fn parse_trait_instruction_param_inner_1<T: Parse>(input: &syn::parse::ParseBuffer, condition: bool, setter: impl FnOnce(), span: impl Fn(T) -> Span, name: &str) -> Result<bool> {
+    let a = input.parse::<T>()?;
+    if input.peek(Token![,]) {
+        input.parse::<Token![,]>()?;
+    }
+    if condition {
+        Err(syn::Error::new(span(a), format!("Instruction parameter '{}' was already set.", name)))?
+    } else {
+        setter();
+        return Ok(true)
+    }
+}
+
+fn parse_trait_instruction_param_inner_2<T: Parse, U>(input: &syn::parse::ParseBuffer, parser: impl Fn(ParseBuffer) -> Result<U>, condition: bool, setter: impl FnOnce(U), span: impl Fn(T) -> Span, name: &str) -> Result<bool> {
+    let a = input.parse::<T>()?;
+    let content;
+    parenthesized!(content in input);
+    let content = parser(content)?;
+    if input.peek(Token![,]) {
+        input.parse::<Token![,]>()?;
+    }
+    if condition {
+        Err(syn::Error::new(span(a), format!("Instruction parameter '{}' was already set.", name)))?
+    } else {
+        setter(content);
+        return Ok(true)
+    }
+}
+
 fn parse_trait_instruction_param(input: &syn::parse::ParseBuffer, attr: &mut TraitAttrCore) -> Result<bool> {
     if input.peek(kw::stop_repeat) {
-        let a = input.parse::<kw::stop_repeat>()?;
-        if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-        }
-        if attr.stop_repeat {
-            Err(syn::Error::new(a.span, "Instruction parameter 'stop_repeat' was already set."))?
-        } else {
-            attr.stop_repeat = true;
-            return Ok(true)
-        }
+        return parse_trait_instruction_param_inner_1::<kw::stop_repeat>(input, attr.stop_repeat, || attr.stop_repeat = true, |a| a.span, "stop_repeat");
     } else if input.peek(kw::skip_repeat) {
-        let a = input.parse::<kw::skip_repeat>()?;
-        if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-        }
-        if attr.skip_repeat {
-            Err(syn::Error::new(a.span, "Instruction parameter 'skip_repeat' was already set."))?
-        } else {
-            attr.skip_repeat = true;
-            return Ok(true)
-        }
+        return parse_trait_instruction_param_inner_1::<kw::skip_repeat>(input, attr.skip_repeat, || attr.skip_repeat = true, |a| a.span, "skip_repeat");
     } else if input.peek(kw::repeat) {
-        let a = input.parse::<kw::repeat>()?;
-        let content;
-        parenthesized!(content in input);
-        let repeat  = content.parse::<TraitRepeatForWrap>()?;
-        if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-        }
-        if attr.repeat.is_some() {
-            Err(syn::Error::new(a.span, "Instruction parameter 'repeat' was already set."))?
-        } else {
-            attr.repeat = Some(repeat.0);
-            return Ok(true)
-        }
+        return parse_trait_instruction_param_inner_2::<kw::repeat, TraitRepeatForWrap>(input, |c| c.parse(), attr.repeat.is_some(), |x|attr.repeat = Some(x.0), |a|a.span, "repeat");
     } else if input.peek(kw::vars) {
-        let a = input.parse::<kw::vars>()?;
-        let content;
-        parenthesized!(content in input);
-        let vars = Some(Punctuated::parse_separated_nonempty(&content)?);
-        if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-        }
-        if attr.init_data.is_some() {
-            Err(syn::Error::new(a.span, "Instruction parameter 'vars' was already set."))?
-        } else {
-            attr.init_data = vars;
-            return Ok(true)
-        }
+        return parse_trait_instruction_param_inner_2::<kw::vars, Punctuated<InitData, Comma>>(input, |c| Punctuated::parse_separated_nonempty(&c), attr.init_data.is_some(), |x|attr.init_data = Some(x), |a|a.span, "vars");
     } else if input.peek(Token![..]) {
         input.parse::<Token![..]>()?;
         attr.update = try_parse_action(input, true)?;
@@ -612,49 +599,11 @@ fn parse_trait_instruction_param(input: &syn::parse::ParseBuffer, attr: &mut Tra
         attr.default_case = try_parse_action(input, true)?;
         return Ok(false)
     } else if input.peek(kw::attribute) {
-        let a = input.parse::<kw::attribute>()?;
-        let content;
-        parenthesized!(content in input);
-        let attribute  = content.parse::<TokenStream>()?;
-        if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-        }
-        if attr.attribute.is_some() {
-            Err(syn::Error::new(a.span, "Instruction parameter 'attribute' was already set."))?
-        } else {
-            attr.attribute = Some(quote!(#[ #attribute ]));
-            return Ok(true)
-        }
-    }
-    else if input.peek(kw::impl_attribute) {
-        let a = input.parse::<kw::impl_attribute>()?;
-        let content;
-        parenthesized!(content in input);
-        let attribute  = content.parse::<TokenStream>()?;
-        if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-        }
-        if attr.impl_attribute.is_some() {
-            Err(syn::Error::new(a.span, "Instruction parameter 'impl_attribute' was already set."))?
-        } else {
-            attr.impl_attribute = Some(quote!(#[ #attribute ]));
-            return Ok(true)
-        }
-    }
-    if input.peek(kw::inner_attribute) {
-        let a = input.parse::<kw::inner_attribute>()?;
-        let content;
-        parenthesized!(content in input);
-        let attribute  = content.parse::<TokenStream>()?;
-        if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-        }
-        if attr.inner_attribute.is_some() {
-            Err(syn::Error::new(a.span, "Instruction parameter 'inner_attribute' was already set."))?
-        } else {
-            attr.inner_attribute = Some(quote!(#![ #attribute ]));
-            return Ok(true)
-        }
+        return parse_trait_instruction_param_inner_2::<kw::attribute, TokenStream>(input, |c| c.parse(), attr.attribute.is_some(), |x|attr.attribute = Some(quote!(#[ #x ])), |a|a.span, "attribute");
+    } else if input.peek(kw::impl_attribute) {
+        return parse_trait_instruction_param_inner_2::<kw::impl_attribute, TokenStream>(input, |c| c.parse(), attr.impl_attribute.is_some(), |x|attr.impl_attribute = Some(quote!(#[ #x ])), |a|a.span, "impl_attribute");
+    } else if input.peek(kw::inner_attribute) {
+        return parse_trait_instruction_param_inner_2::<kw::inner_attribute, TokenStream>(input, |c| c.parse(), attr.inner_attribute.is_some(), |x|attr.inner_attribute = Some(quote!(#![ #x ])), |a|a.span, "inner_attribute");
     }
 
     Ok(false)
