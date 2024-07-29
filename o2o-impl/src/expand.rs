@@ -1079,7 +1079,7 @@ fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
     let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, where_clause, r } = get_quote_trait_params(input, ctx);
     quote! {
         #impl_attr
-        impl #gens std::convert::From<#r #src> for #dst #gens #where_clause {
+        impl #gens ::core::convert::From<#r #src> for #dst #gens #where_clause {
             #attr
             fn from(value: #r #src) -> #dst #gens {
                 #inner_attr
@@ -1095,7 +1095,7 @@ fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
     quote! {
         #impl_attr
-        impl #gens std::convert::TryFrom<#r #src> for #dst #gens #where_clause {
+        impl #gens ::core::convert::TryFrom<#r #src> for #dst #gens #where_clause {
             type Error = #err_ty;
             #attr
             fn try_from(value: #r #src) -> Result<#dst #gens, #err_ty> {
@@ -1125,7 +1125,7 @@ fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 
     quote!{
         #impl_attr
-        impl #gens std::convert::Into<#dst> for #r #src #gens #where_clause {
+        impl #gens ::core::convert::Into<#dst> for #r #src #gens #where_clause {
             #attr
             fn into(self) -> #dst {
                 #inner_attr
@@ -1154,7 +1154,7 @@ fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 
     quote! {
         #impl_attr
-        impl #gens std::convert::TryInto<#dst> for #r #src #gens #where_clause {
+        impl #gens ::core::convert::TryInto<#dst> for #r #src #gens #where_clause {
             type Error = #err_ty;
             #attr
             fn try_into(self) -> Result<#dst, #err_ty> {

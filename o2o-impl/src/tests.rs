@@ -1735,7 +1735,7 @@ fn permeating_repeat(code_fragment: TokenStream) {
 },
 quote!{
     #[impl_attribute(param)]
-    impl std::convert::From<TestDto> for Test {
+    impl ::core::convert::From<TestDto> for Test {
         #[attribute(param)]
         fn from(value: TestDto) -> Test {
             #![inner_param(param)]
@@ -1744,7 +1744,7 @@ quote!{
     }
 
     #[impl_attribute(param)]
-    impl std::convert::From<&TestDto> for Test {
+    impl ::core::convert::From<&TestDto> for Test {
         #[attribute(param)]
         fn from(value: &TestDto) -> Test {
             #![inner_param(param)]
@@ -1752,7 +1752,7 @@ quote!{
         }
     }
     #[impl_attribute(param)]
-    impl std::convert::Into<TestDto> for Test {
+    impl ::core::convert::Into<TestDto> for Test {
         #[attribute(param)]
         fn into(self) -> TestDto {
             #![inner_param(param)]
@@ -1760,7 +1760,7 @@ quote!{
         }
     }
     #[impl_attribute(param)]
-    impl std::convert::Into<TestDto> for &Test {
+    impl ::core::convert::Into<TestDto> for &Test {
         #[attribute(param)]
         fn into(self) -> TestDto {
             #![inner_param(param)]
@@ -1801,7 +1801,7 @@ quote!{
 },
 quote!{
     #[impl_attribute(param)]
-    impl std::convert::TryFrom<TestDto> for Test {
+    impl ::core::convert::TryFrom<TestDto> for Test {
         type Error = String;
         #[attribute(param)]
         fn try_from(value: TestDto) -> Result<Test, String> {
@@ -1810,7 +1810,7 @@ quote!{
         }
     }
     #[impl_attribute(param)]
-    impl std::convert::TryFrom<&TestDto> for Test {
+    impl ::core::convert::TryFrom<&TestDto> for Test {
         type Error = String;
         #[attribute(param)]
         fn try_from(value: &TestDto) -> Result<Test, String> {
@@ -1819,7 +1819,7 @@ quote!{
         }
     }
     #[impl_attribute(param)]
-    impl std::convert::TryInto<TestDto> for Test {
+    impl ::core::convert::TryInto<TestDto> for Test {
         type Error = String;
         #[attribute(param)]
         fn try_into(self) -> Result<TestDto, String> {
@@ -1828,7 +1828,7 @@ quote!{
         }
     }
     #[impl_attribute(param)]
-    impl std::convert::TryInto<TestDto> for &Test {
+    impl ::core::convert::TryInto<TestDto> for &Test {
         type Error = String;
         #[attribute(param)]
         fn try_into(self) -> Result<TestDto, String> {
