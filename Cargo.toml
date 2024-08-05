@@ -1,6 +1,6 @@
 [package]
 name = "o2o"
-version = "0.4.9-alpha.2"
+version = "0.4.9-alpha.3"
 edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 categories = ["rust-patterns"]
