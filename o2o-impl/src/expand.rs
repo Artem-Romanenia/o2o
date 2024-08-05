@@ -22,10 +22,7 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
             validate(&input)?;
             Ok(data_type_impl(input))
         },
-        _ => Err(Error::new_spanned(
-            node,
-            "#[derive(o2o)] only supports structs and enums.",
-        ))
+        _ => Err(Error::new_spanned(node, "#[derive(o2o)] only supports structs and enums."))
     }
 }
 
@@ -384,7 +381,7 @@ fn struct_init_block<'a>(input: &'a Struct, ctx: &ImplContext) -> TokenStream {
             unique_paths.insert(path);
             make_tuple(path, FieldData::Field(x))
         }).collect::<Vec<(usize, &str, FieldData)>>());
-    
+
     fields.extend(input.attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
         .filter(|x| unique_paths.insert(x.get_child_path_str(None)))
