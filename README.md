@@ -83,7 +83,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Person> for PersonDto {
+  impl ::core::convert::From<Person> for PersonDto {
       fn from(value: Person) -> PersonDto {
           PersonDto {
               id: value.id,
@@ -92,7 +92,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
           }
       }
   }
-  impl std::convert::TryInto<Person> for PersonDto {
+  impl ::core::convert::TryInto<Person> for PersonDto {
       type Error = std::io::Error;
       fn try_into(self) -> Result<Person, std::io::Error> {
           Ok(Person {
@@ -103,7 +103,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
       }
   }
 
-  impl std::convert::From<Creature> for CreatureDto {
+  impl ::core::convert::From<Creature> for CreatureDto {
       fn from(value: Creature) -> CreatureDto {
           match value {
               Creature::Person(f0) => CreatureDto::Person(f0.into()),
@@ -118,6 +118,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 ## Some milestones<!-- omit from toc --> 
 
+* **v0.4.9** Support for `#![no_std]`
 * **v0.4.4** Fallible conversions
 * **v0.4.3** Enum-to-primitive type conversions with `#[literal(...)]` and `#[pattern(...)]`
 * **v0.4.2** Basic enum conversions
@@ -126,6 +127,8 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 ## Content<!-- omit from toc --> 
 
 - [Traits and `o2o` *trait instructions*](#traits-and-o2o-trait-instructions)
+- [Installation](#installation)
+  - [no\_std](#no_std)
 - [The (not so big) Problem](#the-not-so-big-problem)
 - [Inline expressions](#inline-expressions)
 - [Struct Examples](#struct-examples)
@@ -184,28 +187,28 @@ o2o procedural macro is able to generate implementation of 12 kinds of traits:
 // When applied to a struct B:
 
 // #[from_owned(A)]
-impl std::convert::From<A> for B { ... }
+impl ::core::convert::From<A> for B { ... }
 
 // #[try_from_owned(A)]
-impl std::convert::TryFrom<A> for B { ... }
+impl ::core::convert::TryFrom<A> for B { ... }
 
 // #[from_ref(A)]
-impl std::convert::From<&A> for B { ... }
+impl ::core::convert::From<&A> for B { ... }
 
 // #[try_from_ref(A)]
-impl std::convert::TryFrom<&A> for B { ... }
+impl ::core::convert::TryFrom<&A> for B { ... }
 
 // #[owned_into(A)]
-impl std::convert::Into<A> for B { ... }
+impl ::core::convert::Into<A> for B { ... }
 
 // #[try_owned_into(A)]
-impl std::convert::TryInto<A> for B { ... }
+impl ::core::convert::TryInto<A> for B { ... }
 
 // #[ref_into(A)]
-impl std::convert::Into<A> for &B { ... }
+impl ::core::convert::Into<A> for &B { ... }
 
 // #[try_ref_into(A)]
-impl std::convert::TryInto<A> for &B { ... }
+impl ::core::convert::TryInto<A> for &B { ... }
 
 // #[owned_into_existing(A)]
 impl o2o::traits::IntoExisting<A> for B { ... }
@@ -254,6 +257,26 @@ struct EntityDto { }
 
 **Exactly the same shortcuts apply to *fallible* conversions.**
 
+## Installation
+
+In a typical project just add this to `Cargo.toml`:
+
+``` toml
+[dependencies]
+o2o = "0.4.9"
+```
+
+### no_std
+
+In `#![no_std]` project, add this to `Cargo.toml`:
+
+``` toml
+[dependencies]
+o2o-macros = "0.4.9"
+# Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
+o2o = { version = "0.4.9", default-features = false }
+```
+
 ## The (not so big) Problem
 
 This section may be useful for people which are not very familiar with Rust's procedural macros and it explains why some things are done the way they're done.
@@ -300,14 +323,14 @@ struct EntityDto {
 This example will be expanded into the following code:
 
 ``` rust ignore
-impl std::convert::From<Entity> for EntityDto {
+impl ::core::convert::From<Entity> for EntityDto {
     fn from(value: Entity) -> EntityDto {
         EntityDto {
             some_int: value.some_int * 2, // '~' got replaced by 'value.some_int' for From<> implementation
         }
     }
 }
-impl std::convert::Into<Entity> for EntityDto {
+impl ::core::convert::Into<Entity> for EntityDto {
     fn into(self) -> Entity {
         Entity {
             some_int: self.some_int / 2, // '~' got replaced by 'self.some_int' for Into<> implementation
@@ -333,14 +356,14 @@ struct EntityDto {
 This expands into exactly the same code:
 
 ``` rust ignore
-impl std::convert::From<Entity> for EntityDto {
+impl ::core::convert::From<Entity> for EntityDto {
     fn from(value: Entity) -> EntityDto {
         EntityDto {
             some_int: value.some_int * 2, // '@' got replaced by 'value' for From<> implementation
         }
     }
 }
-impl std::convert::Into<Entity> for EntityDto {
+impl ::core::convert::Into<Entity> for EntityDto {
     fn into(self) -> Entity {
         Entity {
             some_int: self.some_int / 2, // '@' got replaced by 'self' for Into<> implementation
@@ -393,7 +416,7 @@ enum EntityEnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<&Entity> for EntityDto {
+  impl ::core::convert::From<&Entity> for EntityDto {
       fn from(value: &Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
@@ -408,7 +431,7 @@ enum EntityEnumDto {
       }
   }
 
-  impl std::convert::From<&EntityEnum> for EntityEnumDto {
+  impl ::core::convert::From<&EntityEnum> for EntityEnumDto {
       fn from(value: &EntityEnum) -> EntityEnumDto {
           match value {
               EntityEnum::Entity(f0) => EntityEnumDto::EntityDto(f0.into()),
@@ -416,7 +439,7 @@ enum EntityEnumDto {
           }
       }
   }
-  impl std::convert::Into<EntityEnum> for &EntityEnumDto {
+  impl ::core::convert::Into<EntityEnum> for &EntityEnumDto {
       fn into(self) -> EntityEnum {
           match self {
               EntityEnumDto::EntityDto(f0) => EntityEnum::Entity(f0.into()),
@@ -454,7 +477,7 @@ struct EntityDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Entity> for EntityDto {
+  impl ::core::convert::From<Entity> for EntityDto {
       fn from(value: Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
@@ -463,7 +486,7 @@ struct EntityDto {
           }
       }
   }
-  impl std::convert::From<&Entity> for EntityDto {
+  impl ::core::convert::From<&Entity> for EntityDto {
       fn from(value: &Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
@@ -472,7 +495,7 @@ struct EntityDto {
           }
       }
   }
-  impl std::convert::TryInto<Entity> for EntityDto {
+  impl ::core::convert::TryInto<Entity> for EntityDto {
       type Error = std::num::ParseIntError;
       fn try_into(self) -> Result<Entity, std::num::ParseIntError> {
           Ok(Entity {
@@ -482,7 +505,7 @@ struct EntityDto {
           })
       }
   }
-  impl std::convert::TryInto<Entity> for &EntityDto {
+  impl ::core::convert::TryInto<Entity> for &EntityDto {
       type Error = std::num::ParseIntError;
       fn try_into(self) -> Result<Entity, std::num::ParseIntError> {
           Ok(Entity {
@@ -526,7 +549,7 @@ struct ChildDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Entity> for EntityDto {
+  impl ::core::convert::From<Entity> for EntityDto {
       fn from(value: Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
@@ -535,7 +558,7 @@ struct ChildDto {
       }
   }
   
-  impl std::convert::From<Child> for ChildDto {
+  impl ::core::convert::From<Child> for ChildDto {
       fn from(value: Child) -> ChildDto {
           ChildDto {
               child_int: value.child_int,
@@ -576,7 +599,7 @@ struct ChildDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Entity> for EntityDto {
+  impl ::core::convert::From<Entity> for EntityDto {
       fn from(value: Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
@@ -584,7 +607,7 @@ struct ChildDto {
           }
       }
   }
-  impl std::convert::Into<Entity> for EntityDto {
+  impl ::core::convert::Into<Entity> for EntityDto {
       fn into(self) -> Entity {
           Entity {
               some_int: self.some_int,
@@ -592,14 +615,14 @@ struct ChildDto {
           }
       }
   }
-  impl std::convert::From<&Child> for ChildDto {
+  impl ::core::convert::From<&Child> for ChildDto {
       fn from(value: &Child) -> ChildDto {
           ChildDto {
               child_int: value.child_int,
           }
       }
   }
-  impl std::convert::Into<Child> for &ChildDto {
+  impl ::core::convert::Into<Child> for &ChildDto {
       fn into(self) -> Child {
           Child {
               child_int: self.child_int,
@@ -640,7 +663,7 @@ enum ZodiacSign {}
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Person> for PersonDto {
+  impl ::core::convert::From<Person> for PersonDto {
       fn from(value: Person) -> PersonDto {
           PersonDto {
               id: value.id,
@@ -650,7 +673,7 @@ enum ZodiacSign {}
           }
       }
   }
-  impl std::convert::Into<Person> for PersonDto {
+  impl ::core::convert::Into<Person> for PersonDto {
       fn into(self) -> Person {
           Person {
               id: self.id,
@@ -687,7 +710,7 @@ enum ZodiacSign {}
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<PersonDto> for Person {
+  impl ::core::convert::From<PersonDto> for Person {
       fn from(value: PersonDto) -> Person {
           Person {
               id: value.id,
@@ -696,7 +719,7 @@ enum ZodiacSign {}
           }
       }
   }
-  impl std::convert::Into<PersonDto> for Person {
+  impl ::core::convert::Into<PersonDto> for Person {
       fn into(self) -> PersonDto {
           PersonDto {
               id: self.id,
@@ -738,7 +761,7 @@ fn get_default() -> EntityDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<&Entity> for EntityDto {
+  impl ::core::convert::From<&Entity> for EntityDto {
       fn from(value: &Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
@@ -746,7 +769,7 @@ fn get_default() -> EntityDto {
           }
       }
   }
-  impl std::convert::Into<Entity> for EntityDto {
+  impl ::core::convert::Into<Entity> for EntityDto {
       fn into(self) -> Entity {
           Entity {
               some_int: self.some_int,
@@ -782,7 +805,7 @@ struct PersonDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Person> for PersonDto {
+  impl ::core::convert::From<Person> for PersonDto {
       fn from(value: Person) -> PersonDto {
           let first_name = value.first_name;
           let last_name = value.last_name;
@@ -792,7 +815,7 @@ struct PersonDto {
           }
       }
   }
-  impl std::convert::Into<Person> for PersonDto {
+  impl ::core::convert::Into<Person> for PersonDto {
       fn into(self) -> Person {
           let first = "John";
           let last = "Doe";
@@ -822,13 +845,13 @@ struct Wrapper(#[from(@.parse::<i32>()?)]i32);
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::TryFrom<String> for Wrapper {
+  impl ::core::convert::TryFrom<String> for Wrapper {
       type Error = std::num::ParseIntError;
       fn try_from(value: String) -> Result<Wrapper, std::num::ParseIntError> {
           Ok(Wrapper(value.parse::<i32>()?))
       }
   }
-  impl std::convert::Into<String> for Wrapper {
+  impl ::core::convert::Into<String> for Wrapper {
       fn into(self) -> String {
           self.0.to_string()
       }
@@ -854,7 +877,7 @@ struct Time {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::Into<i32> for Time {
+  impl ::core::convert::Into<i32> for Time {
       fn into(self) -> i32 {
           let hrs = self.hours as i32;
           let mns = self.minutes as i32;
@@ -881,22 +904,22 @@ struct MyError(String);
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<std::num::ParseIntError> for MyError {
+  impl ::core::convert::From<std::num::ParseIntError> for MyError {
       fn from(value: std::num::ParseIntError) -> MyError {
           Self(value.to_string())
       }
   }
-  impl std::convert::From<std::num::ParseFloatError> for MyError {
+  impl ::core::convert::From<std::num::ParseFloatError> for MyError {
       fn from(value: std::num::ParseFloatError) -> MyError {
           Self(value.to_string())
       }
   }
-  impl std::convert::From<std::num::TryFromIntError> for MyError {
+  impl ::core::convert::From<std::num::TryFromIntError> for MyError {
       fn from(value: std::num::TryFromIntError) -> MyError {
           Self(value.to_string())
       }
   }
-  impl std::convert::From<std::str::ParseBoolError> for MyError {
+  impl ::core::convert::From<std::str::ParseBoolError> for MyError {
       fn from(value: std::str::ParseBoolError) -> MyError {
           Self(value.to_string())
       }
@@ -936,37 +959,37 @@ struct MyError(String);
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<std::num::ParseIntError> for MyError {
+  impl ::core::convert::From<std::num::ParseIntError> for MyError {
       fn from(value: std::num::ParseIntError) -> MyError {
           Self(value.to_string())
       }
   }
-  impl std::convert::From<std::num::ParseFloatError> for MyError {
+  impl ::core::convert::From<std::num::ParseFloatError> for MyError {
       fn from(value: std::num::ParseFloatError) -> MyError {
           Self(value.to_string())
       }
   }
-  impl std::convert::From<std::num::TryFromIntError> for MyError {
+  impl ::core::convert::From<std::num::TryFromIntError> for MyError {
       fn from(value: std::num::TryFromIntError) -> MyError {
           Self("Custom TryFromIntError message".into())
       }
   }
-  impl std::convert::From<std::str::ParseBoolError> for MyError {
+  impl ::core::convert::From<std::str::ParseBoolError> for MyError {
       fn from(value: std::str::ParseBoolError) -> MyError {
           Self(value.to_string())
       }
   }
-  impl std::convert::From<std::char::ParseCharError> for MyError {
+  impl ::core::convert::From<std::char::ParseCharError> for MyError {
       fn from(value: std::char::ParseCharError) -> MyError {
           Self(value.to_string())
       }
   }
-  impl std::convert::From<std::net::AddrParseError> for MyError {
+  impl ::core::convert::From<std::net::AddrParseError> for MyError {
       fn from(value: std::net::AddrParseError) -> MyError {
           Self("other".into())
       }
   }
-  impl std::convert::From<std::io::Error> for MyError {
+  impl ::core::convert::From<std::io::Error> for MyError {
       fn from(value: std::io::Error) -> MyError {
           Self("other".into())
       }
@@ -997,7 +1020,7 @@ struct Test {
 
   ``` rust ignore
   #[cfg(any(foo, bar))]
-  impl std::convert::From<TestDto> for Test {
+  impl ::core::convert::From<TestDto> for Test {
       #[inline(always)]
       fn from(value: TestDto) -> Test {
           #![allow(unused_variables)]
@@ -1057,7 +1080,7 @@ impl EmployeeDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Employee> for EmployeeDto {
+  impl ::core::convert::From<Employee> for EmployeeDto {
       fn from(value: Employee) -> EmployeeDto {
           EmployeeDto {
               employee_id: value.id,
@@ -1067,7 +1090,7 @@ impl EmployeeDto {
           }
       }
   }
-  impl std::convert::From<&Employee> for EmployeeDto {
+  impl ::core::convert::From<&Employee> for EmployeeDto {
       fn from(value: &Employee) -> EmployeeDto {
           EmployeeDto {
               employee_id: value.id,
@@ -1077,7 +1100,7 @@ impl EmployeeDto {
           }
       }
   }
-  impl std::convert::Into<Employee> for EmployeeDto {
+  impl ::core::convert::Into<Employee> for EmployeeDto {
       fn into(self) -> Employee {
           Employee {
               id: self.employee_id,
@@ -1088,7 +1111,7 @@ impl EmployeeDto {
           }
       }
   }
-  impl std::convert::Into<Employee> for &EmployeeDto {
+  impl ::core::convert::Into<Employee> for &EmployeeDto {
       fn into(self) -> Employee {
           Employee {
               id: self.employee_id,
@@ -1142,7 +1165,7 @@ struct CarDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Car> for CarDto {
+  impl ::core::convert::From<Car> for CarDto {
       fn from(value: Car) -> CarDto {
           CarDto {
               number_of_doors: value.number_of_doors,
@@ -1201,7 +1224,7 @@ struct CarDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::Into<Car> for CarDto {
+  impl ::core::convert::Into<Car> for CarDto {
       fn into(self) -> Car {
           Car {
               number_of_doors: self.number_of_doors,
@@ -1260,7 +1283,7 @@ struct CarDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::Into<CarDto> for Car {
+  impl ::core::convert::Into<CarDto> for Car {
       fn into(self) -> CarDto {
           let mut obj: CarDto = Default::default();
           obj.number_of_doors = self.number_of_doors;
@@ -1298,12 +1321,12 @@ struct TupleEntityDto(i32, #[map_ref(~.clone())] String);
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<&TupleEntity> for TupleEntityDto {
+  impl ::core::convert::From<&TupleEntity> for TupleEntityDto {
       fn from(value: &TupleEntity) -> TupleEntityDto {
           TupleEntityDto(value.0, value.1.clone())
       }
   }
-  impl std::convert::Into<TupleEntity> for &TupleEntityDto {
+  impl ::core::convert::Into<TupleEntity> for &TupleEntityDto {
       fn into(self) -> TupleEntity {
           TupleEntity(self.0, self.1.clone())
       }
@@ -1331,7 +1354,7 @@ struct EntityDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<&TupleEntity> for EntityDto {
+  impl ::core::convert::From<&TupleEntity> for EntityDto {
       fn from(value: &TupleEntity) -> EntityDto {
           EntityDto {
               some_int: value.0,
@@ -1339,7 +1362,7 @@ struct EntityDto {
           }
       }
   }
-  impl std::convert::Into<TupleEntity> for &EntityDto {
+  impl ::core::convert::Into<TupleEntity> for &EntityDto {
       fn into(self) -> TupleEntity {
           TupleEntity {
               0: self.some_int,
@@ -1368,7 +1391,7 @@ pub struct Entity{
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<&(i32, String)> for Entity {
+  impl ::core::convert::From<&(i32, String)> for Entity {
       fn from(value: &(i32, String)) -> Entity {
           Entity {
               int: value.0,
@@ -1376,7 +1399,7 @@ pub struct Entity{
           }
       }
   }
-  impl std::convert::Into<(i32, String)> for &Entity {
+  impl ::core::convert::Into<(i32, String)> for &Entity {
       fn into(self) -> (i32, String) {
           (self.int, self.string.clone())
       }
@@ -1404,12 +1427,12 @@ struct EntityDto{
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<EntityDto> for TupleEntity {
+  impl ::core::convert::From<EntityDto> for TupleEntity {
       fn from(value: EntityDto) -> TupleEntity {
           TupleEntity(value.some_int, value.some_str)
       }
   }
-  impl std::convert::Into<EntityDto> for TupleEntity {
+  impl ::core::convert::Into<EntityDto> for TupleEntity {
       fn into(self) -> EntityDto {
           EntityDto {
               some_int: self.0,
@@ -1441,7 +1464,7 @@ struct EntityDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Entity<f32>> for EntityDto {
+  impl ::core::convert::From<Entity<f32>> for EntityDto {
       fn from(value: Entity<f32>) -> EntityDto {
           EntityDto {
               some_int: value.some_int,
@@ -1449,7 +1472,7 @@ struct EntityDto {
           }
       }
   }
-  impl std::convert::Into<Entity<f32>> for EntityDto {
+  impl ::core::convert::Into<Entity<f32>> for EntityDto {
       fn into(self) -> Entity<f32> {
           Entity::<f32> {
               some_int: self.some_int,
@@ -1483,7 +1506,7 @@ struct ChildDto<T> {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl<T> std::convert::From<Child<T>> for ChildDto<T> where T: Clone, {
+  impl<T> ::core::convert::From<Child<T>> for ChildDto<T> where T: Clone, {
       fn from(value: Child<T>) -> ChildDto<T> {
           ChildDto {
               child_int: value.child_int,
@@ -1491,7 +1514,7 @@ struct ChildDto<T> {
           }
       }
   }
-  impl<T> std::convert::Into<Child<T>> for ChildDto<T> where T: Clone, {
+  impl<T> ::core::convert::Into<Child<T>> for ChildDto<T> where T: Clone, {
       fn into(self) -> Child<T> {
           Child::<T> {
               child_int: self.child_int,
@@ -1537,7 +1560,7 @@ struct PersonDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::Into<Person> for &PersonDto {
+  impl ::core::convert::Into<Person> for &PersonDto {
       fn into(self) -> Person {
           Person {
               full_name: self.name.clone(),
@@ -1546,7 +1569,7 @@ struct PersonDto {
           }
       }
   }
-  impl std::convert::Into<PersonModel> for &PersonDto {
+  impl ::core::convert::Into<PersonModel> for &PersonDto {
       fn into(self) -> PersonModel {
           PersonModel {
               full_name: self.name.clone(),
@@ -1642,7 +1665,7 @@ struct EntityDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<&Entity> for EntityDto {
+  impl ::core::convert::From<&Entity> for EntityDto {
       fn from(value: &Entity) -> EntityDto {
           EntityDto {
               some_int: value.some_int as i16,
@@ -1650,7 +1673,7 @@ struct EntityDto {
           }
       }
   }
-  impl std::convert::Into<Entity> for &EntityDto {
+  impl ::core::convert::Into<Entity> for &EntityDto {
       fn into(self) -> Entity {
           Entity {
               some_int: self.some_int as i32,
@@ -1729,7 +1752,7 @@ struct CarDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<&Car> for CarDto {
+  impl ::core::convert::From<&Car> for CarDto {
       fn from(value: &Car) -> CarDto {
           CarDto {
               number_of_doors: value.number_of_doors,
@@ -1750,7 +1773,7 @@ struct CarDto {
           }
       }
   }
-  impl std::convert::Into<Car> for &CarDto {
+  impl ::core::convert::Into<Car> for &CarDto {
       fn into(self) -> Car {
           Car {
               number_of_doors: self.number_of_doors,
@@ -1810,7 +1833,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Enum> for EnumDto {
+  impl ::core::convert::From<Enum> for EnumDto {
       fn from(value: Enum) -> EnumDto {
           match value {
               Enum::Var1 { field, field_2 } => EnumDto::Var1 {
@@ -1830,7 +1853,7 @@ enum EnumDto {
           }
       }
   }
-  impl std::convert::Into<Enum> for EnumDto {
+  impl ::core::convert::Into<Enum> for EnumDto {
       fn into(self) -> Enum {
           match self {
               EnumDto::Var1 { field, field_2 } => Enum::Var1 {
@@ -1877,7 +1900,7 @@ pub enum SortDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Sort> for SortDto {
+  impl ::core::convert::From<Sort> for SortDto {
       fn from(value: Sort) -> SortDto {
           match value {
               Sort::ASC => SortDto::Ascending,
@@ -1886,7 +1909,7 @@ pub enum SortDto {
           }
       }
   }
-  impl std::convert::Into<Sort> for SortDto {
+  impl ::core::convert::Into<Sort> for SortDto {
       fn into(self) -> Sort {
           match self {
               SortDto::Ascending => Sort::ASC,
@@ -1929,7 +1952,7 @@ enum EnumWithDataDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<EnumWithData> for EnumWithDataDto {
+  impl ::core::convert::From<EnumWithData> for EnumWithDataDto {
       fn from(value: EnumWithData) -> EnumWithDataDto {
           match value {
               EnumWithData::Item1(f0, f1) => EnumWithDataDto::Item1(f0.to_string(), f1),
@@ -1940,7 +1963,7 @@ enum EnumWithDataDto {
           }
       }
   }
-  impl std::convert::TryInto<EnumWithData> for EnumWithDataDto {
+  impl ::core::convert::TryInto<EnumWithData> for EnumWithDataDto {
       type Error = std::num::ParseIntError;
       fn try_into(self) -> Result<EnumWithData, std::num::ParseIntError> {
           Ok(match self {
@@ -2005,7 +2028,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::Into<EnumDto> for Enum {
+  impl ::core::convert::Into<EnumDto> for Enum {
       fn into(self) -> EnumDto {
           match self {
               Enum::Var1 => EnumDto::Var1,
@@ -2039,7 +2062,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Enum> for EnumDto {
+  impl ::core::convert::From<Enum> for EnumDto {
       fn from(value: Enum) -> EnumDto {
           match value {
               Enum::Var1 => EnumDto::Var1,
@@ -2080,7 +2103,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<EnumDto> for Enum {
+  impl ::core::convert::From<EnumDto> for Enum {
       fn from(value: EnumDto) -> Enum {
           match value {
               EnumDto::Var1 => Enum::Var1,
@@ -2089,7 +2112,7 @@ enum EnumDto {
           }
       }
   }
-  impl std::convert::Into<EnumDto> for Enum {
+  impl ::core::convert::Into<EnumDto> for Enum {
       fn into(self) -> EnumDto {
           match self {
               Enum::Var1 => EnumDto::Var1,
@@ -2124,7 +2147,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<Enum> for EnumDto {
+  impl ::core::convert::From<Enum> for EnumDto {
       fn from(value: Enum) -> EnumDto {
           match value {
               Enum::Var1 => EnumDto::Var1,
@@ -2132,7 +2155,7 @@ enum EnumDto {
           }
       }
   }
-  impl std::convert::TryInto<Enum> for EnumDto {
+  impl ::core::convert::TryInto<Enum> for EnumDto {
       type Error = String;
       fn try_into(self) -> Result<Enum, String> {
           Ok(match self {
@@ -2168,7 +2191,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::TryFrom<EnumDto> for Enum {
+  impl ::core::convert::TryFrom<EnumDto> for Enum {
       type Error = String;
       fn try_from(value: EnumDto) -> Result<Enum, String> {
           Ok(match value {
@@ -2178,7 +2201,7 @@ enum EnumDto {
           })
       }
   }
-  impl std::convert::Into<EnumDto> for Enum {
+  impl ::core::convert::Into<EnumDto> for Enum {
       fn into(self) -> EnumDto {
           match self {
               Enum::Var1 => EnumDto::Var1,
@@ -2221,7 +2244,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<EnumDto> for Enum {
+  impl ::core::convert::From<EnumDto> for Enum {
       fn from(value: EnumDto) -> Enum {
           match value {
               EnumDto::Var1 => Enum::Var1,
@@ -2233,7 +2256,7 @@ enum EnumDto {
           }
       }
   }
-  impl std::convert::Into<EnumDto> for Enum {
+  impl ::core::convert::Into<EnumDto> for Enum {
       fn into(self) -> EnumDto {
           match self {
               Enum::Var1 => EnumDto::Var1,
@@ -2273,7 +2296,7 @@ enum EnumDto {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<EnumDto> for Enum {
+  impl ::core::convert::From<EnumDto> for Enum {
       fn from(value: EnumDto) -> Enum {
           match value {
               EnumDto::Var1 => Enum::Var1,
@@ -2282,7 +2305,7 @@ enum EnumDto {
           }
       }
   }
-  impl std::convert::Into<EnumDto> for Enum {
+  impl ::core::convert::Into<EnumDto> for Enum {
       fn into(self) -> EnumDto {
           match self {
               Enum::Var1 => EnumDto::Var1,
@@ -2329,7 +2352,7 @@ enum Animal {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<i32> for HttpStatus {
+  impl ::core::convert::From<i32> for HttpStatus {
       fn from(value: i32) -> HttpStatus {
           match value {
               200 => HttpStatus::Ok,
@@ -2342,7 +2365,7 @@ enum Animal {
           }
       }
   }
-  impl std::convert::Into<i32> for HttpStatus {
+  impl ::core::convert::Into<i32> for HttpStatus {
       fn into(self) -> i32 {
           match self {
               HttpStatus::Ok => 200,
@@ -2355,7 +2378,7 @@ enum Animal {
       }
   }
 
-  impl std::convert::From<StaticStr> for Animal {
+  impl ::core::convert::From<StaticStr> for Animal {
       fn from(value: StaticStr) -> Animal {
           match value {
               "🐶" => Animal::Dog,
@@ -2365,7 +2388,7 @@ enum Animal {
           }
       }
   }
-  impl std::convert::Into<StaticStr> for Animal {
+  impl ::core::convert::Into<StaticStr> for Animal {
       fn into(self) -> StaticStr {
           match self {
               Animal::Dog => "🐶",
@@ -2411,7 +2434,7 @@ enum AnimalKind {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<i32> for HttpStatusFamily {
+  impl ::core::convert::From<i32> for HttpStatusFamily {
       fn from(value: i32) -> HttpStatusFamily {
           match value {
               100..=199 => HttpStatusFamily::Information,
@@ -2424,7 +2447,7 @@ enum AnimalKind {
       }
   }
 
-  impl std::convert::From<StaticStr> for AnimalKind {
+  impl ::core::convert::From<StaticStr> for AnimalKind {
       fn from(value: StaticStr) -> AnimalKind {
           match value {
               "🐶" | "🐱" | "🐵" => AnimalKind::Mammal,
@@ -2464,7 +2487,7 @@ enum Animal {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::From<i32> for HttpStatus {
+  impl ::core::convert::From<i32> for HttpStatus {
       fn from(value: i32) -> HttpStatus {
           match value {
               200 => HttpStatus::Ok,
@@ -2474,7 +2497,7 @@ enum Animal {
           }
       }
   }
-  impl std::convert::Into<i32> for HttpStatus {
+  impl ::core::convert::Into<i32> for HttpStatus {
       fn into(self) -> i32 {
           match self {
               HttpStatus::Ok => 200,
@@ -2485,7 +2508,7 @@ enum Animal {
       }
   }
 
-  impl std::convert::From<StaticStr> for Animal {
+  impl ::core::convert::From<StaticStr> for Animal {
       fn from(value: StaticStr) -> Animal {
           match value {
               "🐶" => Animal::Dog,
@@ -2495,7 +2518,7 @@ enum Animal {
           }
       }
   }
-  impl std::convert::Into<StaticStr> for Animal {
+  impl ::core::convert::Into<StaticStr> for Animal {
       fn into(self) -> StaticStr {
           match self {
               Animal::Dog => "🐶",
@@ -2541,7 +2564,7 @@ enum HttpStatusFamily {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl std::convert::TryFrom<i32> for HttpStatus {
+  impl ::core::convert::TryFrom<i32> for HttpStatus {
       type Error = StaticStr;
       fn try_from(value: i32) -> Result<HttpStatus, StaticStr> {
           Ok(match value {
@@ -2555,7 +2578,7 @@ enum HttpStatusFamily {
           })
       }
   }
-  impl std::convert::TryInto<i32> for HttpStatus {
+  impl ::core::convert::TryInto<i32> for HttpStatus {
       type Error = StaticStr;
       fn try_into(self) -> Result<i32, StaticStr> {
           Ok(match self {
@@ -2569,7 +2592,7 @@ enum HttpStatusFamily {
       }
   }
 
-  impl std::convert::TryFrom<i32> for HttpStatusFamily {
+  impl ::core::convert::TryFrom<i32> for HttpStatusFamily {
     type Error = StaticStr;
     fn try_from(value: i32) -> Result<HttpStatusFamily, StaticStr> {
         Ok(match value {

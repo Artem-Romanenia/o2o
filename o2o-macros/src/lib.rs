@@ -6,10 +6,10 @@ use syn::{parse_macro_input, DeriveInput};
 
 /// ### Object to Object mapper for Rust
 /// **o2o** can implement ... 
-/// * `std::convert::From<T>`
-/// * `std::convert::TryFrom<T>`
-/// * `std::convert::Into<T>`
-/// * `std::convert::TryInto<T>`
+/// * `::core::convert::From<T>`
+/// * `::core::convert::TryFrom<T>`
+/// * `::core::convert::Into<T>`
+/// * `::core::convert::TryInto<T>`
 /// * `o2o::traits::IntoExisting<T>`
 /// * `o2o::traits::TryIntoExisting<T>`
 ///  
