@@ -5,7 +5,7 @@ use crate::{
     attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, InitData, Kind, TraitAttrCore, TypeHint}, validate::validate
 };
 use proc_macro2::{TokenStream, Span};
-use syn::{parse2, punctuated::Punctuated, Data, DeriveInput, Error, Index, Member, Result, Token, Type};
+use syn::{parse2, parse_quote, punctuated::Punctuated, Data, DeriveInput, Error, Index, Member, Result, Token, Type};
 use quote::{format_ident, quote, ToTokens};
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
@@ -1063,18 +1063,49 @@ struct QuoteTraitParams<'a> {
 }
 
 fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
-    QuoteTraitParams { 
-        attr: ctx.struct_attr.attribute.as_ref(), 
-        impl_attr: ctx.struct_attr.impl_attribute.as_ref(), 
-        inner_attr: ctx.struct_attr.inner_attribute.as_ref(), 
-        dst: ctx.dst_ty, 
-        src: ctx.src_ty, 
-        gens: input.get_generics().to_token_stream(), 
-        where_clause: input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
-            let where_clause = x.where_clause.to_token_stream();
-            quote!(where #where_clause)
-        }), 
-        r: ctx.kind.is_ref().then_some(quote!(&)) 
+    // If there is at least one lifetime in generics,we add a new lifetime `'o2o` and add a bound `'o2o: 'a + 'b`.
+    let generics = input.get_generics();
+    let (gens, where_clause, r) = if ctx.kind.is_ref() && generics.lifetimes().next().is_some() {
+        let lifetimes: Vec<_> = generics
+            .lifetimes()
+            .map(|params| params.lifetime.clone())
+            .collect();
+
+        let mut generics = generics.clone();
+        generics.params.push(parse_quote!('o2o));
+
+        let mut where_clause = input
+            .get_attrs()
+            .where_attr(&ctx.struct_attr.ty)
+            .map(|x| x.where_clause.clone())
+            .unwrap_or_default();
+        where_clause.push(parse_quote!('o2o: #( #lifetimes )+*));
+
+        (
+            generics.to_token_stream(),
+            Some(quote!(where #where_clause)),
+            Some(quote!(&'o2o)),
+        )
+    } else {
+        (
+            input.get_generics().to_token_stream(),
+            input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
+                let where_clause = x.where_clause.to_token_stream();
+                quote!(where #where_clause)
+            }),
+            ctx.kind.is_ref().then_some(quote!(&)),
+        )
+    };
+
+    QuoteTraitParams {
+        attr: ctx.struct_attr.attribute.as_ref(),
+        impl_attr: ctx.struct_attr.impl_attribute.as_ref(),
+        inner_attr: ctx.struct_attr.inner_attribute.as_ref(),
+        dst: ctx.dst_ty,
+        src: ctx.src_ty,
+        gens,
+        where_clause,
+        r,
     }
 }
 
