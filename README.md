@@ -1443,6 +1443,22 @@ struct EntityDto{
   ```
 </details>
 
+### Lifetime
+
+```rust
+use o2o::o2o;
+
+struct Entity<'a> {
+    some_str: &'a str,
+}
+
+#[derive(o2o)]
+#[map_owned(Entity<'a>)]
+struct EntityDto<'a> {
+    some_str: &'a str,
+}
+```
+
 ### Generics
 
 ``` rust
