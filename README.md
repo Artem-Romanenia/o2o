@@ -1443,6 +1443,23 @@ struct EntityDto{
   ```
 </details>
 
+### Reference with lifetime
+
+```rust
+use o2o::o2o;
+
+pub struct Entity {
+	pub some_str: String,
+}
+
+#[derive(o2o)]
+#[from_ref(Entity)]
+pub struct EntityDto<'a> {
+    #[from(~.as_str())]
+	pub some_str: &'a str
+}
+```
+
 ### Lifetime both ways
 
 ```rust
