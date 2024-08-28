@@ -1449,16 +1449,36 @@ struct EntityDto{
 use o2o::o2o;
 
 pub struct Entity {
-	pub some_str: String,
+    pub some_a: String,
+    pub some_b: String,
 }
 
 #[derive(o2o)]
 #[from_ref(Entity)]
-pub struct EntityDto<'a> {
+pub struct EntityDto<'a, 'b> {
     #[from(~.as_str())]
-	pub some_str: &'a str
+    pub some_a: &'a str,
+    #[from(~.as_str())]
+    pub some_b: &'b str,
 }
 ```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl<'a, 'b, 'o2o> ::core::convert::From<&'o2o Entity> for EntityDto<'a, 'b>
+  where
+      'o2o: 'a + 'b,
+  {
+      fn from(value: &'o2o Entity) -> EntityDto<'a, 'b> {
+          EntityDto {
+              some_a: value.some_a.as_str(),
+              some_b: value.some_b.as_str(),
+          }
+      }
+  }
+  ```
+</details>
 
 ### Lifetime both ways
 
