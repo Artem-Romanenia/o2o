@@ -5,7 +5,7 @@ use crate::{
     attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, InitData, Kind, TraitAttrCore, TypeHint}, validate::validate
 };
 use proc_macro2::{TokenStream, Span};
-use syn::{punctuated::Punctuated, Data, DeriveInput, Error, Index, Member, Result, Token};
+use syn::{parse2, punctuated::Punctuated, Data, DeriveInput, Error, Index, Member, Result, Token, Type};
 use quote::{format_ident, quote, ToTokens};
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
@@ -333,9 +333,15 @@ fn struct_main_code_block(input: &Struct, ctx: &ImplContext) -> TokenStream {
             quote!(#dst #struct_init_block)
         },
         Kind::OwnedInto | Kind::RefInto => {
-            let dst = if ctx.struct_attr.ty.nameless_tuple || ctx.has_post_init { TokenStream::new() } else { ctx.dst_ty.clone() };
+            let dst = if ctx.struct_attr.ty.nameless_tuple || ctx.has_post_init {
+                TokenStream::new()
+            } else if let Ok(Type::Path(path)) = parse2::<Type>(ctx.dst_ty.clone()) {
+                path.path.segments.first().unwrap().ident.to_token_stream()
+            } else {
+                ctx.dst_ty.clone()
+            };
             quote!(#dst #struct_init_block)
-        },
+        }
         Kind::OwnedIntoExisting | Kind::RefIntoExisting => struct_init_block,
     }
 }

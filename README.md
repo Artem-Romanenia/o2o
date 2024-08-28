@@ -1443,7 +1443,7 @@ struct EntityDto{
   ```
 </details>
 
-### Lifetime
+### Lifetime both ways
 
 ```rust
 use o2o::o2o;
@@ -1458,6 +1458,22 @@ struct EntityDto<'a> {
     some_str: &'a str,
 }
 ```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl<'a> ::core::convert::From<Entity<'a>> for EntityDto<'a> {
+      fn from(value: Entity<'a>) -> EntityDto<'a> {
+          EntityDto { some_str: value.some_str }
+      }
+  }
+  impl<'a> ::core::convert::Into<Entity<'a>> for EntityDto<'a> {
+      fn into(self) -> Entity<'a> {
+          Entity { some_str: self.some_str }
+      }
+  }
+  ```
+</details>
 
 ### Generics
 
@@ -1492,6 +1508,42 @@ struct EntityDto {
       fn into(self) -> Entity<f32> {
           Entity::<f32> {
               some_int: self.some_int,
+              something: self.something,
+          }
+      }
+  }
+  ```
+</details>
+
+### Generics both ways
+
+```rust
+use o2o::o2o;
+
+struct Entity<T> {
+    something: T,
+}
+
+#[derive(o2o)]
+#[map_owned(Entity<T>)]
+struct EntityDto<T> {
+    something: T,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl<T> ::core::convert::From<Entity<T>> for EntityDto<T> {
+      fn from(value: Entity<T>) -> EntityDto<T> {
+          EntityDto {
+              something: value.something,
+          }
+      }
+  }
+  impl<T> ::core::convert::Into<Entity<T>> for EntityDto<T> {
+      fn into(self) -> Entity<T> {
+          Entity {
               something: self.something,
           }
       }
