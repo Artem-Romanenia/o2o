@@ -417,8 +417,13 @@ fn struct_main_code_block(input: &Struct, ctx: &ImplContext) -> TokenStream {
         Kind::OwnedInto | Kind::RefInto => {
             let dst = if ctx.struct_attr.ty.nameless_tuple || ctx.has_post_init {
                 TokenStream::new()
-            } else if let Ok(Type::Path(path)) = parse2::<Type>(ctx.dst_ty.clone()) {
-                path.path.segments.first().unwrap().ident.to_token_stream()
+            } else if let Ok(Type::Path(mut path)) = parse2::<Type>(ctx.dst_ty.clone()) {
+                // In this case we want to transform something like `mod1::mod2::Entity<T>` to `mod1::mod2::Entity`.
+                // So set all segments arguments to None.
+                path.path.segments.iter_mut().for_each(|segment| {
+                    segment.arguments = syn::PathArguments::None;
+                });
+                path.to_token_stream()
             } else {
                 ctx.dst_ty.clone()
             };
