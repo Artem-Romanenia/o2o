@@ -9,14 +9,14 @@ fn struct2unit() {
     #[try_into_existing(A as Unit, String)]
     struct B {
         #[ghost({123})]
-        x: i32
+        x: i32,
     }
 
     let a = A;
     let b: B = a.try_into().unwrap();
     assert_eq!(123, b.x);
 
-    let b = B {x: 111};
+    let b = B { x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 
@@ -24,16 +24,16 @@ fn struct2unit() {
     let b: B = a.try_into().unwrap();
     assert_eq!(123, b.x);
 
-    let b = &B {x: 111};
+    let b = &B { x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 
     let mut a = A;
-    let b = B {x: 111};
+    let b = B { x: 111 };
     b.try_into_existing(&mut a).unwrap();
 
     let mut a = A;
-    let b = &B {x: 111};
+    let b = &B { x: 111 };
     b.try_into_existing(&mut a).unwrap();
 }
 
@@ -80,14 +80,14 @@ fn unit2struct() {
     struct A;
 
     struct B {
-        x: i32
+        x: i32,
     }
 
     let a = A;
     let b: B = a.try_into().unwrap();
     assert_eq!(123, b.x);
 
-    let b = B {x: 111};
+    let b = B { x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 
@@ -95,17 +95,17 @@ fn unit2struct() {
     let b: B = a.try_into().unwrap();
     assert_eq!(123, b.x);
 
-    let b = &B {x: 111};
+    let b = &B { x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 
     let a = A;
-    let mut b = B {x: 111};
+    let mut b = B { x: 111 };
     a.try_into_existing(&mut b).unwrap();
     assert_eq!(123, b.x);
 
     let a = &A;
-    let mut b = B {x: 111};
+    let mut b = B { x: 111 };
     a.try_into_existing(&mut b).unwrap();
     assert_eq!(123, b.x);
 }
@@ -155,23 +155,23 @@ fn struct2unit_no_ghost() {
     #[try_into(A as Unit, String)]
     #[try_into_existing(A as Unit, String)]
     struct B {
-        _x: i32
+        _x: i32,
     }
 
-    let b = B {_x: 111};
+    let b = B { _x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 
-    let b = &B {_x: 111};
+    let b = &B { _x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 
     let mut a = A;
-    let b = B {_x: 111};
+    let b = B { _x: 111 };
     b.try_into_existing(&mut a).unwrap();
 
     let mut a = A;
-    let b = &B {_x: 111};
+    let b = &B { _x: 111 };
     b.try_into_existing(&mut a).unwrap();
 }
 
@@ -207,13 +207,15 @@ fn unit2struct_no_ghost() {
     #[try_from(B, String)]
     struct A;
 
-    struct B {_x: i32}
+    struct B {
+        _x: i32,
+    }
 
-    let b = B {_x: 111};
+    let b = B { _x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 
-    let b = &B {_x: 111};
+    let b = &B { _x: 111 };
     let a: A = b.try_into().unwrap();
     assert!(matches!(a, A));
 }

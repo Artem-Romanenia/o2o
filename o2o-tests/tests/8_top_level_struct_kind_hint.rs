@@ -49,13 +49,12 @@ struct UnnamedStruct(
         from(NamedStructModel| @.some_int as i32),
         into(NamedStructModel| some_int, ~ as i16),
     )]
-    i32, 
+    i32,
     #[o2o(map(NamedStructDto| another_int))]
     #[o2o(from(NamedStructModel| @.another_int as i32))]
     #[o2o(into(NamedStructModel| another_int, ~ as i8))]
-    i32, 
-    #[o2o(map(some_float))]
-    f32
+    i32,
+    #[o2o(map(some_float))] f32,
 );
 
 #[test]
@@ -63,7 +62,7 @@ fn named2unnamed() {
     let named = NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let dto: UnnamedStructDto = named.into();
@@ -75,7 +74,7 @@ fn named2unnamed() {
     let named = NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let model: UnnamedStructModel = named.into();
@@ -90,7 +89,7 @@ fn named2unnamed_2() {
     let dto = NamedStructDto {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let unnamed: UnnamedStruct = dto.into();
@@ -102,7 +101,7 @@ fn named2unnamed_2() {
     let named = NamedStructModel {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let unnamed: UnnamedStruct = named.into();
@@ -155,7 +154,7 @@ fn named2unnamed_ref() {
     let named = &NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let dto: UnnamedStructDto = named.into();
@@ -167,7 +166,7 @@ fn named2unnamed_ref() {
     let named = &NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let model: UnnamedStructModel = named.into();
@@ -182,7 +181,7 @@ fn named2unnamed_2_ref() {
     let dto = &NamedStructDto {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let unnamed: UnnamedStruct = dto.into();
@@ -194,7 +193,7 @@ fn named2unnamed_2_ref() {
     let model = &NamedStructModel {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let unnamed: UnnamedStruct = model.into();
@@ -247,7 +246,7 @@ fn existing_named2unnamed() {
     let named = NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let mut dto: UnnamedStructDto = Default::default();
@@ -260,7 +259,7 @@ fn existing_named2unnamed() {
     let named = NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let mut model: UnnamedStructModel = Default::default();
@@ -296,7 +295,7 @@ fn existing_named2unnamed_ref() {
     let named = &NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let mut dto: UnnamedStructDto = Default::default();
@@ -309,7 +308,7 @@ fn existing_named2unnamed_ref() {
     let named = &NamedStruct {
         some_int: 123,
         another_int: 127,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let mut model: UnnamedStructModel = Default::default();

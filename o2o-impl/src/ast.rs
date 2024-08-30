@@ -1,15 +1,17 @@
 use crate::attr::{self};
-use crate::attr::{MemberAttrs, DataTypeAttrs};
+use crate::attr::{DataTypeAttrs, MemberAttrs};
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
+use syn::{
+    Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result,
+};
 
 #[derive(Default)]
 struct Context {
     variant_attrs_to_repeat: Option<MemberAttrs>,
-    field_attrs_to_repeat: Option<(MemberAttrs, bool)>
+    field_attrs_to_repeat: Option<(MemberAttrs, bool)>,
 }
 
 pub(crate) struct Struct<'a> {
@@ -57,7 +59,9 @@ impl<'a> Field {
 
                 if let Some(repeat_attr) = &field.attrs.repeat {
                     if ctx.field_attrs_to_repeat.is_some() && !field.attrs.stop_repeat {
-                        panic!("Previous #[repeat] instruction must be terminated with #[stop_repeat]")
+                        panic!(
+                            "Previous #[repeat] instruction must be terminated with #[stop_repeat]"
+                        )
                     }
 
                     ctx.field_attrs_to_repeat = Some((field.attrs.clone(), repeat_attr.permeate));
@@ -88,7 +92,7 @@ pub(crate) struct Enum<'a> {
     pub attrs: DataTypeAttrs,
     pub ident: &'a Ident,
     pub generics: &'a Generics,
-    pub variants: Vec<Variant>
+    pub variants: Vec<Variant>,
 }
 
 impl<'a> Enum<'a> {
@@ -99,7 +103,7 @@ impl<'a> Enum<'a> {
             attrs,
             ident: &node.ident,
             generics: &node.generics,
-            variants
+            variants,
         })
     }
 }
@@ -110,14 +114,17 @@ pub(crate) struct Variant {
     _idx: usize,
     pub fields: Vec<Field>,
     pub named_fields: bool,
-    pub unit: bool
+    pub unit: bool,
 }
 
 impl<'a> Variant {
-    fn multiple_from_syn(variants: &'a Punctuated<syn::Variant, Comma>, bark: bool) -> Result<Vec<Self>> {
+    fn multiple_from_syn(
+        variants: &'a Punctuated<syn::Variant, Comma>,
+        bark: bool,
+    ) -> Result<Vec<Self>> {
         let mut ctx = Context {
             variant_attrs_to_repeat: None,
-            field_attrs_to_repeat: None
+            field_attrs_to_repeat: None,
         };
 
         variants
@@ -132,7 +139,9 @@ impl<'a> Variant {
 
                 if variant.attrs.repeat.is_some() {
                     if ctx.variant_attrs_to_repeat.is_some() && !variant.attrs.stop_repeat {
-                        panic!("Previous #[repeat] instruction must be terminated with #[stop_repeat]")
+                        panic!(
+                            "Previous #[repeat] instruction must be terminated with #[stop_repeat]"
+                        )
                     }
 
                     ctx.variant_attrs_to_repeat = Some(variant.attrs.clone());
@@ -145,7 +154,12 @@ impl<'a> Variant {
             .collect()
     }
 
-    fn from_syn(ctx: &mut Context, i: usize, variant: &'a syn::Variant, bark: bool) -> Result<Self> {
+    fn from_syn(
+        ctx: &mut Context,
+        i: usize,
+        variant: &'a syn::Variant,
+        bark: bool,
+    ) -> Result<Self> {
         let fields = Field::multiple_from_syn(ctx, &variant.fields, bark)?;
         let attrs = attr::get_member_attrs(SynDataTypeMember::Variant(variant), bark)?;
 
@@ -168,49 +182,49 @@ impl<'a> Variant {
 
 pub(crate) enum DataType<'a> {
     Struct(&'a Struct<'a>),
-    Enum(&'a Enum<'a>)
+    Enum(&'a Enum<'a>),
 }
 
 impl<'a> DataType<'a> {
     pub fn get_ident(&'a self) -> &Ident {
         match self {
             DataType::Struct(s) => s.ident,
-            DataType::Enum(e) => e.ident
+            DataType::Enum(e) => e.ident,
         }
     }
 
     pub fn get_attrs(&'a self) -> &'a DataTypeAttrs {
         match self {
             DataType::Struct(s) => &s.attrs,
-            DataType::Enum(e) => &e.attrs
+            DataType::Enum(e) => &e.attrs,
         }
     }
 
     pub fn get_members(&'a self) -> Vec<DataTypeMember> {
         match self {
             DataType::Struct(s) => s.fields.iter().map(DataTypeMember::Field).collect(),
-            DataType::Enum(e) => e.variants.iter().map(DataTypeMember::Variant).collect()
+            DataType::Enum(e) => e.variants.iter().map(DataTypeMember::Variant).collect(),
         }
     }
 
     pub fn get_generics(&'a self) -> &'a Generics {
         match self {
             DataType::Struct(s) => s.generics,
-            DataType::Enum(e) => e.generics
+            DataType::Enum(e) => e.generics,
         }
     }
 }
 
 pub(crate) enum SynDataTypeMember<'a> {
     Field(&'a syn::Field),
-    Variant(&'a syn::Variant)
+    Variant(&'a syn::Variant),
 }
 
 impl<'a> SynDataTypeMember<'a> {
     pub fn get_attrs(&'a self) -> &'a Vec<Attribute> {
         match self {
             SynDataTypeMember::Field(f) => &f.attrs,
-            SynDataTypeMember::Variant(v) => &v.attrs
+            SynDataTypeMember::Variant(v) => &v.attrs,
         }
     }
 }
@@ -218,21 +232,21 @@ impl<'a> SynDataTypeMember<'a> {
 #[derive(Clone, Copy)]
 pub(crate) enum DataTypeMember<'a> {
     Field(&'a Field),
-    Variant(&'a Variant)
+    Variant(&'a Variant),
 }
 
 impl<'a> DataTypeMember<'a> {
     pub fn get_attrs(&'a self) -> &'a MemberAttrs {
         match self {
             DataTypeMember::Field(f) => &f.attrs,
-            DataTypeMember::Variant(v) => &v.attrs
+            DataTypeMember::Variant(v) => &v.attrs,
         }
     }
 
     pub fn get_span(&'a self) -> Span {
         match self {
             DataTypeMember::Field(f) => f.member.span(),
-            DataTypeMember::Variant(v) => v.ident.span()
+            DataTypeMember::Variant(v) => v.ident.span(),
         }
     }
 }

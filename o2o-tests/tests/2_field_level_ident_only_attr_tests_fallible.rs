@@ -22,9 +22,9 @@ struct NamedStructModel {
 #[try_into_existing(NamedStructModel, String)]
 struct NamedStructDto {
     some_int: i32,
-    #[try_map(another_int)] 
+    #[try_map(another_int)]
     diff_another_int: i32,
-    #[map(NamedStruct| some_float)] 
+    #[map(NamedStruct| some_float)]
     #[map(NamedStructModel| some_float_diff)]
     diff_some_float: f32,
 }
@@ -33,19 +33,21 @@ struct NamedStructDto {
 #[o2o(try_from(NamedStruct, i32))]
 #[o2o(try_from(NamedStructModel, i32))]
 struct UnnamedStructDto(
-    #[o2o(try_map(some_int))] i32, 
-    #[o2o(map(another_int))] i32, 
-    #[o2o(map(NamedStruct| some_float), map(NamedStructModel| some_float_diff))] f32
+    #[o2o(try_map(some_int))] i32,
+    #[o2o(map(another_int))] i32,
+    #[o2o(map(NamedStruct| some_float), map(NamedStructModel| some_float_diff))] f32,
 );
 
-#[derive(Default)]
-#[derive(o2o)]
+#[derive(Default, o2o)]
 #[try_map(UnnamedStructDto, anyhow::Error)]
 #[try_into_existing(UnnamedStructDto, anyhow::Error)]
 struct NamedStruct2 {
-    #[try_map(0)] some_int: i32,
-    #[map(1)] another_int: i32,
-    #[map(2)] some_float: f32,
+    #[try_map(0)]
+    some_int: i32,
+    #[map(1)]
+    another_int: i32,
+    #[map(2)]
+    some_float: f32,
 }
 
 #[test]
@@ -80,7 +82,7 @@ fn named2named_reverse() {
     let named = NamedStruct {
         some_int: 123,
         another_int: 321,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let dto: NamedStructDto = named.try_into().unwrap();
@@ -92,7 +94,7 @@ fn named2named_reverse() {
     let model = NamedStructModel {
         some_int: 123,
         another_int: 321,
-        some_float_diff: 456.0
+        some_float_diff: 456.0,
     };
 
     let dto: NamedStructDto = model.try_into().unwrap();
@@ -107,7 +109,7 @@ fn named2named_ref() {
     let dto = &NamedStructDto {
         some_int: 123,
         diff_another_int: 321,
-        diff_some_float: 456.0
+        diff_some_float: 456.0,
     };
 
     let named: NamedStruct = dto.try_into().unwrap();
@@ -128,7 +130,7 @@ fn named2named_ref_reversed() {
     let named = &NamedStruct {
         some_int: 123,
         another_int: 321,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let dto: NamedStructDto = named.try_into().unwrap();
@@ -140,7 +142,7 @@ fn named2named_ref_reversed() {
     let model = &NamedStructModel {
         some_int: 123,
         another_int: 321,
-        some_float_diff: 456.0
+        some_float_diff: 456.0,
     };
 
     let dto: NamedStructDto = model.try_into().unwrap();
@@ -150,7 +152,7 @@ fn named2named_ref_reversed() {
     assert_eq!(model.some_float_diff, dto.diff_some_float);
 }
 
-#[test] 
+#[test]
 fn named2unnamed() {
     let named = NamedStruct {
         some_int: 123,
@@ -177,7 +179,7 @@ fn named2unnamed() {
     assert_eq!(456.0, unnamed.2);
 }
 
-#[test] 
+#[test]
 fn named2unnamed_ref() {
     let named = &NamedStruct {
         some_int: 123,
@@ -204,7 +206,7 @@ fn named2unnamed_ref() {
     assert_eq!(model.some_float_diff, unnamed.2);
 }
 
-#[test] 
+#[test]
 fn unnamed2named() {
     let dto = UnnamedStructDto(123, 321, 456.0);
 
@@ -215,12 +217,12 @@ fn unnamed2named() {
     assert_eq!(456.0, named.some_float);
 }
 
-#[test] 
+#[test]
 fn unnamed2named_reverse() {
-    let named = NamedStruct2{
+    let named = NamedStruct2 {
         some_int: 123,
         another_int: 321,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let dto: UnnamedStructDto = named.try_into().unwrap();
@@ -230,7 +232,7 @@ fn unnamed2named_reverse() {
     assert_eq!(456.0, dto.2);
 }
 
-#[test] 
+#[test]
 fn unnamed2named_ref() {
     let dto = &UnnamedStructDto(123, 321, 456.0);
 
@@ -241,12 +243,12 @@ fn unnamed2named_ref() {
     assert_eq!(dto.2, named.some_float);
 }
 
-#[test] 
+#[test]
 fn unnamed2named_reverse_ref() {
-    let named = &NamedStruct2{
+    let named = &NamedStruct2 {
         some_int: 123,
         another_int: 321,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let dto: UnnamedStructDto = named.try_into().unwrap();
@@ -290,7 +292,7 @@ fn existing_named2named_ref() {
     let dto = &NamedStructDto {
         some_int: 123,
         diff_another_int: 321,
-        diff_some_float: 456.0
+        diff_some_float: 456.0,
     };
 
     let mut named: NamedStruct = Default::default();
@@ -308,12 +310,12 @@ fn existing_named2named_ref() {
     assert_eq!(named.some_float, model.some_float_diff);
 }
 
-#[test] 
+#[test]
 fn existing_named2unnamed() {
-    let named = NamedStruct2{
+    let named = NamedStruct2 {
         some_int: 123,
         another_int: 321,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let mut dto: UnnamedStructDto = Default::default();
@@ -324,12 +326,12 @@ fn existing_named2unnamed() {
     assert_eq!(456.0, dto.2);
 }
 
-#[test] 
+#[test]
 fn existing_named2unnamed_ref() {
-    let named = &NamedStruct2{
+    let named = &NamedStruct2 {
         some_int: 123,
         another_int: 321,
-        some_float: 456.0
+        some_float: 456.0,
     };
 
     let mut dto: UnnamedStructDto = Default::default();

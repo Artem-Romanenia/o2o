@@ -7,12 +7,12 @@ struct Entity {
     some_float: f32,
     another_float: f64,
     extra_float: f32,
-    child: Child
+    child: Child,
 }
 
 #[derive(Default)]
 struct Child {
-    child_float: f32
+    child_float: f32,
 }
 
 fn another_int_to_string(e: &Entity) -> String {
@@ -95,10 +95,8 @@ struct EntityDto {
 #[try_into_existing(Entity as {}, String)]
 #[children(child: Child as {})]
 #[ghosts(extra_float: { extra_float_2(&@) })]
-struct UnnamedEntityDto (
-    #[map(Entity| some_int)]
-    i32,
-
+struct UnnamedEntityDto(
+    #[map(Entity| some_int)] i32,
     #[o2o(
         from_ref(another_int_to_string(@)),
         from_owned(another_int_to_string(&@)),
@@ -106,20 +104,15 @@ struct UnnamedEntityDto (
         owned_into(another_int, { unnamed_another_int_string_to_int(&@) } )
     )]
     String,
-
     #[o2o(from(some_float, { float_to_string(~) } ))]
     #[o2o(ref_into(some_float, { string_to_float(~.clone()) } ))]
     #[o2o(owned_into(some_float, { string_to_float(~.clone()) } ))]
     String,
-
     #[from(another_float, { float64_to_string(~) } )]
     #[ref_into(another_float, { string_to_float64(~.clone()) } )]
     #[owned_into(another_float, { string_to_float64(~.clone()) } )]
     String,
-
-    #[ghost({ extra_string(&@) })]
-    String,
-
+    #[ghost({ extra_string(&@) })] String,
     #[child(child)]
     #[from(child_float, { float_to_string(~) })]
     #[into(child_float, { string_to_float(~.clone()) })]
@@ -134,7 +127,7 @@ fn named2named() {
         some_float: "789".into(),
         another_float_string: "987".into(),
         extra_string: "654".into(),
-        child_float_string: "321".into()
+        child_float_string: "321".into(),
     };
 
     let entity: Entity = dto.try_into().unwrap();
@@ -155,9 +148,7 @@ fn named2named_reverse() {
         some_float: 789.0,
         another_float: 987.0,
         extra_float: 654.0,
-        child: Child {
-            child_float: 321.0
-        }
+        child: Child { child_float: 321.0 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -168,7 +159,6 @@ fn named2named_reverse() {
     assert_eq!("987", dto.another_float_string);
     assert_eq!("654", dto.extra_string);
     assert_eq!("321", dto.child_float_string);
-    
 }
 
 #[test]
@@ -179,7 +169,7 @@ fn named2named_ref() {
         some_float: "789".into(),
         another_float_string: "987".into(),
         extra_string: "654".into(),
-        child_float_string: "321".into()
+        child_float_string: "321".into(),
     };
 
     let entity: Entity = dto.try_into().unwrap();
@@ -200,9 +190,7 @@ fn named2named_ref_reverse() {
         some_float: 789.0,
         another_float: 987.0,
         extra_float: 654.0,
-        child: Child {
-            child_float: 321.0
-        }
+        child: Child { child_float: 321.0 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -213,7 +201,6 @@ fn named2named_ref_reverse() {
     assert_eq!("987", dto.another_float_string);
     assert_eq!("654", dto.extra_string);
     assert_eq!("321", dto.child_float_string);
-    
 }
 
 #[test]
@@ -224,7 +211,7 @@ fn existing_named2named() {
         some_float: "789".into(),
         another_float_string: "987".into(),
         extra_string: "654".into(),
-        child_float_string: "321".into()
+        child_float_string: "321".into(),
     };
 
     let mut entity: Entity = Default::default();
@@ -246,7 +233,7 @@ fn existing_named2named_ref() {
         some_float: "789".into(),
         another_float_string: "987".into(),
         extra_string: "654".into(),
-        child_float_string: "321".into()
+        child_float_string: "321".into(),
     };
 
     let mut entity: Entity = Default::default();
@@ -262,13 +249,13 @@ fn existing_named2named_ref() {
 
 #[test]
 fn unnamed2named() {
-    let dto = UnnamedEntityDto (
+    let dto = UnnamedEntityDto(
         123,
         "456".into(),
         "789".into(),
         "987".into(),
         "654".into(),
-        "321".into()
+        "321".into(),
     );
 
     let entity: Entity = dto.try_into().unwrap();
@@ -289,9 +276,7 @@ fn unnamed2named_reverse() {
         some_float: 789.0,
         another_float: 987.0,
         extra_float: 654.0,
-        child: Child {
-            child_float: 321.0
-        }
+        child: Child { child_float: 321.0 },
     };
 
     let dto: UnnamedEntityDto = entity.try_into().unwrap();
@@ -306,13 +291,13 @@ fn unnamed2named_reverse() {
 
 #[test]
 fn unnamed2named_ref() {
-    let dto = &UnnamedEntityDto (
+    let dto = &UnnamedEntityDto(
         123,
         "456".into(),
         "789".into(),
         "987".into(),
         "654".into(),
-        "321".into()
+        "321".into(),
     );
 
     let entity: Entity = dto.try_into().unwrap();
@@ -333,9 +318,7 @@ fn unnamed2named_ref_reverse() {
         some_float: 789.0,
         another_float: 987.0,
         extra_float: 654.0,
-        child: Child {
-            child_float: 321.0
-        }
+        child: Child { child_float: 321.0 },
     };
 
     let dto: UnnamedEntityDto = entity.try_into().unwrap();
@@ -346,18 +329,17 @@ fn unnamed2named_ref_reverse() {
     assert_eq!("987", dto.3);
     assert_eq!("654", dto.4);
     assert_eq!("321", dto.5);
-    
 }
 
 #[test]
 fn existing_unnamed2named() {
-    let dto = UnnamedEntityDto (
+    let dto = UnnamedEntityDto(
         123,
         "456".into(),
         "789".into(),
         "987".into(),
         "654".into(),
-        "321".into()
+        "321".into(),
     );
 
     let mut entity: Entity = Default::default();
@@ -373,13 +355,13 @@ fn existing_unnamed2named() {
 
 #[test]
 fn existing_unnamed2named_ref() {
-    let dto = &UnnamedEntityDto (
+    let dto = &UnnamedEntityDto(
         123,
         "456".into(),
         "789".into(),
         "987".into(),
         "654".into(),
-        "321".into()
+        "321".into(),
     );
 
     let mut entity: Entity = Default::default();

@@ -13,7 +13,7 @@ enum EnumDto {
     #[ghost({Err("todo")?})]
     Var3,
     #[ghost]
-    Var4
+    Var4,
 }
 
 #[derive(Clone, PartialEq, o2o::o2o)]
@@ -30,15 +30,12 @@ enum EnumDto2 {
     Var1,
     Var2,
     Var3,
-    Var4
+    Var4,
 }
 
 #[test]
 fn enum2enum() {
-    for data in vec![
-        (Enum::Var1, EnumDto::Var1),
-        (Enum::Var22, EnumDto::Var2),
-    ] {
+    for data in vec![(Enum::Var1, EnumDto::Var1), (Enum::Var22, EnumDto::Var2)] {
         let dto_ref = &data.1;
         let en: Enum = dto_ref.try_into().unwrap();
         assert!(en == data.0);
@@ -56,14 +53,14 @@ fn enum2enum() {
 }
 
 #[test]
-fn enum2enum_panic () {
+fn enum2enum_panic() {
     let dto = EnumDto::Var3;
     let res: Result<Enum, String> = dto.try_into();
     assert!(res.is_err_and(|x| x == "todo"))
 }
 
 #[test]
-fn enum2enum_panic2 () {
+fn enum2enum_panic2() {
     let dto = EnumDto::Var4;
     let res: Result<Enum, String> = dto.try_into();
     assert!(res.is_err_and(|x| x == "unknown"))

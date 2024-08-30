@@ -5,7 +5,7 @@ use o2o::traits::IntoExisting;
 struct Person {
     age: i8,
     first_name: String,
-    last_name: String
+    last_name: String,
 }
 
 #[derive(o2o)]
@@ -17,7 +17,7 @@ struct Person {
 struct PersonDto {
     age: i8,
     #[ghost({format!("{} {}", first_name, last_name)})]
-    full_name: String
+    full_name: String,
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn named2named() {
     let person = Person {
         age: 42,
         first_name: "Dohn".into(),
-        last_name: "Joe".into()
+        last_name: "Joe".into(),
     };
 
     let dto: PersonDto = person.into();
@@ -39,20 +39,23 @@ fn named2named_ref() {
     let person = &Person {
         age: 42,
         first_name: "Dohn".into(),
-        last_name: "Joe".into()
+        last_name: "Joe".into(),
     };
 
     let dto: PersonDto = person.into();
 
     assert_eq!(person.age, dto.age);
-    assert_eq!(format!("{} {}", person.first_name, person.last_name), dto.full_name);
+    assert_eq!(
+        format!("{} {}", person.first_name, person.last_name),
+        dto.full_name
+    );
 }
 
 #[test]
 fn named2named_reverse() {
     let dto = PersonDto {
         age: 42,
-        full_name: "Test".into()
+        full_name: "Test".into(),
     };
 
     let person: Person = dto.into();
@@ -66,7 +69,7 @@ fn named2named_reverse() {
 fn named2named_reverse_ref() {
     let dto = &PersonDto {
         age: 42,
-        full_name: "Test".into()
+        full_name: "Test".into(),
     };
 
     let person: Person = dto.into();
@@ -80,7 +83,7 @@ fn named2named_reverse_ref() {
 fn existing_named2named() {
     let dto = PersonDto {
         age: 42,
-        full_name: "Test".into()
+        full_name: "Test".into(),
     };
 
     let mut person: Person = Default::default();
@@ -95,7 +98,7 @@ fn existing_named2named() {
 fn existing_named2named_ref() {
     let dto = &PersonDto {
         age: 42,
-        full_name: "Test".into()
+        full_name: "Test".into(),
     };
 
     let mut person: Person = Default::default();

@@ -2,12 +2,15 @@ use o2o::o2o;
 
 struct Entity {
     some_int: i32,
-    some_float: f32
+    some_float: f32,
 }
 
 impl Default for Entity {
     fn default() -> Self {
-        Self { some_int: 0, some_float: 321.0 }
+        Self {
+            some_int: 0,
+            some_float: 321.0,
+        }
     }
 }
 
@@ -17,18 +20,21 @@ impl Default for Entity {
 struct EntityDto {
     some_int: i32,
     #[ghost]
-    some_string: String
+    some_string: String,
 }
 
 fn get_default() -> EntityDto {
-    EntityDto { some_int: 0, some_string: "test".try_into().unwrap() }
+    EntityDto {
+        some_int: 0,
+        some_string: "test".try_into().unwrap(),
+    }
 }
 
 #[test]
 fn named2named() {
     let dto = EntityDto {
         some_int: 123,
-        some_string: "321".try_into().unwrap()
+        some_string: "321".try_into().unwrap(),
     };
 
     let entity: Entity = dto.try_into().unwrap();
@@ -41,7 +47,7 @@ fn named2named() {
 fn named2named_reverse() {
     let entity = Entity {
         some_int: 123,
-        some_float: 654.0
+        some_float: 654.0,
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -54,7 +60,7 @@ fn named2named_reverse() {
 fn named2named_ref() {
     let dto = &EntityDto {
         some_int: 123,
-        some_string: "321".try_into().unwrap()
+        some_string: "321".try_into().unwrap(),
     };
 
     let entity: Entity = dto.try_into().unwrap();
@@ -67,7 +73,7 @@ fn named2named_ref() {
 fn named2named_ref_reverse() {
     let entity = &Entity {
         some_int: 123,
-        some_float: 654.0
+        some_float: 654.0,
     };
 
     let dto: EntityDto = entity.try_into().unwrap();

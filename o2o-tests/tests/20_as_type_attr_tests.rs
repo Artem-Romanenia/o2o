@@ -6,7 +6,7 @@ struct NamedStruct {
     some_int: i32,
     another_int: i32,
     some_float: f32,
-    another_float: f64
+    another_float: f64,
 }
 
 #[derive(Default)]
@@ -14,7 +14,7 @@ struct NamedStructModel {
     some_int: i32,
     different_int: i8,
     some_float: f32,
-    another_float: f64
+    another_float: f64,
 }
 
 #[derive(o2o)]
@@ -36,12 +36,12 @@ struct NamedStructDto {
 }
 
 #[test]
-fn named2named_different_types(){
-    let dto = NamedStructDto{
+fn named2named_different_types() {
+    let dto = NamedStructDto {
         some_int: 123,
         different_int: 321,
         some_float: 456.0,
-        different_float: 654.0
+        different_float: 654.0,
     };
 
     let named: NamedStruct = dto.into();
@@ -51,11 +51,11 @@ fn named2named_different_types(){
     assert_eq!(456.0, named.some_float);
     assert_eq!(654.0, named.another_float);
 
-    let dto = NamedStructDto{
+    let dto = NamedStructDto {
         some_int: 123,
         different_int: 127,
         some_float: 456.0,
-        different_float: 654.0
+        different_float: 654.0,
     };
 
     let model: NamedStructModel = dto.into();
@@ -67,12 +67,12 @@ fn named2named_different_types(){
 }
 
 #[test]
-fn named2named_different_types_reverse(){
-    let named = NamedStruct{
+fn named2named_different_types_reverse() {
+    let named = NamedStruct {
         some_int: 123,
         another_int: 321,
         some_float: 456.0,
-        another_float: 654.0
+        another_float: 654.0,
     };
 
     let dto: NamedStructDto = named.into();
@@ -81,11 +81,11 @@ fn named2named_different_types_reverse(){
     assert_eq!(321, dto.different_int);
     assert_eq!(456.0, dto.some_float);
 
-    let model = NamedStructModel{
+    let model = NamedStructModel {
         some_int: 123,
         different_int: 127,
         some_float: 456.0,
-        another_float: 654.0
+        another_float: 654.0,
     };
 
     let dto: NamedStructDto = model.into();
@@ -97,12 +97,12 @@ fn named2named_different_types_reverse(){
 }
 
 #[test]
-fn named2named_different_types_ref(){
-    let dto = &NamedStructDto{
+fn named2named_different_types_ref() {
+    let dto = &NamedStructDto {
         some_int: 123,
         different_int: 127,
         some_float: 456.0,
-        different_float: 654.0
+        different_float: 654.0,
     };
 
     let named: NamedStruct = dto.into();
@@ -121,12 +121,12 @@ fn named2named_different_types_ref(){
 }
 
 #[test]
-fn named2named_different_types_reverse_ref(){
-    let named = &NamedStruct{
+fn named2named_different_types_reverse_ref() {
+    let named = &NamedStruct {
         some_int: 123,
         another_int: 321,
         some_float: 456.0,
-        another_float: 654.0
+        another_float: 654.0,
     };
 
     let dto: NamedStructDto = named.into();
@@ -136,11 +136,11 @@ fn named2named_different_types_reverse_ref(){
     assert_eq!(named.some_float, dto.some_float as f32);
     assert_eq!(named.another_float, dto.different_float as f64);
 
-    let model = &NamedStructModel{
+    let model = &NamedStructModel {
         some_int: 123,
         different_int: 127,
         some_float: 456.0,
-        another_float: 654.0
+        another_float: 654.0,
     };
 
     let dto: NamedStructDto = model.into();
@@ -152,12 +152,12 @@ fn named2named_different_types_reverse_ref(){
 }
 
 #[test]
-fn existing_named2named_different_types(){
-    let dto = NamedStructDto{
+fn existing_named2named_different_types() {
+    let dto = NamedStructDto {
         some_int: 123,
         different_int: 321,
         some_float: 456.0,
-        different_float: 654.0
+        different_float: 654.0,
     };
 
     let mut named: NamedStruct = Default::default();
@@ -168,11 +168,11 @@ fn existing_named2named_different_types(){
     assert_eq!(456.0, named.some_float);
     assert_eq!(654.0, named.another_float);
 
-    let dto = NamedStructDto{
+    let dto = NamedStructDto {
         some_int: 123,
         different_int: 127,
         some_float: 456.0,
-        different_float: 654.0
+        different_float: 654.0,
     };
 
     let mut model: NamedStructModel = Default::default();
@@ -185,12 +185,12 @@ fn existing_named2named_different_types(){
 }
 
 #[test]
-fn existing_named2named_different_types_ref(){
-    let dto = &NamedStructDto{
+fn existing_named2named_different_types_ref() {
+    let dto = &NamedStructDto {
         some_int: 123,
         different_int: 127,
         some_float: 456.0,
-        different_float: 654.0
+        different_float: 654.0,
     };
 
     let mut named: NamedStruct = Default::default();

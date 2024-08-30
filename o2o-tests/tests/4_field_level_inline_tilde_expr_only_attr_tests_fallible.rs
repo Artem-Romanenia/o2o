@@ -20,7 +20,7 @@ struct NamedStructModel {
     try_map(NamedStruct, String),
     try_map(NamedStructModel, String),
     try_into_existing(NamedStruct, String),
-    try_into_existing(NamedStructModel, String),
+    try_into_existing(NamedStructModel, String)
 )]
 struct NamedStructDto {
     some_int: i32,
@@ -69,7 +69,7 @@ struct Person {
 
 struct Pet {
     age: i8,
-    nickname: String
+    nickname: String,
 }
 
 #[derive(o2o)]
@@ -90,8 +90,8 @@ struct PetDto {
 }
 
 #[test]
-fn named2named_different_types(){
-    let dto = NamedStructDto{
+fn named2named_different_types() {
+    let dto = NamedStructDto {
         some_int: 123,
         another_int: 321,
         some_float: 456.0,
@@ -103,7 +103,7 @@ fn named2named_different_types(){
     assert_eq!(321, named.another_int);
     assert_eq!(456.0, named.some_float);
 
-    let dto = NamedStructDto{
+    let dto = NamedStructDto {
         some_int: 123,
         another_int: 127,
         some_float: 456.0,
@@ -117,8 +117,8 @@ fn named2named_different_types(){
 }
 
 #[test]
-fn named2named_different_types_reverse(){
-    let named = NamedStruct{
+fn named2named_different_types_reverse() {
+    let named = NamedStruct {
         some_int: 123,
         another_int: 321,
         some_float: 456.0,
@@ -130,7 +130,7 @@ fn named2named_different_types_reverse(){
     assert_eq!(321, dto.another_int);
     assert_eq!(456.0, dto.some_float);
 
-    let model = NamedStructModel{
+    let model = NamedStructModel {
         some_int: 123,
         another_int: 127,
         some_float: 456.0,
@@ -144,8 +144,8 @@ fn named2named_different_types_reverse(){
 }
 
 #[test]
-fn named2named_different_types_ref(){
-    let dto = &NamedStructDto{
+fn named2named_different_types_ref() {
+    let dto = &NamedStructDto {
         some_int: 123,
         another_int: 127,
         some_float: 456.0,
@@ -165,8 +165,8 @@ fn named2named_different_types_ref(){
 }
 
 #[test]
-fn named2named_different_types_reverse_ref(){
-    let named = &NamedStruct{
+fn named2named_different_types_reverse_ref() {
+    let named = &NamedStruct {
         some_int: 123,
         another_int: 321,
         some_float: 456.0,
@@ -178,7 +178,7 @@ fn named2named_different_types_reverse_ref(){
     assert_eq!(named.another_int, dto.another_int as i32);
     assert_eq!(named.some_float, dto.some_float as f32);
 
-    let model = &NamedStructModel{
+    let model = &NamedStructModel {
         some_int: 123,
         another_int: 127,
         some_float: 456.0,
@@ -195,9 +195,9 @@ fn named2named_different_types_reverse_ref(){
 fn named2named_child() {
     let p = Parent {
         parent_int: 123,
-        child: Child { 
-            child_int: 321, 
-            another_child_int: 456, 
+        child: Child {
+            child_int: 321,
+            another_child_int: 456,
         },
     };
 
@@ -212,9 +212,9 @@ fn named2named_child() {
 fn named2named_child_reverse() {
     let dto = ParentDto {
         parent_int: 123,
-        child: ChildDto { 
-            child_int: 321, 
-            diff_another_child_int: 456, 
+        child: ChildDto {
+            child_int: 321,
+            diff_another_child_int: 456,
         },
     };
 
@@ -232,13 +232,13 @@ fn named2named_children() {
         pets: vec![
             PetDto {
                 age: 5,
-                nickname: String::from("Mr. Dog")
+                nickname: String::from("Mr. Dog"),
             },
             PetDto {
                 age: 10,
-                nickname: String::from("Mr. Cat")
-            }
-        ]
+                nickname: String::from("Mr. Cat"),
+            },
+        ],
     };
 
     let p: Person = dto.try_into().unwrap();
@@ -258,13 +258,13 @@ fn named2named_children_reverse() {
         pets: vec![
             Pet {
                 age: 5,
-                nickname: String::from("Mr. Dog")
+                nickname: String::from("Mr. Dog"),
             },
             Pet {
                 age: 10,
-                nickname: String::from("Mr. Cat")
-            }
-        ]
+                nickname: String::from("Mr. Cat"),
+            },
+        ],
     };
 
     let dto: PersonDto = p.try_into().unwrap();
@@ -284,13 +284,13 @@ fn named2named_children_ref() {
         pets: vec![
             PetDto {
                 age: 5,
-                nickname: String::from("Mr. Dog")
+                nickname: String::from("Mr. Dog"),
             },
             PetDto {
                 age: 10,
-                nickname: String::from("Mr. Cat")
-            }
-        ]
+                nickname: String::from("Mr. Cat"),
+            },
+        ],
     };
 
     let p: Person = dto.try_into().unwrap();
@@ -310,13 +310,13 @@ fn named2named_children_ref_reversed() {
         pets: vec![
             Pet {
                 age: 5,
-                nickname: String::from("Mr. Dog")
+                nickname: String::from("Mr. Dog"),
             },
             Pet {
                 age: 10,
-                nickname: String::from("Mr. Cat")
-            }
-        ]
+                nickname: String::from("Mr. Cat"),
+            },
+        ],
     };
 
     let dto: PersonDto = p.try_into().unwrap();
@@ -330,8 +330,8 @@ fn named2named_children_ref_reversed() {
 }
 
 #[test]
-fn existing_named2named_different_types(){
-    let dto = NamedStructDto{
+fn existing_named2named_different_types() {
+    let dto = NamedStructDto {
         some_int: 123,
         another_int: 321,
         some_float: 456.0,
@@ -344,7 +344,7 @@ fn existing_named2named_different_types(){
     assert_eq!(321, named.another_int);
     assert_eq!(456.0, named.some_float);
 
-    let dto = NamedStructDto{
+    let dto = NamedStructDto {
         some_int: 123,
         another_int: 127,
         some_float: 456.0,
@@ -359,8 +359,8 @@ fn existing_named2named_different_types(){
 }
 
 #[test]
-fn existing_named2named_different_types_ref(){
-    let dto = &NamedStructDto{
+fn existing_named2named_different_types_ref() {
+    let dto = &NamedStructDto {
         some_int: 123,
         another_int: 127,
         some_float: 456.0,

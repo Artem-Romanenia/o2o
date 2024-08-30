@@ -39,7 +39,6 @@ struct NamedStructDto {
 #[try_into_existing(UnnamedStructModel, TryFromIntError)]
 struct UnnamedStructDto(i32, i32);
 
-
 #[test]
 fn named2named() {
     let dto = NamedStructDto {
@@ -245,7 +244,7 @@ fn existing_named2named_ref() {
 
 #[test]
 fn existing_unnamed2unnamed() {
-    let dto = UnnamedStructDto (123, 321);
+    let dto = UnnamedStructDto(123, 321);
 
     let mut unnamed: UnnamedStruct = Default::default();
 
@@ -254,7 +253,7 @@ fn existing_unnamed2unnamed() {
     assert_eq!(123, unnamed.0);
     assert_eq!(321, unnamed.1);
 
-    let dto = UnnamedStructDto (123, 321);
+    let dto = UnnamedStructDto(123, 321);
 
     let model: UnnamedStructModel = dto.try_into().unwrap();
 
@@ -264,7 +263,7 @@ fn existing_unnamed2unnamed() {
 
 #[test]
 fn existing_unnamed2unnamed_ref() {
-    let dto = &UnnamedStructDto (123, 321);
+    let dto = &UnnamedStructDto(123, 321);
 
     let mut unnamed: UnnamedStruct = Default::default();
 
@@ -273,7 +272,7 @@ fn existing_unnamed2unnamed_ref() {
     assert_eq!(dto.0, unnamed.0);
     assert_eq!(dto.1, unnamed.1);
 
-    let dto = &UnnamedStructDto (123, 321);
+    let dto = &UnnamedStructDto(123, 321);
 
     let model: UnnamedStructModel = dto.try_into().unwrap();
 

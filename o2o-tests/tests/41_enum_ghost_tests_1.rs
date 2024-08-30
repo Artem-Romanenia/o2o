@@ -13,9 +13,12 @@ enum EnumDto {
     #[ghost({panic!("impl var3")})]
     Var3,
     #[ghost({panic!("impl var4")})]
-    Var4 { _str: String, _i: i32},
+    Var4 {
+        _str: String,
+        _i: i32,
+    },
     #[ghost({panic!("impl var5")})]
-    Var5(i32, String)
+    Var5(i32, String),
 }
 
 #[derive(Clone, PartialEq, o2o::o2o)]
@@ -32,16 +35,13 @@ enum EnumDto2 {
     Var1,
     Var2,
     Var3,
-    Var4 { _str: String, _i: i32},
-    Var5(i32, String)
+    Var4 { _str: String, _i: i32 },
+    Var5(i32, String),
 }
 
 #[test]
 fn enum2enum() {
-    for data in vec![
-        (Enum::Var1, EnumDto::Var1),
-        (Enum::Var22, EnumDto::Var2),
-    ] {
+    for data in vec![(Enum::Var1, EnumDto::Var1), (Enum::Var22, EnumDto::Var2)] {
         let dto_ref = &data.1;
         let en: Enum = dto_ref.into();
         assert!(en == data.0);
@@ -60,21 +60,24 @@ fn enum2enum() {
 
 #[test]
 #[should_panic(expected = "impl var3")]
-fn enum2enum_panic () {
+fn enum2enum_panic() {
     let dto = EnumDto::Var3;
     let _: Enum = dto.into();
 }
 
 #[test]
 #[should_panic(expected = "impl var4")]
-fn enum2enum_panic_2 () {
-    let dto = EnumDto::Var4 { _str: "test".into(), _i: 123 };
+fn enum2enum_panic_2() {
+    let dto = EnumDto::Var4 {
+        _str: "test".into(),
+        _i: 123,
+    };
     let _: Enum = dto.into();
 }
 
 #[test]
 #[should_panic(expected = "impl var5")]
-fn enum2enum_panic_3 () {
+fn enum2enum_panic_3() {
     let dto = EnumDto::Var5(123, "test".into());
     let _: Enum = dto.into();
 }
@@ -111,7 +114,10 @@ fn enum2enum_panic_reverse() {
 #[test]
 #[should_panic(expected = "impl var4")]
 fn enum2enum_panic_reverse_2() {
-    let dto = EnumDto2::Var4 { _str: "test".into(), _i: 123 };
+    let dto = EnumDto2::Var4 {
+        _str: "test".into(),
+        _i: 123,
+    };
     let _: Enum2 = dto.into();
 }
 

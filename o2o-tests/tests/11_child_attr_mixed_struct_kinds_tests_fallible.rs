@@ -46,24 +46,40 @@ struct TupleChild(i32, i16);
 )]
 struct EntityDto {
     parent_int: i32,
-    #[o2o(child(base.0), map(base_int_2))] base_int: i32,
-    #[child(base.0)] another_base_int: i32,
-    #[child(base)] #[map(1)] base_entity_int: i32,
-    #[child(child)] child_int: i32,
-    #[child(child)] another_child_int: i32,
+    #[o2o(child(base.0), map(base_int_2))]
+    base_int: i32,
+    #[child(base.0)]
+    another_base_int: i32,
+    #[child(base)]
+    #[map(1)]
+    base_entity_int: i32,
+    #[child(child)]
+    child_int: i32,
+    #[child(child)]
+    another_child_int: i32,
 }
 
 #[derive(o2o)]
 #[try_map(TupleEntity, String)]
 #[try_into_existing(TupleEntity, String)]
 #[children(TupleEntity| 1: BaseEntity as {}, 1.base: TupleBase, 2: TupleChild)]
-struct TupleEntityDto (
+struct TupleEntityDto(
     i32,
-    #[child(1.base)] #[map(0)] i32,
-    #[child(1.base)] #[map(1)] i16,
-    #[child(1)] #[map(base_entity_int)] i32,
-    #[child(2)] #[map(0)] i32,
-    #[child(2)] #[map(1)] i16,
+    #[child(1.base)]
+    #[map(0)]
+    i32,
+    #[child(1.base)]
+    #[map(1)]
+    i16,
+    #[child(1)]
+    #[map(base_entity_int)]
+    i32,
+    #[child(2)]
+    #[map(0)]
+    i32,
+    #[child(2)]
+    #[map(1)]
+    i16,
 );
 
 #[test]
@@ -74,7 +90,7 @@ fn named2named() {
         another_base_int: 456,
         base_entity_int: 654,
         child_int: 789,
-        another_child_int: 987
+        another_child_int: 987,
     };
 
     let entity: Entity = dto.try_into().unwrap();
@@ -91,17 +107,17 @@ fn named2named() {
 fn named2named_reverse() {
     let entity = Entity {
         parent_int: 123,
-        base: TupleBaseEntity ( 
+        base: TupleBaseEntity(
             Base {
                 base_int_2: 321,
-                another_base_int: 456
+                another_base_int: 456,
             },
-            654
+            654,
         ),
         child: Child {
             child_int: 789,
-            another_child_int: 987
-        }
+            another_child_int: 987,
+        },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -122,7 +138,7 @@ fn named2named_ref() {
         another_base_int: 456,
         base_entity_int: 654,
         child_int: 789,
-        another_child_int: 987
+        another_child_int: 987,
     };
 
     let entity: Entity = dto.try_into().unwrap();
@@ -139,17 +155,17 @@ fn named2named_ref() {
 fn named2named_reverse_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: TupleBaseEntity ( 
+        base: TupleBaseEntity(
             Base {
                 base_int_2: 321,
-                another_base_int: 456
+                another_base_int: 456,
             },
-            654
+            654,
         ),
         child: Child {
             child_int: 789,
-            another_child_int: 987
-        }
+            another_child_int: 987,
+        },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -172,8 +188,8 @@ fn unnamed2unnamed() {
     assert_eq!(321, entity.1.base.0);
     assert_eq!(456, entity.1.base.1);
     assert_eq!(654, entity.1.base_entity_int);
-    assert_eq!(789, entity.2.0);
-    assert_eq!(987, entity.2.1);
+    assert_eq!(789, entity.2 .0);
+    assert_eq!(987, entity.2 .1);
 }
 
 #[test]
@@ -181,16 +197,10 @@ fn unnamed2unnamed_reverse() {
     let entity = TupleEntity(
         123,
         BaseEntity {
-            base: TupleBase (
-                321,
-                456
-            ),
-            base_entity_int: 654
+            base: TupleBase(321, 456),
+            base_entity_int: 654,
         },
-        TupleChild (
-            789,
-            987
-        )
+        TupleChild(789, 987),
     );
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
@@ -213,8 +223,8 @@ fn unnamed2unnamed_ref() {
     assert_eq!(dto.1, entity.1.base.0);
     assert_eq!(dto.2, entity.1.base.1);
     assert_eq!(dto.3, entity.1.base_entity_int);
-    assert_eq!(dto.4, entity.2.0);
-    assert_eq!(dto.5, entity.2.1);
+    assert_eq!(dto.4, entity.2 .0);
+    assert_eq!(dto.5, entity.2 .1);
 }
 
 #[test]
@@ -222,16 +232,10 @@ fn unnamed2unnamed_reverse_ref() {
     let entity = &TupleEntity(
         123,
         BaseEntity {
-            base: TupleBase (
-                321,
-                456
-            ),
-            base_entity_int: 654
+            base: TupleBase(321, 456),
+            base_entity_int: 654,
         },
-        TupleChild (
-            789,
-            987
-        )
+        TupleChild(789, 987),
     );
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
@@ -240,8 +244,8 @@ fn unnamed2unnamed_reverse_ref() {
     assert_eq!(entity.1.base.0, dto.1);
     assert_eq!(entity.1.base.1, dto.2);
     assert_eq!(entity.1.base_entity_int, dto.3);
-    assert_eq!(entity.2.0, dto.4);
-    assert_eq!(entity.2.1, dto.5);
+    assert_eq!(entity.2 .0, dto.4);
+    assert_eq!(entity.2 .1, dto.5);
 }
 
 #[test]
@@ -252,7 +256,7 @@ fn existing_named2named() {
         another_base_int: 456,
         base_entity_int: 654,
         child_int: 789,
-        another_child_int: 987
+        another_child_int: 987,
     };
 
     let mut entity: Entity = Default::default();
@@ -274,7 +278,7 @@ fn existing_named2named_ref() {
         another_base_int: 456,
         base_entity_int: 654,
         child_int: 789,
-        another_child_int: 987
+        another_child_int: 987,
     };
 
     let mut entity: Entity = Default::default();
@@ -299,8 +303,8 @@ fn existing_unnamed2unnamed() {
     assert_eq!(321, entity.1.base.0);
     assert_eq!(456, entity.1.base.1);
     assert_eq!(654, entity.1.base_entity_int);
-    assert_eq!(789, entity.2.0);
-    assert_eq!(987, entity.2.1);
+    assert_eq!(789, entity.2 .0);
+    assert_eq!(987, entity.2 .1);
 }
 
 #[test]
@@ -314,6 +318,6 @@ fn existing_unnamed2unnamed_ref() {
     assert_eq!(dto.1, entity.1.base.0);
     assert_eq!(dto.2, entity.1.base.1);
     assert_eq!(dto.3, entity.1.base_entity_int);
-    assert_eq!(dto.4, entity.2.0);
-    assert_eq!(dto.5, entity.2.1);
+    assert_eq!(dto.4, entity.2 .0);
+    assert_eq!(dto.5, entity.2 .1);
 }

@@ -4,7 +4,7 @@ use o2o::traits::IntoExisting;
 #[derive(Default)]
 struct Car {
     number_of_doors: i8,
-    vehicle: Vehicle
+    vehicle: Vehicle,
 }
 #[derive(Default)]
 struct Vehicle {
@@ -32,15 +32,16 @@ struct Machine {
 #[children(vehicle: Vehicle, vehicle.machine: Machine)]
 #[ghosts(vehicle.machine@id: { 321 })]
 struct CarDto {
-    #[o2o(repeat)] #[child(vehicle)]
+    #[o2o(repeat)]
+    #[child(vehicle)]
     number_of_seats: i16,
     can_fly: bool,
     needs_driver: bool,
     horsepower: i32,
     top_speed: f32,
     #[o2o(stop_repeat)]
-
-    #[o2o(repeat(child))] #[child(vehicle.machine)]
+    #[o2o(repeat(child))]
+    #[child(vehicle.machine)]
     #[map(~.clone())]
     brand: String,
     year: i16,
@@ -49,11 +50,12 @@ struct CarDto {
     width: f32,
     height: f32,
     #[o2o(stop_repeat)]
-
-    #[o2o(repeat(ghost))] #[ghost({123})]
+    #[o2o(repeat(ghost))]
+    #[ghost({123})]
     useless_param: i32,
     useless_param_2: i32,
-    #[o2o(skip_repeat)] number_of_doors: i8,
+    #[o2o(skip_repeat)]
+    number_of_doors: i8,
     useless_param_3: i32,
 }
 
@@ -61,22 +63,22 @@ struct CarDto {
 fn named2named() {
     let car = Car {
         number_of_doors: 2,
-        vehicle: Vehicle { 
+        vehicle: Vehicle {
             number_of_seats: 4,
             can_fly: false,
             horsepower: 30,
             needs_driver: true,
             top_speed: 105.0,
-            machine: Machine { 
-                id: 123, 
-                brand: "Trabant".into(), 
+            machine: Machine {
+                id: 123,
+                brand: "Trabant".into(),
                 year: 1960,
                 weight: 615.0,
                 length: 3360.0,
                 width: 1500.0,
-                height: 1440.0
-            }
-        }
+                height: 1440.0,
+            },
+        },
     };
 
     let car_dto: CarDto = car.into();
@@ -115,7 +117,7 @@ fn named2named_reverse() {
         height: 1440.0,
         useless_param: 123,
         useless_param_2: 123,
-        useless_param_3: 123
+        useless_param_3: 123,
     };
 
     let car: Car = car_dto.into();
@@ -138,22 +140,22 @@ fn named2named_reverse() {
 fn named2named_ref() {
     let car = &Car {
         number_of_doors: 2,
-        vehicle: Vehicle { 
+        vehicle: Vehicle {
             number_of_seats: 4,
             can_fly: false,
             horsepower: 30,
             needs_driver: true,
             top_speed: 105.0,
-            machine: Machine { 
-                id: 123, 
-                brand: "Trabant".into(), 
+            machine: Machine {
+                id: 123,
+                brand: "Trabant".into(),
                 year: 1960,
                 weight: 615.0,
                 length: 3360.0,
                 width: 1500.0,
-                height: 1440.0
-            }
-        }
+                height: 1440.0,
+            },
+        },
     };
 
     let car_dto: CarDto = car.into();
@@ -192,7 +194,7 @@ fn named2named_reverse_ref() {
         height: 1440.0,
         useless_param: 123,
         useless_param_2: 123,
-        useless_param_3: 123
+        useless_param_3: 123,
     };
 
     let car: Car = car_dto.into();
@@ -228,7 +230,7 @@ fn existing_named2named() {
         height: 1440.0,
         useless_param: 123,
         useless_param_2: 123,
-        useless_param_3: 123
+        useless_param_3: 123,
     };
 
     let mut car: Car = Default::default();
@@ -265,7 +267,7 @@ fn existing_named2named_reverse() {
         height: 1440.0,
         useless_param: 123,
         useless_param_2: 123,
-        useless_param_3: 123
+        useless_param_3: 123,
     };
 
     let mut car: Car = Default::default();

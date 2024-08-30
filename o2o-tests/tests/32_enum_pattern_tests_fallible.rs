@@ -3,11 +3,16 @@ use test_case::{test_case, test_matrix};
 #[derive(PartialEq, Debug, o2o::o2o)]
 #[try_from(i32, String| _ => panic!())]
 enum HttpStatusFamily {
-    #[pattern(100..=199)] Information,
-    #[pattern(200..=299)] Success,
-    #[pattern(300..=399)] Redirection,
-    #[pattern(400..=499)] ClientError,
-    #[pattern(500..=599)] ServerError,
+    #[pattern(100..=199)]
+    Information,
+    #[pattern(200..=299)]
+    Success,
+    #[pattern(300..=399)]
+    Redirection,
+    #[pattern(400..=499)]
+    ClientError,
+    #[pattern(500..=599)]
+    ServerError,
 }
 
 type StaticStr = &'static str;
@@ -18,11 +23,11 @@ enum AnimalKind {
     #[pattern("🐶" | "🐱" | "🐵")]
     Mammal,
 
-    #[pattern("🐟")] 
+    #[pattern("🐟")]
     Fish,
-    
+
     #[pattern("🐛" | "🐜")]
-    Insect
+    Insect,
 }
 
 #[test_matrix([101, 102], [HttpStatusFamily::Information] ; "100_Info")]

@@ -3,17 +3,20 @@ use test_case::test_case;
 #[derive(PartialEq, Debug, o2o::o2o)]
 #[map(i32)]
 enum HttpStatus {
-    #[literal(200)] Ok,
-    #[literal(404)] NotFound,
-    #[literal(500)] InternalError,
+    #[literal(200)]
+    Ok,
+    #[literal(404)]
+    NotFound,
+    #[literal(500)]
+    InternalError,
     #[pattern(_)]
     #[owned_into({f0})]
-    #[ref_into({*f0})] 
+    #[ref_into({*f0})]
     Other(
-        #[from_owned(@)] 
-        #[from_ref(*@)] 
-        i32
-    )
+        #[from_owned(@)]
+        #[from_ref(*@)]
+        i32,
+    ),
 }
 
 type StaticStr = &'static str;
@@ -21,10 +24,18 @@ type StaticStr = &'static str;
 #[derive(PartialEq, Debug, o2o::o2o)]
 #[map_owned(StaticStr)]
 enum Animal {
-    #[literal("🐶")] Dog,
-    #[literal("🐱")] Cat,
-    #[literal("🐵")] Monkey,
-    #[pattern(_)] #[into({name})] Other{ #[from(@)] name: StaticStr }
+    #[literal("🐶")]
+    Dog,
+    #[literal("🐱")]
+    Cat,
+    #[literal("🐵")]
+    Monkey,
+    #[pattern(_)]
+    #[into({name})]
+    Other {
+        #[from(@)]
+        name: StaticStr,
+    },
 }
 
 #[test_case(200, HttpStatus::Ok ; "200_OK")]

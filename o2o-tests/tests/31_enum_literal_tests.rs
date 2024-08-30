@@ -3,9 +3,12 @@ use test_case::test_case;
 #[derive(PartialEq, Debug, o2o::o2o)]
 #[map(i32| _ => panic!("Not supported"))]
 enum HttpStatus {
-    #[literal(200)]Ok,
-    #[literal(404)]NotFound,
-    #[literal(500)]InternalError
+    #[literal(200)]
+    Ok,
+    #[literal(404)]
+    NotFound,
+    #[literal(500)]
+    InternalError,
 }
 
 type StaticStr = &'static str;
@@ -13,9 +16,12 @@ type StaticStr = &'static str;
 #[derive(PartialEq, Debug, o2o::o2o)]
 #[map_owned(StaticStr| _ => todo!())]
 enum Animal {
-    #[literal("🐶")] Dog,
-    #[literal("🐱")] Cat,
-    #[literal("🐵")] Monkey
+    #[literal("🐶")]
+    Dog,
+    #[literal("🐱")]
+    Cat,
+    #[literal("🐵")]
+    Monkey,
 }
 
 #[test_case(200, HttpStatus::Ok ; "200_OK")]

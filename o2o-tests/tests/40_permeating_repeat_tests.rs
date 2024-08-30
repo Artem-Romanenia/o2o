@@ -8,29 +8,47 @@ fn reqular_repeat() {
         Var4 { field_5: i32 },
         Var5 { str: &'static str },
     }
-    
+
     #[derive(Clone, Debug, PartialEq, o2o::o2o)]
     #[map_owned(Enum)]
     enum EnumDto {
         Var1 {
-            #[o2o(repeat)] 
-            #[from(~ * 2)] 
-            #[into(~ / 2)] 
+            #[o2o(repeat)]
+            #[from(~ * 2)]
+            #[into(~ / 2)]
             field: i32,
-            field_2: i32
-         },
-        Var2 { field_3: i32 },
-        Var3 { field_4: i32 },
-        Var4 { field_5: i32 },
-        Var5 { #[o2o(stop_repeat)] str: &'static str },
+            field_2: i32,
+        },
+        Var2 {
+            field_3: i32,
+        },
+        Var3 {
+            field_4: i32,
+        },
+        Var4 {
+            field_5: i32,
+        },
+        Var5 {
+            #[o2o(stop_repeat)]
+            str: &'static str,
+        },
     }
 
     let data = vec![
-        (Enum::Var1 { field: 111, field_2: 111 }, EnumDto::Var1 { field: 222, field_2: 222 }),
+        (
+            Enum::Var1 {
+                field: 111,
+                field_2: 111,
+            },
+            EnumDto::Var1 {
+                field: 222,
+                field_2: 222,
+            },
+        ),
         (Enum::Var2 { field_3: 222 }, EnumDto::Var2 { field_3: 222 }),
         (Enum::Var3 { field_4: 333 }, EnumDto::Var3 { field_4: 333 }),
         (Enum::Var4 { field_5: 444 }, EnumDto::Var4 { field_5: 444 }),
-        (Enum::Var5 { str: "test" }, EnumDto::Var5 { str: "test" })
+        (Enum::Var5 { str: "test" }, EnumDto::Var5 { str: "test" }),
     ];
 
     for data in data {
@@ -52,29 +70,47 @@ fn permeating_repeat() {
         Var4 { field_5: i32 },
         Var5 { str: &'static str },
     }
-    
+
     #[derive(Clone, Debug, PartialEq, o2o::o2o)]
     #[map(Enum)]
     enum EnumDto {
         Var1 {
-            #[o2o(repeat(permeate()))] 
-            #[from(~ * 2)] 
-            #[into(~ / 2)] 
+            #[o2o(repeat(permeate()))]
+            #[from(~ * 2)]
+            #[into(~ / 2)]
             field: i32,
-            field_2: i32
-         },
-        Var2 { field_3: i32 },
-        Var3 { field_4: i32 },
-        Var4 { field_5: i32 },
-        Var5 { #[o2o(stop_repeat)] str: &'static str },
+            field_2: i32,
+        },
+        Var2 {
+            field_3: i32,
+        },
+        Var3 {
+            field_4: i32,
+        },
+        Var4 {
+            field_5: i32,
+        },
+        Var5 {
+            #[o2o(stop_repeat)]
+            str: &'static str,
+        },
     }
 
     let data = vec![
-        (Enum::Var1 { field: 111, field_2: 111 }, EnumDto::Var1 { field: 222, field_2: 222 }),
+        (
+            Enum::Var1 {
+                field: 111,
+                field_2: 111,
+            },
+            EnumDto::Var1 {
+                field: 222,
+                field_2: 222,
+            },
+        ),
         (Enum::Var2 { field_3: 222 }, EnumDto::Var2 { field_3: 444 }),
         (Enum::Var3 { field_4: 333 }, EnumDto::Var3 { field_4: 666 }),
         (Enum::Var4 { field_5: 444 }, EnumDto::Var4 { field_5: 888 }),
-        (Enum::Var5 { str: "test" }, EnumDto::Var5 { str: "test" })
+        (Enum::Var5 { str: "test" }, EnumDto::Var5 { str: "test" }),
     ];
 
     for data in data {

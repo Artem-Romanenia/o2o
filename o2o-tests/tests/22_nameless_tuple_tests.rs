@@ -4,7 +4,7 @@ use o2o::traits::IntoExisting;
 #[derive(o2o)]
 #[map((i32, String))]
 #[into_existing((i32, String))]
-pub struct Entity{
+pub struct Entity {
     #[map(0)]
     int: i32,
     #[map_owned(1)]
@@ -16,7 +16,7 @@ pub struct Entity{
 fn named2nameless() {
     let entity = Entity {
         int: 123,
-        string: "Test".into()
+        string: "Test".into(),
     };
 
     let (int, string) = entity.into();
@@ -29,7 +29,7 @@ fn named2nameless() {
 fn named2nameless_ref() {
     let entity = &Entity {
         int: 123,
-        string: "Test".into()
+        string: "Test".into(),
     };
 
     let (int, string) = entity.into();
@@ -62,7 +62,7 @@ fn named2nameless_reverse_ref() {
 fn existing_named2nameless() {
     let entity = Entity {
         int: 123,
-        string: "Test".into()
+        string: "Test".into(),
     };
 
     let mut tpl = <(i32, String)>::default();
@@ -76,7 +76,7 @@ fn existing_named2nameless() {
 fn existing_named2nameless_ref() {
     let entity = &Entity {
         int: 123,
-        string: "Test".into()
+        string: "Test".into(),
     };
 
     let mut tpl = <(i32, String)>::default();

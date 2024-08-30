@@ -1,4 +1,4 @@
-use criterion::{Criterion, criterion_group, criterion_main, black_box};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use o2o_impl::expand::derive;
 use quote::quote;
 use syn::DeriveInput;
@@ -14,7 +14,9 @@ fn derive_simple_benchmark(c: &mut Criterion) {
     };
 
     let input: DeriveInput = syn::parse2(tokens).unwrap();
-    c.bench_function("derive_simple_benchmark", |b| b.iter(|| derive(black_box(&input.clone()))));
+    c.bench_function("derive_simple_benchmark", |b| {
+        b.iter(|| derive(black_box(&input.clone())))
+    });
 }
 
 fn derive_complex_benchmark(c: &mut Criterion) {
@@ -36,7 +38,7 @@ fn derive_complex_benchmark(c: &mut Criterion) {
             #[child(Entity| base.base)]
             #[child(TupleEntity| 1 .0)]
             #[map(Entity| another_base_int)]
-            #[map(TupleEntity| 1)] 
+            #[map(TupleEntity| 1)]
             i32,
             #[child(Entity| base)]
             #[child(TupleEntity| 1)]
@@ -57,7 +59,9 @@ fn derive_complex_benchmark(c: &mut Criterion) {
     };
 
     let input: DeriveInput = syn::parse2(tokens).unwrap();
-    c.bench_function("derive_complex_benchmark", |b| b.iter(|| derive(black_box(&input.clone()))));
+    c.bench_function("derive_complex_benchmark", |b| {
+        b.iter(|| derive(black_box(&input.clone())))
+    });
 }
 
 criterion_group!(benches, derive_simple_benchmark, derive_complex_benchmark);

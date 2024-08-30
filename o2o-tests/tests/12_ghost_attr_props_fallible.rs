@@ -13,8 +13,7 @@ struct EntityModel {
 #[derive(Default)]
 struct TupleEntityModel(i32, i16, i32, i16, f32);
 
-#[derive(Default)]
-#[derive(o2o)]
+#[derive(Default, o2o)]
 #[try_map(EntityModel, String)]
 #[try_into_existing(EntityModel, String)]
 #[ghosts(ghost_int: { @.some_int }, ghost_int_2: { @.another_int as i16 }, ghost_float: { 456.0 })]
@@ -30,16 +29,15 @@ struct Entity2 {
     some_int: i32,
     another_int: i32,
     #[ghost()]
-    _some_float: f32
+    _some_float: f32,
 }
 
-#[derive(Default)]
-#[derive(o2o)]
+#[derive(Default, o2o)]
 #[try_map(TupleEntityModel, String)]
 #[try_into_existing(TupleEntityModel, String)]
 #[o2o(ghosts_owned(2: { @.0 }, 3: { @.1 as i16 }, 4: { 456.0 }))]
 #[o2o(ghosts_ref(2: { @.0 }, 3: { @.1 as i16 }, 4: { 4567.0 }))]
-struct TupleEntity (i32, i16);
+struct TupleEntity(i32, i16);
 
 #[derive(o2o)]
 #[try_map(Entity, String)]
@@ -60,15 +58,13 @@ struct EntityDto {
 #[try_map(TupleEntity, String)]
 #[try_into_existing(TupleEntity, String)]
 struct TupleEntityDto(
-    i32, 
-    i16,
-    #[ghost(@.0)]
     i32,
-    #[ghost(@.1 as i16)]
-    i16, 
+    i16,
+    #[ghost(@.0)] i32,
+    #[ghost(@.1 as i16)] i16,
     #[o2o(ghost_owned({456.0}))]
     #[o2o(ghost_ref(4567.0))]
-    f32
+    f32,
 );
 
 #[test]
@@ -76,7 +72,7 @@ fn named2named_basic() {
     let named2 = Entity2 {
         some_int: 123,
         another_int: 321,
-        _some_float: 456.0
+        _some_float: 456.0,
     };
 
     let named: Entity = named2.try_into().unwrap();
@@ -90,7 +86,7 @@ fn named2named_ref_basic() {
     let named2 = &Entity2 {
         some_int: 123,
         another_int: 321,
-        _some_float: 456.0
+        _some_float: 456.0,
     };
 
     let named: Entity = named2.try_into().unwrap();
@@ -138,7 +134,7 @@ fn named2named_reverse() {
         another_int: 321,
         ghost_int: 456,
         ghost_int_2: 654,
-        ghost_float: 789.0
+        ghost_float: 789.0,
     };
 
     let named: Entity = dto.try_into().unwrap();
@@ -154,7 +150,7 @@ fn named2named_reverse_2() {
         another_int: 321,
         ghost_int: 456,
         ghost_int_2: 654,
-        ghost_float: 789.0
+        ghost_float: 789.0,
     };
 
     let named: Entity = model.try_into().unwrap();
@@ -202,7 +198,7 @@ fn named2named_reverse_ref() {
         another_int: 321,
         ghost_int: 456,
         ghost_int_2: 654,
-        ghost_float: 789.0
+        ghost_float: 789.0,
     };
 
     let named: Entity = dto.try_into().unwrap();
@@ -218,7 +214,7 @@ fn named2named_reverse_ref_2() {
         another_int: 321,
         ghost_int: 456,
         ghost_int_2: 654,
-        ghost_float: 789.0
+        ghost_float: 789.0,
     };
 
     let named: Entity = model.try_into().unwrap();
@@ -229,10 +225,7 @@ fn named2named_reverse_ref_2() {
 
 #[test]
 fn unnamed2unnamed() {
-    let entity = TupleEntity (
-        123,
-        321,
-    );
+    let entity = TupleEntity(123, 321);
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 
@@ -245,10 +238,7 @@ fn unnamed2unnamed() {
 
 #[test]
 fn unnamed2unnamed_2() {
-    let entity = TupleEntity (
-        123,
-        321,
-    );
+    let entity = TupleEntity(123, 321);
 
     let model: TupleEntityModel = entity.try_into().unwrap();
 
@@ -261,13 +251,7 @@ fn unnamed2unnamed_2() {
 
 #[test]
 fn unnamed2unnamed_reverse() {
-    let dto = TupleEntityDto (
-        123,
-        321,
-        456,
-        654,
-        789.0
-    );
+    let dto = TupleEntityDto(123, 321, 456, 654, 789.0);
 
     let entity: TupleEntity = dto.try_into().unwrap();
 
@@ -277,13 +261,7 @@ fn unnamed2unnamed_reverse() {
 
 #[test]
 fn unnamed2unnamed_reverse_2() {
-    let model = TupleEntityModel (
-        123,
-        321,
-        456,
-        654,
-        789.0
-    );
+    let model = TupleEntityModel(123, 321, 456, 654, 789.0);
 
     let entity: TupleEntity = model.try_into().unwrap();
 
@@ -293,10 +271,7 @@ fn unnamed2unnamed_reverse_2() {
 
 #[test]
 fn unnamed2unnamed_ref() {
-    let entity = &TupleEntity (
-        123,
-        321,
-    );
+    let entity = &TupleEntity(123, 321);
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 
@@ -309,10 +284,7 @@ fn unnamed2unnamed_ref() {
 
 #[test]
 fn unnamed2unnamed_ref_2() {
-    let entity = &TupleEntity (
-        123,
-        321,
-    );
+    let entity = &TupleEntity(123, 321);
 
     let model: TupleEntityModel = entity.try_into().unwrap();
 
@@ -325,13 +297,7 @@ fn unnamed2unnamed_ref_2() {
 
 #[test]
 fn unnamed2unnamed_reverse_ref() {
-    let dto = &TupleEntityDto (
-        123,
-        321,
-        456,
-        654,
-        789.0
-    );
+    let dto = &TupleEntityDto(123, 321, 456, 654, 789.0);
 
     let entity: TupleEntity = dto.try_into().unwrap();
 
@@ -341,13 +307,7 @@ fn unnamed2unnamed_reverse_ref() {
 
 #[test]
 fn unnamed2unnamed_reverse_ref_2() {
-    let model = &TupleEntityModel (
-        123,
-        321,
-        456,
-        654,
-        789.0
-    );
+    let model = &TupleEntityModel(123, 321, 456, 654, 789.0);
 
     let entity: TupleEntity = model.try_into().unwrap();
 
@@ -360,7 +320,7 @@ fn existing_named2named_basic() {
     let named2 = Entity2 {
         some_int: 123,
         another_int: 321,
-        _some_float: 456.0
+        _some_float: 456.0,
     };
 
     let mut named: Entity = Default::default();
@@ -375,7 +335,7 @@ fn existing_named2named_ref_basic() {
     let named2 = &Entity2 {
         some_int: 123,
         another_int: 321,
-        _some_float: 456.0
+        _some_float: 456.0,
     };
 
     let mut named: Entity = Default::default();
@@ -426,7 +386,7 @@ fn existing_named2named_reverse() {
         another_int: 321,
         ghost_int: 456,
         ghost_int_2: 654,
-        ghost_float: 789.0
+        ghost_float: 789.0,
     };
 
     let mut named: Entity = Default::default();
@@ -443,7 +403,7 @@ fn existing_named2named_reverse_ref() {
         another_int: 321,
         ghost_int: 456,
         ghost_int_2: 654,
-        ghost_float: 789.0
+        ghost_float: 789.0,
     };
 
     let mut named: Entity = Default::default();
@@ -455,10 +415,7 @@ fn existing_named2named_reverse_ref() {
 
 #[test]
 fn existing_unnamed2unnamed() {
-    let named = TupleEntity (
-        123,
-        321,
-    );
+    let named = TupleEntity(123, 321);
 
     let mut model: TupleEntityModel = Default::default();
     named.try_into_existing(&mut model).unwrap();
@@ -472,10 +429,7 @@ fn existing_unnamed2unnamed() {
 
 #[test]
 fn existing_unnamed2unnamed_ref() {
-    let entity = &TupleEntity (
-        123,
-        321,
-    );
+    let entity = &TupleEntity(123, 321);
 
     let mut model: TupleEntityModel = Default::default();
     entity.try_into_existing(&mut model).unwrap();
@@ -489,13 +443,7 @@ fn existing_unnamed2unnamed_ref() {
 
 #[test]
 fn existing_unnamed2unnamed_reverse() {
-    let dto = TupleEntityDto (
-        123,
-        321,
-        456,
-        654,
-        789.0
-    );
+    let dto = TupleEntityDto(123, 321, 456, 654, 789.0);
 
     let mut entity: TupleEntity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -506,13 +454,7 @@ fn existing_unnamed2unnamed_reverse() {
 
 #[test]
 fn existing_unnamed2unnamed_reverse_ref() {
-    let dto = &TupleEntityDto (
-        123,
-        321,
-        456,
-        654,
-        789.0
-    );
+    let dto = &TupleEntityDto(123, 321, 456, 654, 789.0);
 
     let mut entity: TupleEntity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
