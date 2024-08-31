@@ -11,8 +11,8 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse2, parse_quote, punctuated::Punctuated, Data, DeriveInput, Error, Index, Member, Result,
-    Token, Type,
+    parse2, parse_quote, punctuated::Punctuated, Data, DeriveInput, Error, GenericArgument,
+    GenericParam, Index, Lifetime, Member, PathArguments, Result, Token, TypePath,
 };
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
@@ -417,11 +417,11 @@ fn struct_main_code_block(input: &Struct, ctx: &ImplContext) -> TokenStream {
         Kind::OwnedInto | Kind::RefInto => {
             let dst = if ctx.struct_attr.ty.nameless_tuple || ctx.has_post_init {
                 TokenStream::new()
-            } else if let Ok(Type::Path(mut path)) = parse2::<Type>(ctx.dst_ty.clone()) {
+            } else if let Ok(mut path) = parse2::<TypePath>(ctx.dst_ty.clone()) {
                 // In this case we want to transform something like `mod1::mod2::Entity<T>` to `mod1::mod2::Entity`.
                 // So set all segments arguments to None.
                 path.path.segments.iter_mut().for_each(|segment| {
-                    segment.arguments = syn::PathArguments::None;
+                    segment.arguments = PathArguments::None;
                 });
                 path.to_token_stream()
             } else {
@@ -1442,29 +1442,70 @@ struct QuoteTraitParams<'a> {
 }
 
 fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
-    // If there is at least one lifetime in generics,we add a new lifetime `'o2o` and add a bound `'o2o: 'a + 'b`.
     let generics = input.get_generics();
-    let (gens_impl, where_clause, r) = if ctx.kind.is_ref() && generics.lifetimes().next().is_some()
-    {
-        let lifetimes: Vec<_> = generics
-            .lifetimes()
-            .map(|params| params.lifetime.clone())
-            .collect();
+    let mut generics_impl = generics.clone();
+    let mut lifetimes: Vec<Lifetime> = vec![];
 
-        let mut generics = generics.clone();
-        generics.params.push(parse_quote!('o2o));
+    if let Ok(dst_ty) = parse2::<syn::TypePath>(ctx.dst_ty.clone()) {
+        // The idea is to check if all lifetimes of the dst are included in the input generics or not.
+        // If not, we will add the missing ones to the input generics.
+
+        let dst_generics = match &dst_ty.path.segments.last().unwrap().arguments {
+            PathArguments::None => syn::punctuated::Punctuated::new(),
+            PathArguments::AngleBracketed(args) => args.args.clone(),
+            PathArguments::Parenthesized(_) => {
+                unimplemented!("Only Struct<T> syntax is supported")
+            }
+        };
+
+        for dst_generic in dst_generics {
+            if let GenericArgument::Lifetime(arg) = &dst_generic {
+                lifetimes.push(parse_quote!(#dst_generic));
+                if generics.params.iter().all(|param| {
+                    if let GenericParam::Lifetime(param) = param {
+                        &param.lifetime != arg
+                    } else {
+                        // Skip any other generic param
+                        false
+                    }
+                }) {
+                    generics_impl.params.push(parse_quote!(#dst_generic));
+                }
+            }
+        }
+    }
+
+    // If there is at least one lifetime in generics, we add a new lifetime `'o2o` and add a bound `'o2o: 'a + 'b`.
+    let (gens_impl, where_clause, r) = if ctx.kind.is_ref() {
+        // If lifetime is empty, we assume that lifetime generics come from the other structure (src <-> dst).
+        let lifetimes: Vec<_> = if lifetimes.is_empty() {
+            generics
+                .lifetimes()
+                .map(|params| params.lifetime.clone())
+                .collect()
+        } else {
+            lifetimes
+        };
 
         let mut where_clause = input
             .get_attrs()
             .where_attr(&ctx.struct_attr.ty)
-            .map(|x| x.where_clause.clone())
-            .unwrap_or_default();
-        where_clause.push(parse_quote!('o2o: #( #lifetimes )+*));
+            .map(|x| x.where_clause.clone());
+
+        let r = if !lifetimes.is_empty() {
+            generics_impl.params.push(parse_quote!('o2o));
+            let mut where_clause_punctuated = where_clause.unwrap_or_default();
+            where_clause_punctuated.push(parse_quote!('o2o: #( #lifetimes )+*));
+            where_clause = Some(where_clause_punctuated);
+            Some(quote!(&'o2o))
+        } else {
+            Some(quote!(&))
+        };
 
         (
-            generics.to_token_stream(),
-            Some(quote!(where #where_clause)),
-            Some(quote!(&'o2o)),
+            generics_impl.to_token_stream(),
+            where_clause.map(|where_clause| quote!(where #where_clause)),
+            r,
         )
     } else {
         (
