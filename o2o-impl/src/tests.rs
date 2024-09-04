@@ -928,12 +928,8 @@ fn missing_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, boo
 
     for (ty, should_contain) in errs {
         match should_contain {
-            true => {
-                assert!(errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty)))
-            }
-            false => {
-                assert!(!errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty)))
-            }
+            true => assert!(errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty))),
+            false => assert!(!errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty)))
         }
     }
 }
@@ -1249,9 +1245,7 @@ fn incomplete_field_attr_instruction(code_fragment: TokenStream, errs: Vec<(&str
         assert_eq!(errs.len(), errors.len());
 
         for (field, ty, or_action) in errs {
-            assert!(errors
-                .iter()
-                .any(|x| x.to_string() == format!("Member 0 should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", if or_action { " or an action" } else { "" }, field, ty)))
+            assert!(errors.iter().any(|x| x.to_string() == format!("Member 0 should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", if or_action { " or an action" } else { "" }, field, ty)))
         }
     } else {
         assert!(output.is_ok())
@@ -1450,9 +1444,7 @@ fn incomplete_variant_field_attr_instruction(code_fragment: TokenStream, err_ty:
         assert_eq!(errs.len(), errors.len());
 
         for (idx, variant, field, ty, or_action) in errs {
-            assert!(errors
-                .iter()
-                .any(|x| x.to_string() == format!("Member {} of a variant {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", idx, variant, if or_action { " or an action" } else { "" }, field, ty)))
+            assert!(errors.iter().any(|x| x.to_string() == format!("Member {} of a variant {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", idx, variant, if or_action { " or an action" } else { "" }, field, ty)))
         }
     } else {
         assert!(output.is_ok())
@@ -1540,9 +1532,7 @@ fn incomplete_field_attr_instruction_2(code_fragment: TokenStream, errs: Vec<(&s
         assert_eq!(errs.len(), errors.len());
 
         for (field, ty, or_action) in errs {
-            assert!(errors
-                .iter()
-                .any(|x| x.to_string() == format!("Member trait instruction #[{}(...)] for member 0 should specify corresponding field name of the {}{}", field, ty, if or_action { " or an action" } else { "" })))
+            assert!(errors.iter().any(|x| x.to_string() == format!("Member trait instruction #[{}(...)] for member 0 should specify corresponding field name of the {}{}", field, ty, if or_action { " or an action" } else { "" })))
         }
     } else {
         assert!(output.is_ok())

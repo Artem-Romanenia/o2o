@@ -149,7 +149,10 @@ fn named2unnamed_ref() {
 
 #[test]
 fn named2named_uneven() {
-    let p = Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
+    let p = Parent {
+        parent_int: 123,
+        child: Child { child_int: 321, another_child_int: 456 },
+    };
 
     let dto: ParentDto2 = p.into();
 
@@ -160,7 +163,10 @@ fn named2named_uneven() {
 
 #[test]
 fn named2named_uneven_ref() {
-    let parent = &Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
+    let parent = &Parent {
+        parent_int: 123,
+        child: Child { child_int: 321, another_child_int: 456 },
+    };
 
     let dto: ParentDto2 = parent.into();
 
@@ -245,7 +251,10 @@ fn named2named_different_types_reverse_ref() {
 
 #[test]
 fn named2named_child() {
-    let p = Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
+    let p = Parent {
+        parent_int: 123,
+        child: Child { child_int: 321, another_child_int: 456 },
+    };
 
     let dto: ParentDto = p.into();
 

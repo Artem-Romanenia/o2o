@@ -32,7 +32,10 @@ struct ChildDto {
 
 #[test]
 fn named2named_child() {
-    let p = Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
+    let p = Parent {
+        parent_int: 123,
+        child: Child { child_int: 321, another_child_int: 456 },
+    };
 
     let dto: ParentDto = p.try_into().unwrap();
 
@@ -57,7 +60,10 @@ fn named2named_child_reverse() {
 
 #[test]
 fn named2named_child_ref() {
-    let p = &Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
+    let p = &Parent {
+        parent_int: 123,
+        child: Child { child_int: 321, another_child_int: 456 },
+    };
 
     let dto: ParentDto = p.try_into().unwrap();
 

@@ -78,7 +78,10 @@ fn named2named_different_name_and_type() {
 
 #[test]
 fn named2named_different_name_and_type_reverse() {
-    let p = Parent { parent_int: 987, child: Child { child_int: 456, another_child_int: 123 } };
+    let p = Parent {
+        parent_int: 987,
+        child: Child { child_int: 456, another_child_int: 123 },
+    };
 
     let dto: ParentDto = p.into();
 
@@ -120,7 +123,10 @@ fn named2named_different_name_and_type_ref() {
 
 #[test]
 fn named2named_different_name_and_type_reverse_ref() {
-    let p = &Parent { parent_int: 987, child: Child { child_int: 456, another_child_int: 123 } };
+    let p = &Parent {
+        parent_int: 987,
+        child: Child { child_int: 456, another_child_int: 123 },
+    };
 
     let dto: ParentDto = p.into();
 

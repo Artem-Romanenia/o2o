@@ -97,7 +97,11 @@ fn named2named_reverse() {
     let entity = Entity {
         parent_int: 123,
         base: BaseEntity {
-            base: Base { base_int_2: 321, another_base_int: 456, some_string: "Test".into() },
+            base: Base {
+                base_int_2: 321,
+                another_base_int: 456,
+                some_string: "Test".into(),
+            },
             base_entity_int: 654,
         },
         child: Child { child_int: 789, another_child_int: 987 },
@@ -142,7 +146,11 @@ fn named2named_reverse_ref() {
     let entity = &Entity {
         parent_int: 123,
         base: BaseEntity {
-            base: Base { base_int_2: 321, another_base_int: 456, some_string: "Test".into() },
+            base: Base {
+                base_int_2: 321,
+                another_base_int: 456,
+                some_string: "Test".into(),
+            },
             base_entity_int: 654,
         },
         child: Child { child_int: 789, another_child_int: 987 },

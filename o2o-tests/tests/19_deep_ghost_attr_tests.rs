@@ -135,7 +135,12 @@ fn named2named() {
 
 #[test]
 fn named2named_reverse() {
-    let car_dto = CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
+    let car_dto = CarDto {
+        number_of_doors: 2,
+        number_of_seats: 4,
+        brand: "Trabant".into(),
+        year: 1960,
+    };
 
     let car: Car = car_dto.into();
 
@@ -166,7 +171,12 @@ fn named2named_ref() {
 
 #[test]
 fn named2named_reverse_ref() {
-    let car_dto = &CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
+    let car_dto = &CarDto {
+        number_of_doors: 2,
+        number_of_seats: 4,
+        brand: "Trabant".into(),
+        year: 1960,
+    };
 
     let car: Car = car_dto.into();
 
@@ -179,7 +189,12 @@ fn named2named_reverse_ref() {
 
 #[test]
 fn existing_named2named() {
-    let car_dto = CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
+    let car_dto = CarDto {
+        number_of_doors: 2,
+        number_of_seats: 4,
+        brand: "Trabant".into(),
+        year: 1960,
+    };
 
     let mut car: Car = Default::default();
     car_dto.into_existing(&mut car);
@@ -193,7 +208,12 @@ fn existing_named2named() {
 
 #[test]
 fn existing_named2named_reverse() {
-    let car_dto = &CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
+    let car_dto = &CarDto {
+        number_of_doors: 2,
+        number_of_seats: 4,
+        brand: "Trabant".into(),
+        year: 1960,
+    };
 
     let mut car: Car = Default::default();
     car_dto.into_existing(&mut car);

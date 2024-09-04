@@ -68,7 +68,12 @@ fn named2named_different_types() {
 
 #[test]
 fn named2named_different_types_reverse() {
-    let named = NamedStruct { some_int: 123, another_int: 321, some_float: 456.0, another_float: 654.0 };
+    let named = NamedStruct {
+        some_int: 123,
+        another_int: 321,
+        some_float: 456.0,
+        another_float: 654.0,
+    };
 
     let dto: NamedStructDto = named.into();
 
@@ -76,7 +81,12 @@ fn named2named_different_types_reverse() {
     assert_eq!(321, dto.different_int);
     assert_eq!(456.0, dto.some_float);
 
-    let model = NamedStructModel { some_int: 123, different_int: 127, some_float: 456.0, another_float: 654.0 };
+    let model = NamedStructModel {
+        some_int: 123,
+        different_int: 127,
+        some_float: 456.0,
+        another_float: 654.0,
+    };
 
     let dto: NamedStructDto = model.into();
 
@@ -112,7 +122,12 @@ fn named2named_different_types_ref() {
 
 #[test]
 fn named2named_different_types_reverse_ref() {
-    let named = &NamedStruct { some_int: 123, another_int: 321, some_float: 456.0, another_float: 654.0 };
+    let named = &NamedStruct {
+        some_int: 123,
+        another_int: 321,
+        some_float: 456.0,
+        another_float: 654.0,
+    };
 
     let dto: NamedStructDto = named.into();
 
@@ -121,7 +136,12 @@ fn named2named_different_types_reverse_ref() {
     assert_eq!(named.some_float, dto.some_float as f32);
     assert_eq!(named.another_float, dto.different_float as f64);
 
-    let model = &NamedStructModel { some_int: 123, different_int: 127, some_float: 456.0, another_float: 654.0 };
+    let model = &NamedStructModel {
+        some_int: 123,
+        different_int: 127,
+        some_float: 456.0,
+        another_float: 654.0,
+    };
 
     let dto: NamedStructDto = model.into();
 

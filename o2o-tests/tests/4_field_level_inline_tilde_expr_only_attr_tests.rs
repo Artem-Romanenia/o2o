@@ -160,7 +160,10 @@ fn named2named_different_types_reverse_ref() {
 
 #[test]
 fn named2named_child() {
-    let p = Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
+    let p = Parent {
+        parent_int: 123,
+        child: Child { child_int: 321, another_child_int: 456 },
+    };
 
     let dto: ParentDto = p.into();
 

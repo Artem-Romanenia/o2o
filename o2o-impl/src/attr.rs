@@ -25,9 +25,7 @@ impl Parse for OptionalParenthesizedTokenStream {
                 let content;
                 parenthesized!(content in input);
                 Some(content.parse()?)
-            } else {
-                None
-            },
+            } else { None },
         })
     }
 }
@@ -197,19 +195,21 @@ impl<'a> DataTypeAttrs {
     }
 
     pub(crate) fn ghosts_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&StructGhostAttrCore> {
-        self.ghosts_attrs
-            .iter()
+        self.ghosts_attrs.iter()
             .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.ghosts_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none()))
-            .map(|x| &x.attr)
+            .or_else(|| self.ghosts_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
-    pub(crate) fn where_attr(&'a self, container_ty: &TypePath) -> Option<&WhereAttr> {
-        self.where_attrs.iter().find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty).or_else(|| self.where_attrs.iter().find(|x| x.container_ty.is_none()))
+    pub(crate) fn where_attr(&'a self, container_ty: &TypePath) -> Option<&WhereAttr>{
+        self.where_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.where_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn children_attr(&'a self, container_ty: &TypePath) -> Option<&ChildrenAttr> {
-        self.children_attrs.iter().find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty).or_else(|| self.children_attrs.iter().find(|x| x.container_ty.is_none()))
+    pub(crate) fn children_attr(&'a self, container_ty: &TypePath) -> Option<&ChildrenAttr>{
+        self.children_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.children_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 }
 
@@ -305,15 +305,15 @@ impl<'a> MemberAttrs {
     }
 
     pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<ApplicableAttr> {
-        self.ghost(container_ty, kind).map(ApplicableAttr::Ghost).or_else(|| {
-            self.field_attr_core(kind, fallible, container_ty)
+        self.ghost(container_ty, kind)
+            .map(ApplicableAttr::Ghost)
+            .or_else(|| self.field_attr_core(kind, fallible, container_ty)
                 .or_else(|| if fallible { self.field_attr_core(kind, false, container_ty) } else { None })
                 .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr_core(&Kind::OwnedInto, fallible, container_ty) } else { None })
                 .or_else(|| if kind == &Kind::OwnedIntoExisting && fallible { self.field_attr_core(&Kind::OwnedInto, false, container_ty) } else { None })
                 .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr_core(&Kind::RefInto, fallible, container_ty) } else { None })
                 .or_else(|| if kind == &Kind::RefIntoExisting && fallible { self.field_attr_core(&Kind::RefInto, false, container_ty) } else { None })
-                .map(ApplicableAttr::Field)
-        })
+                .map(ApplicableAttr::Field))
     }
 
     pub(crate) fn applicable_field_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&'a MemberAttr> {
@@ -322,28 +322,34 @@ impl<'a> MemberAttrs {
             .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, fallible, container_ty) } else { None })
     }
 
-    pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&ChildAttr> {
-        self.child_attrs.iter().find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty).or_else(|| self.child_attrs.iter().find(|x| x.container_ty.is_none()))
+    pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&ChildAttr>{
+        self.child_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.child_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn ghost(&'a self, container_ty: &TypePath, kind: &'a Kind) -> Option<&FieldGhostAttrCore> {
-        self.ghost_attrs
-            .iter()
+    pub(crate) fn ghost(&'a self, container_ty: &TypePath, kind: &'a Kind) -> Option<&FieldGhostAttrCore>{
+        self.ghost_attrs.iter()
             .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none()))
-            .map(|x| &x.attr)
+            .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
-    pub(crate) fn lit(&'a self, container_ty: &TypePath) -> Option<&LitAttr> {
-        self.lit_attrs.iter().find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty).or_else(|| self.lit_attrs.iter().find(|x| x.container_ty.is_none()))
+    pub(crate) fn lit(&'a self, container_ty: &TypePath) -> Option<&LitAttr>{
+        self.lit_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.lit_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn pat(&'a self, container_ty: &TypePath) -> Option<&PatAttr> {
-        self.pat_attrs.iter().find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty).or_else(|| self.pat_attrs.iter().find(|x| x.container_ty.is_none()))
+    pub(crate) fn pat(&'a self, container_ty: &TypePath) -> Option<&PatAttr>{
+        self.pat_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.pat_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn type_hint(&'a self, container_ty: &TypePath) -> Option<&VariantTypeHintAttr> {
-        self.type_hint_attrs.iter().find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty).or_else(|| self.type_hint_attrs.iter().find(|x| x.container_ty.is_none()))
+    pub(crate) fn type_hint(&'a self, container_ty: &TypePath) -> Option<&VariantTypeHintAttr>{
+        self.type_hint_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
+            .or_else(|| self.type_hint_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
     pub(crate) fn has_parent_attr(&'a self, container_ty: &TypePath) -> bool {
@@ -515,32 +521,14 @@ impl Parse for TraitAttrCore {
             parenthesized!(content in input);
             let content_stream = content.parse::<TokenStream>()?;
             quote!((#content_stream)).into()
-        } else {
-            input.parse::<syn::Path>()?.into()
-        };
+        } else { input.parse::<syn::Path>()?.into() };
         let type_hint = if ty.nameless_tuple { TypeHint::Tuple } else { try_parse_type_hint(input)? };
         let err_ty = if input.peek(Token![,]) {
             input.parse::<Token![,]>()?;
             Some(input.parse::<syn::Path>()?.into())
-        } else {
-            None
-        };
+        } else { None };
 
-        let mut attr = TraitAttrCore {
-            ty,
-            err_ty,
-            type_hint,
-            init_data: None,
-            update: None,
-            quick_return: None,
-            default_case: None,
-            repeat: None,
-            skip_repeat: false,
-            stop_repeat: false,
-            attribute: None,
-            impl_attribute: None,
-            inner_attribute: None,
-        };
+        let mut attr = TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None, repeat: None, skip_repeat: false, stop_repeat: false, attribute: None, impl_attribute: None, inner_attribute: None };
 
         if !input.peek(Token![|]) {
             return Ok(attr);
@@ -705,9 +693,7 @@ impl Parse for GhostData {
             });
             input.parse::<Token![@]>()?;
             child_path
-        } else {
-            None
-        };
+        } else { None };
         let ghost_ident = if input.peek2(Token![:]) {
             GhostIdent::Member(input.parse()?)
         } else if input.peek2(Brace) {
@@ -881,9 +867,7 @@ impl Parse for AsAttr {
             input.parse::<Token![,]>()?;
             let tokens = input.parse()?;
             (ident, tokens)
-        } else {
-            (None, input.parse()?)
-        };
+        } else { (None, input.parse()?) };
 
         Ok(AsAttr { container_ty, member: ident, tokens })
     }
@@ -983,7 +967,7 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
                 }
 
                 attrs.attrs.push(trait_attr)
-            }
+            },
             DataTypeInstruction::Ghosts(attr) => attrs.ghosts_attrs.push(attr),
             DataTypeInstruction::Where(attr) => attrs.where_attrs.push(attr),
             DataTypeInstruction::Children(attr) => attrs.children_attrs.push(attr),
@@ -1029,7 +1013,7 @@ pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<M
                     SynDataTypeMember::Field(f) => add_as_type_attrs(f, attr, &mut attrs.attrs),
                     SynDataTypeMember::Variant(_) => unreachable!("1"),
                 };
-            }
+            },
             MemberInstruction::Lit(attr) => attrs.lit_attrs.push(attr),
             MemberInstruction::Pat(attr) => attrs.pat_attrs.push(attr),
             MemberInstruction::Repeat(repeat_for) => attrs.repeat = Some(repeat_for),
@@ -1085,18 +1069,8 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "children" => Ok(DataTypeInstruction::Children(syn::parse2(input)?)),
         "where_clause" => Ok(DataTypeInstruction::Where(syn::parse2(input)?)),
         "ghost" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost", span: instr.span(), guess_name: "ghosts", own: own_instr }),
-        "ghost_ref" if bark => Ok(DataTypeInstruction::Misnamed {
-            instr: "ghost_ref",
-            span: instr.span(),
-            guess_name: "ghosts_ref",
-            own: own_instr,
-        }),
-        "ghost_owned" if bark => Ok(DataTypeInstruction::Misnamed {
-            instr: "ghost_owned",
-            span: instr.span(),
-            guess_name: "ghosts_owned",
-            own: own_instr,
-        }),
+        "ghost_ref" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost_ref", span: instr.span(), guess_name: "ghosts_ref", own: own_instr }),
+        "ghost_owned" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost_owned", span: instr.span(), guess_name: "ghosts_owned", own: own_instr }),
         "child" if bark => Ok(DataTypeInstruction::Misnamed { instr: "child", span: instr.span(), guess_name: "children", own: own_instr }),
         "parent" if bark => Ok(DataTypeInstruction::Misplaced { instr: "parent", span: instr.span(), own: own_instr }),
         "as_type" if bark => Ok(DataTypeInstruction::Misplaced { instr: "as_type", span: instr.span(), own: own_instr }),

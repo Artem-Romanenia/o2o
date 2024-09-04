@@ -169,7 +169,10 @@ fn named2unnamed() {
 fn named2named_reverse() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -187,7 +190,10 @@ fn named2named_reverse() {
 fn named2unnamed_reverse() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -247,7 +253,10 @@ fn named2unnamed_ref() {
 fn named2named_reverse_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -265,7 +274,10 @@ fn named2named_reverse_ref() {
 fn named2unnamed_reverse_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -395,7 +407,10 @@ fn unnamed2named_reverse_ref() {
 fn named2named_2() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -413,7 +428,10 @@ fn named2named_2() {
 fn named2named_2_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -431,7 +449,10 @@ fn named2named_2_ref() {
 fn named2named_2_reverse() {
     let model = EntityModel {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -449,7 +470,10 @@ fn named2named_2_reverse() {
 fn named2named_2_ref_reverse() {
     let model = &EntityModel {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -467,7 +491,10 @@ fn named2named_2_ref_reverse() {
 fn existing_named2named() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -486,7 +513,10 @@ fn existing_named2named() {
 fn existing_named2unnamed() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -505,7 +535,10 @@ fn existing_named2unnamed() {
 fn existing_named2named_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 
@@ -524,7 +557,10 @@ fn existing_named2named_ref() {
 fn existing_named2unnamed_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        base: BaseEntity {
+            base: Base { base_int_2: 321, another_base_int: 456 },
+            base_entity_int: 654,
+        },
         child: Child { child_int: 789, another_child_int: 987 },
     };
 

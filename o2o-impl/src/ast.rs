@@ -74,7 +74,12 @@ impl<'a> Field {
         Ok(Field {
             attrs: attr::get_member_attrs(SynDataTypeMember::Field(node), bark)?,
             idx: i,
-            member: node.ident.clone().map(Member::Named).unwrap_or_else(|| Member::Unnamed(Index { index: i as u32, span: node.ty.span() })),
+            member: node.ident.clone().map(Member::Named).unwrap_or_else(|| {
+                Member::Unnamed(Index {
+                    index: i as u32,
+                    span: node.ty.span(),
+                })
+            }),
         })
     }
 }

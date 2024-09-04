@@ -233,7 +233,9 @@ fn named2named_2() {
         division: Division {
             base: Base { id: 456, name: "TestDivision".try_into().unwrap() },
             league_id: 789,
-            league: League { base: Base { id: 789, name: "TestLeague".try_into().unwrap() } },
+            league: League {
+                base: Base { id: 789, name: "TestLeague".try_into().unwrap() },
+            },
         },
     };
 
@@ -276,7 +278,9 @@ fn named2named_ref_2() {
         division: Division {
             base: Base { id: 456, name: "TestDivision".try_into().unwrap() },
             league_id: 789,
-            league: League { base: Base { id: 789, name: "TestLeague".try_into().unwrap() } },
+            league: League {
+                base: Base { id: 789, name: "TestLeague".try_into().unwrap() },
+            },
         },
     };
 

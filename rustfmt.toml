@@ -3,3 +3,4 @@ struct_lit_width = 75
 array_width = 100
 chain_width = 200
 fn_call_width = 250
+match_block_trailing_comma = true

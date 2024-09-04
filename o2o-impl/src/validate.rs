@@ -60,14 +60,14 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
                 bark_at_member_attr(&member_attrs.ghosts_attrs.iter().filter(|x| !x.applicable_to[&Kind::OwnedInto] && x.applicable_to[&Kind::RefInto]).collect(), "ghosts_ref", |_| f.member.span(), &mut errors);
 
                 validate_dedicated_member_attrs(&member_attrs.parent_attrs, |x| x.container_ty.as_ref(), Some("parent"), member_span, &type_paths, &mut errors);
-            }
+            },
             DataTypeMember::Variant(v) => {
                 bark_at_member_attr(&member_attrs.parent_attrs, "parent", |_| v.ident.span(), &mut errors);
 
                 validate_dedicated_member_attrs(&member_attrs.lit_attrs, |x| x.container_ty.as_ref(), Some("literal"), member_span, &type_paths, &mut errors);
                 validate_dedicated_member_attrs(&member_attrs.pat_attrs, |x| x.container_ty.as_ref(), Some("pattern"), member_span, &type_paths, &mut errors);
                 validate_dedicated_member_attrs(&member_attrs.type_hint_attrs, |x| x.container_ty.as_ref(), Some("type_hint"), member_span, &type_paths, &mut errors);
-            }
+            },
         }
 
         validate_member_error_instrs(input, member_attrs, &mut errors)
@@ -76,12 +76,12 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     match input {
         DataType::Struct(s) => {
             validate_fields(s, attrs, &type_paths, &mut errors);
-        }
+        },
         DataType::Enum(e) => {
             for v in &e.variants {
                 validate_variant_fields(v, attrs, &type_paths, &mut errors);
             }
-        }
+        },
     }
 
     if errors.is_empty() {
@@ -96,57 +96,34 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
 }
 
 fn validate_error_instrs(input: &DataType, attrs: &DataTypeAttrs, errors: &mut HashMap<String, Span>) {
-    let postfix = |own: bool| {
-        if !own {
-            " To turn this message off, use #[o2o(allow_unknown)]"
-        } else {
-            ""
-        }
-    };
+    let postfix = |own: bool| if !own { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" };
 
     for err in &attrs.error_instrs {
         match (input, err) {
-            (DataType::Enum(_), DataTypeInstruction::Misnamed { instr: instr @ "child", span, guess_name: _, own }) | (DataType::Enum(_), DataTypeInstruction::Misplaced { instr: instr @ ("parent" | "as_type"), span, own }) => {
+            (DataType::Enum(_), DataTypeInstruction::Misnamed { instr: instr @ "child", span, guess_name: _, own }) |
+            (DataType::Enum(_), DataTypeInstruction::Misplaced { instr: instr @ ("parent" | "as_type"), span, own }) => {
                 errors.insert(format!("Member instruction '{}' is not applicable to enums.{}", instr, postfix(*own)), *span);
-            }
-            (_, DataTypeInstruction::Misnamed { instr: _, span, guess_name, own }) => {
-                errors.insert(format!("Perhaps you meant '{}'?{}", guess_name, postfix(*own)), *span);
-            }
-            (_, DataTypeInstruction::Misplaced { instr, span, own }) => {
-                errors.insert(format!("Member instruction '{}' should be used on a member.{}", instr, postfix(*own)), *span);
-            }
-            (_, DataTypeInstruction::UnrecognizedWithError { instr, span }) => {
-                errors.insert(format!("Struct instruction '{}' is not supported.", instr), *span);
-            }
-            _ => unreachable!("13"),
+            },
+            (_, DataTypeInstruction::Misnamed { instr: _, span, guess_name, own }) => { errors.insert(format!("Perhaps you meant '{}'?{}", guess_name, postfix(*own)), *span); },
+            (_, DataTypeInstruction::Misplaced { instr, span, own }) => { errors.insert(format!("Member instruction '{}' should be used on a member.{}", instr, postfix(*own)), *span); },
+            (_, DataTypeInstruction::UnrecognizedWithError { instr, span }) => { errors.insert(format!("Struct instruction '{}' is not supported.", instr), *span); },
+            _ => unreachable!("13")
         }
     }
 }
 
 fn validate_member_error_instrs(input: &DataType, attrs: &MemberAttrs, errors: &mut HashMap<String, Span>) {
-    let postfix = |own: bool| {
-        if !own {
-            " To turn this message off, use #[o2o(allow_unknown)]"
-        } else {
-            ""
-        }
-    };
+    let postfix = |own: bool| if !own { " To turn this message off, use #[o2o(allow_unknown)]" } else { "" };
 
     for err in &attrs.error_instrs {
         match (input, err) {
             (DataType::Enum(_), MemberInstruction::Misnamed { instr: instr @ "children", span, guess_name: _, own }) => {
                 errors.insert(format!("Struct instruction '{}' is not applicable to enums.{}", instr, postfix(*own)), *span);
             }
-            (_, MemberInstruction::Misnamed { instr: _, span, guess_name, own }) => {
-                errors.insert(format!("Perhaps you meant '{}'?{}", guess_name, postfix(*own)), *span);
-            }
-            (_, MemberInstruction::Misplaced { instr, span, own }) => {
-                errors.insert(format!("Struct instruction '{}' should be used on a struct.{}", instr, postfix(*own)), *span);
-            }
-            (_, MemberInstruction::UnrecognizedWithError { instr, span }) => {
-                errors.insert(format!("Member instruction '{}' is not supported.", instr), *span);
-            }
-            _ => unreachable!("14"),
+            (_, MemberInstruction::Misnamed { instr: _, span, guess_name, own }) => { errors.insert(format!("Perhaps you meant '{}'?{}", guess_name, postfix(*own)), *span); },
+            (_, MemberInstruction::Misplaced { instr, span, own }) => { errors.insert(format!("Struct instruction '{}' should be used on a struct.{}", instr, postfix(*own)), *span); },
+            (_, MemberInstruction::UnrecognizedWithError { instr, span }) => { errors.insert(format!("Member instruction '{}' is not supported.", instr), *span); },
+            _ => unreachable!("14")
         }
     }
 }
@@ -262,16 +239,14 @@ fn validate_dedicated_member_attrs<T, U: Fn(&T) -> Option<&TypePath>>(attrs: &Ve
 }
 
 fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
-    let into_type_paths = data_type_attrs
-        .iter_for_kind_core(&Kind::OwnedInto, false)
+    let into_type_paths = data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, false)
         .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, false))
         .chain(data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, true))
         .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, true))
         .map(|x| &x.ty)
         .collect::<HashSet<_>>();
 
-    let from_type_paths = data_type_attrs
-        .iter_for_kind_core(&Kind::FromOwned, false)
+    let from_type_paths = data_type_attrs.iter_for_kind_core(&Kind::FromOwned, false)
         .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, false))
         .chain(data_type_attrs.iter_for_kind_core(&Kind::FromOwned, true))
         .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, true))
@@ -289,13 +264,13 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: 
                     if from_type_paths.contains(tp) {
                         errors.insert(format!("Member instruction #[ghost(...)] for member '{}' should provide default value for type {}", field.member.to_token_stream(), tp.path_str), field.member.span());
                     }
-                }
+                },
                 None => {
                     let field_name_str = field.member.to_token_stream().to_string();
                     for tp in from_type_paths.iter() {
                         errors.insert(format!("Member instruction #[ghost(...)] for member '{}' should provide default value for type {}", field_name_str, tp.path_str), field.member.span());
                     }
-                }
+                },
             }
         }
 
@@ -315,19 +290,15 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: 
                 if into_type_paths.contains(tp) {
                     check_child_errors(child_attr, data_type_attrs, tp, errors)
                 }
-            }
-            None => {
-                for tp in into_type_paths.iter() {
-                    check_child_errors(child_attr, data_type_attrs, tp, errors)
-                }
-            }
+            },
+            None => for tp in into_type_paths.iter() {
+                check_child_errors(child_attr, data_type_attrs, tp, errors)
+            },
         }
     }
 
     if !input.named_fields {
-        let data_type_attrs: Vec<(&TraitAttrCore, Kind)> = data_type_attrs
-            .iter_for_kind_core(&Kind::OwnedInto, false)
-            .map(|x| (x, Kind::OwnedInto))
+        let data_type_attrs: Vec<(&TraitAttrCore, Kind)> = data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
             .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, false).map(|x| (x, Kind::RefInto)))
             .chain(data_type_attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, false).map(|x| (x, Kind::OwnedIntoExisting)))
             .chain(data_type_attrs.iter_for_kind_core(&Kind::RefIntoExisting, false).map(|x| (x, Kind::RefIntoExisting)))
@@ -357,16 +328,7 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: 
                             errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {}", field_attr.original_instr, field.member.to_token_stream(), data_type_attr.ty.path_str), field.member.span());
                         }
                     } else {
-                        errors.insert(
-                            format!(
-                                "Member {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction",
-                                field.member.to_token_stream(),
-                                if kind == Kind::FromOwned || kind == Kind::FromRef { " or an action" } else { "" },
-                                FallibleKind(kind, false),
-                                data_type_attr.ty.path_str
-                            ),
-                            field.member.span(),
-                        );
+                        errors.insert(format!("Member {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", field.member.to_token_stream(), if kind == Kind::FromOwned || kind == Kind::FromRef { " or an action" } else { "" }, FallibleKind(kind, false), data_type_attr.ty.path_str), field.member.span());
                     }
                 }
             }
@@ -376,9 +338,7 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: 
 
 fn validate_variant_fields(input: &Variant, data_type_attrs: &DataTypeAttrs, _type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     if !input.named_fields {
-        let data_type_attrs: Vec<(&TraitAttr, Kind)> = data_type_attrs
-            .iter_for_kind(&Kind::OwnedInto, false)
-            .map(|x| (x, Kind::OwnedInto))
+        let data_type_attrs: Vec<(&TraitAttr, Kind)> = data_type_attrs.iter_for_kind(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
             .chain(data_type_attrs.iter_for_kind(&Kind::RefInto, false).map(|x| (x, Kind::RefInto)))
             .chain(data_type_attrs.iter_for_kind(&Kind::OwnedIntoExisting, false).map(|x| (x, Kind::OwnedIntoExisting)))
             .chain(data_type_attrs.iter_for_kind(&Kind::RefIntoExisting, false).map(|x| (x, Kind::RefIntoExisting)))
@@ -408,17 +368,7 @@ fn validate_variant_fields(input: &Variant, data_type_attrs: &DataTypeAttrs, _ty
                             errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {}", field_attr.original_instr, field.member.to_token_stream(), data_type_attr.core.ty.path_str), field.member.span());
                         }
                     } else {
-                        errors.insert(
-                            format!(
-                                "Member {} of a variant {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction",
-                                field.member.to_token_stream(),
-                                input.ident,
-                                if kind == Kind::FromOwned || kind == Kind::FromRef { " or an action" } else { "" },
-                                FallibleKind(kind, data_type_attr.fallible),
-                                data_type_attr.core.ty.path_str
-                            ),
-                            field.member.span(),
-                        );
+                        errors.insert(format!("Member {} of a variant {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", field.member.to_token_stream(), input.ident, if kind == Kind::FromOwned || kind == Kind::FromRef { " or an action" } else { "" }, FallibleKind(kind, data_type_attr.fallible), data_type_attr.core.ty.path_str), field.member.span());
                     }
                 }
             }
@@ -435,10 +385,10 @@ fn check_child_errors(child_attr: &ChildAttr, struct_attrs: &DataTypeAttrs, tp: 
                 if !children_attr.children.iter().any(|x| x.check_match(path)) {
                     errors.insert(format!("Missing '{}: [Type Path]' instruction for type {}", path, tp.path_str), tp.span);
                 }
-            }
+            },
             None => {
                 errors.insert(format!("Missing #[children(...)] instruction for {}", tp.path_str), tp.span);
-            }
+            },
         }
     }
 }
