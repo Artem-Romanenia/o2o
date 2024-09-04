@@ -59,11 +59,7 @@ struct UnnamedStruct(
 
 #[test]
 fn named2unnamed() {
-    let named = NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let dto: UnnamedStructDto = named.into();
 
@@ -71,11 +67,7 @@ fn named2unnamed() {
     assert_eq!(127, dto.1);
     assert_eq!(456.0, dto.2);
 
-    let named = NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let model: UnnamedStructModel = named.into();
 
@@ -86,11 +78,7 @@ fn named2unnamed() {
 
 #[test]
 fn named2unnamed_2() {
-    let dto = NamedStructDto {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let dto = NamedStructDto { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let unnamed: UnnamedStruct = dto.into();
 
@@ -98,11 +86,7 @@ fn named2unnamed_2() {
     assert_eq!(127, unnamed.1);
     assert_eq!(456.0, unnamed.2);
 
-    let named = NamedStructModel {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = NamedStructModel { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let unnamed: UnnamedStruct = named.into();
 
@@ -151,11 +135,7 @@ fn unnamed2named_2() {
 
 #[test]
 fn named2unnamed_ref() {
-    let named = &NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = &NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let dto: UnnamedStructDto = named.into();
 
@@ -163,11 +143,7 @@ fn named2unnamed_ref() {
     assert_eq!(named.another_int, dto.1);
     assert_eq!(named.some_float, dto.2);
 
-    let named = &NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = &NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let model: UnnamedStructModel = named.into();
 
@@ -178,11 +154,7 @@ fn named2unnamed_ref() {
 
 #[test]
 fn named2unnamed_2_ref() {
-    let dto = &NamedStructDto {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let dto = &NamedStructDto { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let unnamed: UnnamedStruct = dto.into();
 
@@ -190,11 +162,7 @@ fn named2unnamed_2_ref() {
     assert_eq!(dto.another_int, unnamed.1);
     assert_eq!(dto.some_float, unnamed.2);
 
-    let model = &NamedStructModel {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let model = &NamedStructModel { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let unnamed: UnnamedStruct = model.into();
 
@@ -243,11 +211,7 @@ fn unnamed2named_2_ref() {
 
 #[test]
 fn existing_named2unnamed() {
-    let named = NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let mut dto: UnnamedStructDto = Default::default();
     named.into_existing(&mut dto);
@@ -256,11 +220,7 @@ fn existing_named2unnamed() {
     assert_eq!(127, dto.1);
     assert_eq!(456.0, dto.2);
 
-    let named = NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let mut model: UnnamedStructModel = Default::default();
     named.into_existing(&mut model);
@@ -292,11 +252,7 @@ fn existing_unnamed2named() {
 
 #[test]
 fn existing_named2unnamed_ref() {
-    let named = &NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = &NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let mut dto: UnnamedStructDto = Default::default();
     named.into_existing(&mut dto);
@@ -305,11 +261,7 @@ fn existing_named2unnamed_ref() {
     assert_eq!(named.another_int, dto.1);
     assert_eq!(named.some_float, dto.2);
 
-    let named = &NamedStruct {
-        some_int: 123,
-        another_int: 127,
-        some_float: 456.0,
-    };
+    let named = &NamedStruct { some_int: 123, another_int: 127, some_float: 456.0 };
 
     let mut model: UnnamedStructModel = Default::default();
     named.into_existing(&mut model);

@@ -67,14 +67,7 @@ struct EntityDto {
 #[try_map(TupleEntity, String)]
 #[try_into_existing(TupleEntity, String)]
 #[children(1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
-struct TupleEntityDto(
-    i32,
-    #[o2o(child(1 .0), map(0))] i32,
-    #[o2o(child(1 .0), map(1))] i16,
-    #[o2o(child(1), map(1))] i32,
-    #[o2o(child(2), map(0))] i32,
-    #[o2o(child(2), map(1))] i16,
-);
+struct TupleEntityDto(i32, #[o2o(child(1 .0), map(0))] i32, #[o2o(child(1 .0), map(1))] i16, #[o2o(child(1), map(1))] i32, #[o2o(child(2), map(0))] i32, #[o2o(child(2), map(1))] i16);
 
 #[test]
 fn named2named() {
@@ -111,10 +104,7 @@ fn named2named_reverse() {
             },
             base_entity_int: 654,
         },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -163,10 +153,7 @@ fn named2named_reverse_ref() {
             },
             base_entity_int: 654,
         },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -196,11 +183,7 @@ fn unnamed2unnamed() {
 
 #[test]
 fn unnamed2unnamed_reverse() {
-    let entity = TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 
@@ -228,11 +211,7 @@ fn unnamed2unnamed_ref() {
 
 #[test]
 fn unnamed2unnamed_reverse_ref() {
-    let entity = &TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = &TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 

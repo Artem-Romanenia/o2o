@@ -249,14 +249,7 @@ fn existing_named2named_ref() {
 
 #[test]
 fn unnamed2named() {
-    let dto = UnnamedEntityDto(
-        123,
-        "456".into(),
-        "789".into(),
-        "987".into(),
-        "654".into(),
-        "321".into(),
-    );
+    let dto = UnnamedEntityDto(123, "456".into(), "789".into(), "987".into(), "654".into(), "321".into());
 
     let entity: Entity = dto.into();
 
@@ -291,14 +284,7 @@ fn unnamed2named_reverse() {
 
 #[test]
 fn unnamed2named_ref() {
-    let dto = &UnnamedEntityDto(
-        123,
-        "456".into(),
-        "789".into(),
-        "987".into(),
-        "654".into(),
-        "321".into(),
-    );
+    let dto = &UnnamedEntityDto(123, "456".into(), "789".into(), "987".into(), "654".into(), "321".into());
 
     let entity: Entity = dto.into();
 
@@ -333,14 +319,7 @@ fn unnamed2named_ref_reverse() {
 
 #[test]
 fn existing_unnamed2named() {
-    let dto = UnnamedEntityDto(
-        123,
-        "456".into(),
-        "789".into(),
-        "987".into(),
-        "654".into(),
-        "321".into(),
-    );
+    let dto = UnnamedEntityDto(123, "456".into(), "789".into(), "987".into(), "654".into(), "321".into());
 
     let mut entity: Entity = Default::default();
     dto.into_existing(&mut entity);
@@ -355,14 +334,7 @@ fn existing_unnamed2named() {
 
 #[test]
 fn existing_unnamed2named_ref() {
-    let dto = &UnnamedEntityDto(
-        123,
-        "456".into(),
-        "789".into(),
-        "987".into(),
-        "654".into(),
-        "321".into(),
-    );
+    let dto = &UnnamedEntityDto(123, "456".into(), "789".into(), "987".into(), "654".into(), "321".into());
 
     let mut entity: Entity = Default::default();
     dto.into_existing(&mut entity);

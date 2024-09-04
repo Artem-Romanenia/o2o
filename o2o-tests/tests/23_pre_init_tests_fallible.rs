@@ -45,18 +45,12 @@ fn named2named_ref() {
     let dto: PersonDto = person.try_into().unwrap();
 
     assert_eq!(person.age, dto.age);
-    assert_eq!(
-        format!("{} {}", person.first_name, person.last_name),
-        dto.full_name
-    );
+    assert_eq!(format!("{} {}", person.first_name, person.last_name), dto.full_name);
 }
 
 #[test]
 fn named2named_reverse() {
-    let dto = PersonDto {
-        age: 42,
-        full_name: "Test".try_into().unwrap(),
-    };
+    let dto = PersonDto { age: 42, full_name: "Test".try_into().unwrap() };
 
     let person: Person = dto.try_into().unwrap();
 
@@ -67,10 +61,7 @@ fn named2named_reverse() {
 
 #[test]
 fn named2named_reverse_ref() {
-    let dto = &PersonDto {
-        age: 42,
-        full_name: "Test".try_into().unwrap(),
-    };
+    let dto = &PersonDto { age: 42, full_name: "Test".try_into().unwrap() };
 
     let person: Person = dto.try_into().unwrap();
 
@@ -81,10 +72,7 @@ fn named2named_reverse_ref() {
 
 #[test]
 fn existing_named2named() {
-    let dto = PersonDto {
-        age: 42,
-        full_name: "Test".try_into().unwrap(),
-    };
+    let dto = PersonDto { age: 42, full_name: "Test".try_into().unwrap() };
 
     let mut person: Person = Default::default();
     dto.try_into_existing(&mut person).unwrap();
@@ -96,10 +84,7 @@ fn existing_named2named() {
 
 #[test]
 fn existing_named2named_ref() {
-    let dto = &PersonDto {
-        age: 42,
-        full_name: "Test".try_into().unwrap(),
-    };
+    let dto = &PersonDto { age: 42, full_name: "Test".try_into().unwrap() };
 
     let mut person: Person = Default::default();
     dto.try_into_existing(&mut person).unwrap();

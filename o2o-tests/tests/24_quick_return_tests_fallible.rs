@@ -21,11 +21,7 @@ struct TotalTime {
 
 #[test]
 fn time2i() {
-    let time = Time {
-        hours: 2,
-        minutes: 10,
-        seconds: 15,
-    };
+    let time = Time { hours: 2, minutes: 10, seconds: 15 };
 
     let i: i32 = time.try_into().unwrap();
 
@@ -34,11 +30,7 @@ fn time2i() {
 
 #[test]
 fn named2named() {
-    let time = Time {
-        hours: 2,
-        minutes: 10,
-        seconds: 15,
-    };
+    let time = Time { hours: 2, minutes: 10, seconds: 15 };
 
     let total: TotalTime = time.try_into().unwrap();
 
@@ -47,11 +39,7 @@ fn named2named() {
 
 #[test]
 fn named2named_ref() {
-    let time = &Time {
-        hours: 2,
-        minutes: 10,
-        seconds: 15,
-    };
+    let time = &Time { hours: 2, minutes: 10, seconds: 15 };
 
     let total: TotalTime = time.try_into().unwrap();
 

@@ -510,13 +510,7 @@ fn more_than_one_default_instruction(code_fragment: TokenStream, err: &str) {
     let output = derive(&input);
     let message = get_error(output, true);
 
-    assert_eq!(
-        message,
-        format!(
-            "There can be at most one default #[{}(...)] instruction.",
-            err
-        )
-    );
+    assert_eq!(message, format!("There can be at most one default #[{}(...)] instruction.", err));
 }
 
 // endregion: more_than_one_default_instruction
@@ -560,13 +554,7 @@ fn more_than_one_default_member_instruction(code_fragment: TokenStream, err: &st
     let output = derive(&input);
     let message = get_error(output, true);
 
-    assert_eq!(
-        message,
-        format!(
-            "There can be at most one default #[{}(...)] instruction for a given member.",
-            err
-        )
-    );
+    assert_eq!(message, format!("There can be at most one default #[{}(...)] instruction for a given member.", err));
 }
 
 // endregion: more_than_one_default_member_instruction
@@ -602,13 +590,7 @@ fn dedicated_instruction_defined_twice(code_fragment: TokenStream, err_instr: &s
     let output = derive(&input);
     let message = get_error(output, true);
 
-    assert_eq!(
-        message,
-        format!(
-            "Dedicated #[{}(...)] instruction for type {} is already defined.",
-            err_instr, err_ty
-        )
-    );
+    assert_eq!(message, format!("Dedicated #[{}(...)] instruction for type {} is already defined.", err_instr, err_ty));
 }
 
 // endregion: dedicated_instruction_defined_twice
@@ -647,22 +629,12 @@ fn dedicated_instruction_defined_twice(code_fragment: TokenStream, err_instr: &s
         Var
     }
 }, "type_hint", "EnumDto"; "enum_type_hint_instr")]
-fn dedicated_member_instruction_defined_twice(
-    code_fragment: TokenStream,
-    err_instr: &str,
-    err_ty: &str,
-) {
+fn dedicated_member_instruction_defined_twice(code_fragment: TokenStream, err_instr: &str, err_ty: &str) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
     let message = get_error(output, true);
 
-    assert_eq!(
-        message,
-        format!(
-            "Dedicated #[{}(...)] instruction for type {} is already defined.",
-            err_instr, err_ty
-        )
-    );
+    assert_eq!(message, format!("Dedicated #[{}(...)] instruction for type {} is already defined.", err_instr, err_ty));
 }
 
 // endregion: dedicated_member_instruction_defined_twice
@@ -825,11 +797,7 @@ fn dedicated_field_instruction_mismatch(code_fragment: TokenStream, errs: Vec<&s
         assert_eq!(errs.len(), errors.len());
 
         for err_ty in errs {
-            assert!(errors.iter().any(|x| x.to_string()
-                == format!(
-                    "Type '{}' doesn't match any type specified in trait instructions.",
-                    err_ty
-                )))
+            assert!(errors.iter().any(|x| x.to_string() == format!("Type '{}' doesn't match any type specified in trait instructions.", err_ty)))
         }
     } else {
         assert!(output.is_ok())
@@ -961,16 +929,10 @@ fn missing_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, boo
     for (ty, should_contain) in errs {
         match should_contain {
             true => {
-                assert!(errors
-                    .iter()
-                    .any(|x| x.to_string()
-                        == format!("Missing #[children(...)] instruction for {}", ty)))
+                assert!(errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty)))
             }
             false => {
-                assert!(!errors
-                    .iter()
-                    .any(|x| x.to_string()
-                        == format!("Missing #[children(...)] instruction for {}", ty)))
+                assert!(!errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty)))
             }
         }
     }
@@ -1050,11 +1012,7 @@ fn member_instr_on_wrong_member(code_fragment: TokenStream, errs: Vec<&str>) {
         assert_eq!(errs.len(), errors.len());
 
         for err in errs {
-            assert!(errors.iter().any(|x| x.to_string()
-                == format!(
-                    "Instruction #[{}(...)] is not supported for this member.",
-                    err
-                )))
+            assert!(errors.iter().any(|x| x.to_string() == format!("Instruction #[{}(...)] is not supported for this member.", err)))
         }
     } else {
         assert!(output.is_ok())
@@ -1127,16 +1085,8 @@ fn incomplete_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, 
 
     for (field, ty, should_contain) in errs {
         match should_contain {
-            true => assert!(errors.iter().any(|x| x.to_string()
-                == format!(
-                    "Missing '{}: [Type Path]' instruction for type {}",
-                    field, ty
-                ))),
-            false => assert!(!errors.iter().any(|x| x.to_string()
-                == format!(
-                    "Missing '{}: [Type Path]' instruction for type {}",
-                    field, ty
-                ))),
+            true => assert!(errors.iter().any(|x| x.to_string() == format!("Missing '{}: [Type Path]' instruction for type {}", field, ty))),
+            false => assert!(!errors.iter().any(|x| x.to_string() == format!("Missing '{}: [Type Path]' instruction for type {}", field, ty))),
         }
     }
 }
@@ -1299,7 +1249,9 @@ fn incomplete_field_attr_instruction(code_fragment: TokenStream, errs: Vec<(&str
         assert_eq!(errs.len(), errors.len());
 
         for (field, ty, or_action) in errs {
-            assert!(errors.iter().any(|x| x.to_string() == format!("Member 0 should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", if or_action {" or an action"} else {""}, field, ty)))
+            assert!(errors
+                .iter()
+                .any(|x| x.to_string() == format!("Member 0 should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", if or_action { " or an action" } else { "" }, field, ty)))
         }
     } else {
         assert!(output.is_ok())
@@ -1478,11 +1430,7 @@ fn incomplete_field_attr_instruction(code_fragment: TokenStream, errs: Vec<(&str
     (1, "Var3", "ref_try_into_existing", "TestDto", false),
     (0, "Var4", "ref_try_into_existing", "TestDto", false),
 ]; "24")]
-fn incomplete_variant_field_attr_instruction(
-    code_fragment: TokenStream,
-    err_ty: TokenStream,
-    errs: Vec<(u32, &str, &str, &str, bool)>,
-) {
+fn incomplete_variant_field_attr_instruction(code_fragment: TokenStream, err_ty: TokenStream, errs: Vec<(u32, &str, &str, &str, bool)>) {
     let code_fragment = quote! {
         #[#code_fragment(TestDto #err_ty)]
         enum Test2Dto {
@@ -1502,7 +1450,9 @@ fn incomplete_variant_field_attr_instruction(
         assert_eq!(errs.len(), errors.len());
 
         for (idx, variant, field, ty, or_action) in errs {
-            assert!(errors.iter().any(|x| x.to_string() == format!("Member {} of a variant {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", idx, variant, if or_action {" or an action"} else {""}, field, ty)))
+            assert!(errors
+                .iter()
+                .any(|x| x.to_string() == format!("Member {} of a variant {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", idx, variant, if or_action { " or an action" } else { "" }, field, ty)))
         }
     } else {
         assert!(output.is_ok())
@@ -1590,7 +1540,9 @@ fn incomplete_field_attr_instruction_2(code_fragment: TokenStream, errs: Vec<(&s
         assert_eq!(errs.len(), errors.len());
 
         for (field, ty, or_action) in errs {
-            assert!(errors.iter().any(|x| x.to_string() == format!("Member trait instruction #[{}(...)] for member 0 should specify corresponding field name of the {}{}", field, ty, if or_action {" or an action"} else {""})))
+            assert!(errors
+                .iter()
+                .any(|x| x.to_string() == format!("Member trait instruction #[{}(...)] for member 0 should specify corresponding field name of the {}{}", field, ty, if or_action { " or an action" } else { "" })))
         }
     } else {
         assert!(output.is_ok())
@@ -1649,10 +1601,7 @@ fn fallible_map_instruction_no_error_type(instr: TokenStream, postfix: Option<To
     let output = derive(&input);
     let message = get_error(output, true);
 
-    assert_eq!(
-        message,
-        "Error type should be specified for fallible instruction."
-    );
+    assert_eq!(message, "Error type should be specified for fallible instruction.");
 }
 
 // endregion: fallible_map_instruction_no_error_type
@@ -1707,10 +1656,7 @@ fn infallible_map_instruction_error_type(instr: TokenStream, postfix: Option<Tok
     let output = derive(&input);
     let message = get_error(output, true);
 
-    assert_eq!(
-        message,
-        "Error type should not be specified for infallible instruction."
-    );
+    assert_eq!(message, "Error type should not be specified for infallible instruction.");
 }
 
 // endregion: infallible_map_instruction_error_type
@@ -1771,10 +1717,7 @@ fn permeating_repeat(code_fragment: TokenStream) {
     let output = derive(&input);
     let message = get_error(output, true);
 
-    assert_eq!(
-        message,
-        "Permeating repeat instruction is only applicable to enum variant fields."
-    );
+    assert_eq!(message, "Permeating repeat instruction is only applicable to enum variant fields.");
 }
 
 // endregion: permeating_repeat
@@ -1925,10 +1868,7 @@ fn item_attributes(code_fragment: TokenStream, expected_output: TokenStream) {
     let output = derive(&input);
 
     assert!(output.is_ok());
-    assert_eq!(
-        output.unwrap().to_string().trim(),
-        expected_output.to_string().trim()
-    );
+    assert_eq!(output.unwrap().to_string().trim(), expected_output.to_string().trim());
 }
 
 // endregion: item_attributes
@@ -1939,10 +1879,7 @@ fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> Str
 
     if expect_root_error {
         let error = err_iter.next();
-        assert_eq!(
-            error.expect("Root error expected").to_string(),
-            "Cannot expand o2o macro"
-        );
+        assert_eq!(error.expect("Root error expected").to_string(), "Cannot expand o2o macro");
     }
 
     let error = err_iter.next();

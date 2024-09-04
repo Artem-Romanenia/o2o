@@ -25,13 +25,7 @@ fn struct2unit() {
     for data in vec![
         (Enum::Var1, EnumDto::Var1),
         (Enum::Var2(123, "test".into()), EnumDto::Var2),
-        (
-            Enum::Var3 {
-                _field: 123,
-                _str_field: "test".into(),
-            },
-            EnumDto::Var3,
-        ),
+        (Enum::Var3 { _field: 123, _str_field: "test".into() }, EnumDto::Var3),
     ] {
         let dto_ref = &data.1;
         let en: Enum = dto_ref.try_into().unwrap();
@@ -73,13 +67,7 @@ fn unit2struct() {
     for data in vec![
         (Enum::Var1, EnumDto::Var1),
         (Enum::Var2(123, "test".into()), EnumDto::Var2),
-        (
-            Enum::Var3 {
-                _field: 123,
-                _str_field: "test".into(),
-            },
-            EnumDto::Var3,
-        ),
+        (Enum::Var3 { _field: 123, _str_field: "test".into() }, EnumDto::Var3),
     ] {
         let dto_ref = &data.1;
         let en: Enum = dto_ref.try_into().unwrap();
@@ -122,13 +110,7 @@ fn struct2unit_no_ghost() {
     for data in vec![
         (Enum::Var1, EnumDto::Var1),
         (Enum::Var2(123, "test".into()), EnumDto::Var2),
-        (
-            Enum::Var3 {
-                _field: 123,
-                _str_field: "test".into(),
-            },
-            EnumDto::Var3,
-        ),
+        (Enum::Var3 { _field: 123, _str_field: "test".into() }, EnumDto::Var3),
     ] {
         let en_ref = &data.0;
         let dto: EnumDto = en_ref.try_into().unwrap();
@@ -161,13 +143,7 @@ fn unit2struct_no_ghost() {
     for data in vec![
         (Enum::Var1, EnumDto::Var1),
         (Enum::Var2(123, "test".into()), EnumDto::Var2),
-        (
-            Enum::Var3 {
-                _field: 123,
-                _str_field: "test".into(),
-            },
-            EnumDto::Var3,
-        ),
+        (Enum::Var3 { _field: 123, _str_field: "test".into() }, EnumDto::Var3),
     ] {
         let en_ref = &data.0;
         let dto: EnumDto = en_ref.try_into().unwrap();

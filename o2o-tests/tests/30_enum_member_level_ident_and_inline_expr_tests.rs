@@ -24,20 +24,8 @@ enum EnumWithDataDto {
 #[test]
 fn enum2enum_with_data() {
     for data in vec![
-        (
-            EnumWithDataDto::Item1("123".into(), 321),
-            EnumWithData::Item1(123, 321),
-        ),
-        (
-            EnumWithDataDto::Item2 {
-                str: "Test".into(),
-                i_str: "654".into(),
-            },
-            EnumWithData::Item2 {
-                str: "Test".into(),
-                i: 654,
-            },
-        ),
+        (EnumWithDataDto::Item1("123".into(), 321), EnumWithData::Item1(123, 321)),
+        (EnumWithDataDto::Item2 { str: "Test".into(), i_str: "654".into() }, EnumWithData::Item2 { str: "Test".into(), i: 654 }),
     ] {
         let en: EnumWithData = data.0.clone().into();
         assert!(en == data.1);

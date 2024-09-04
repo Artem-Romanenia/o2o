@@ -42,13 +42,7 @@ fn enum2enum() {
     for data in vec![
         (Enum::Var1, EnumDto::Var1),
         (Enum::Var22, EnumDto::Var2),
-        (
-            Enum::Error("test".into()),
-            EnumDto::Var3 {
-                _str: "test".into(),
-                _i: 123,
-            },
-        ),
+        (Enum::Error("test".into()), EnumDto::Var3 { _str: "test".into(), _i: 123 }),
     ] {
         let dto_ref = &data.1;
         let en: Enum = dto_ref.into();
@@ -71,13 +65,7 @@ fn enum2enum_reverse() {
     for data in vec![
         (Enum2::Var1, EnumDto2::Var1),
         (Enum2::Var22, EnumDto2::Var2),
-        (
-            Enum2::Error("test".into()),
-            EnumDto2::Var3 {
-                _str: "test".into(),
-                _i: 123,
-            },
-        ),
+        (Enum2::Error("test".into()), EnumDto2::Var3 { _str: "test".into(), _i: 123 }),
     ] {
         let dto_ref = &data.1;
         let en: Enum2 = dto_ref.into();

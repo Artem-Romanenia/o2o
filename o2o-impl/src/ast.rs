@@ -4,9 +4,7 @@ use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{
-    Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result,
-};
+use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
 
 #[derive(Default)]
 struct Context {
@@ -59,9 +57,7 @@ impl<'a> Field {
 
                 if let Some(repeat_attr) = &field.attrs.repeat {
                     if ctx.field_attrs_to_repeat.is_some() && !field.attrs.stop_repeat {
-                        panic!(
-                            "Previous #[repeat] instruction must be terminated with #[stop_repeat]"
-                        )
+                        panic!("Previous #[repeat] instruction must be terminated with #[stop_repeat]")
                     }
 
                     ctx.field_attrs_to_repeat = Some((field.attrs.clone(), repeat_attr.permeate));
@@ -78,12 +74,7 @@ impl<'a> Field {
         Ok(Field {
             attrs: attr::get_member_attrs(SynDataTypeMember::Field(node), bark)?,
             idx: i,
-            member: node.ident.clone().map(Member::Named).unwrap_or_else(|| {
-                Member::Unnamed(Index {
-                    index: i as u32,
-                    span: node.ty.span(),
-                })
-            }),
+            member: node.ident.clone().map(Member::Named).unwrap_or_else(|| Member::Unnamed(Index { index: i as u32, span: node.ty.span() })),
         })
     }
 }
@@ -99,12 +90,7 @@ impl<'a> Enum<'a> {
     pub fn from_syn(node: &'a DeriveInput, data: &'a DataEnum) -> Result<Self> {
         let (attrs, bark) = attr::get_data_type_attrs(&node.attrs)?;
         let variants = Variant::multiple_from_syn(&data.variants, bark)?;
-        Ok(Enum {
-            attrs,
-            ident: &node.ident,
-            generics: &node.generics,
-            variants,
-        })
+        Ok(Enum { attrs, ident: &node.ident, generics: &node.generics, variants })
     }
 }
 
@@ -118,14 +104,8 @@ pub(crate) struct Variant {
 }
 
 impl<'a> Variant {
-    fn multiple_from_syn(
-        variants: &'a Punctuated<syn::Variant, Comma>,
-        bark: bool,
-    ) -> Result<Vec<Self>> {
-        let mut ctx = Context {
-            variant_attrs_to_repeat: None,
-            field_attrs_to_repeat: None,
-        };
+    fn multiple_from_syn(variants: &'a Punctuated<syn::Variant, Comma>, bark: bool) -> Result<Vec<Self>> {
+        let mut ctx = Context { variant_attrs_to_repeat: None, field_attrs_to_repeat: None };
 
         variants
             .iter()
@@ -139,9 +119,7 @@ impl<'a> Variant {
 
                 if variant.attrs.repeat.is_some() {
                     if ctx.variant_attrs_to_repeat.is_some() && !variant.attrs.stop_repeat {
-                        panic!(
-                            "Previous #[repeat] instruction must be terminated with #[stop_repeat]"
-                        )
+                        panic!("Previous #[repeat] instruction must be terminated with #[stop_repeat]")
                     }
 
                     ctx.variant_attrs_to_repeat = Some(variant.attrs.clone());
@@ -154,12 +132,7 @@ impl<'a> Variant {
             .collect()
     }
 
-    fn from_syn(
-        ctx: &mut Context,
-        i: usize,
-        variant: &'a syn::Variant,
-        bark: bool,
-    ) -> Result<Self> {
+    fn from_syn(ctx: &mut Context, i: usize, variant: &'a syn::Variant, bark: bool) -> Result<Self> {
         let fields = Field::multiple_from_syn(ctx, &variant.fields, bark)?;
         let attrs = attr::get_member_attrs(SynDataTypeMember::Variant(variant), bark)?;
 

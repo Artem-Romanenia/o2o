@@ -32,13 +32,7 @@ struct ChildDto {
 
 #[test]
 fn named2named_child() {
-    let p = Parent {
-        parent_int: 123,
-        child: Child {
-            child_int: 321,
-            another_child_int: 456,
-        },
-    };
+    let p = Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
 
     let dto: ParentDto = p.into();
 
@@ -51,10 +45,7 @@ fn named2named_child() {
 fn named2named_child_reverse() {
     let dto = ParentDto {
         parent_int: 123,
-        child: ChildDto {
-            child_int: 321,
-            diff_another_child_int: 456,
-        },
+        child: ChildDto { child_int: 321, diff_another_child_int: 456 },
     };
 
     let parent: Parent = dto.into();
@@ -66,13 +57,7 @@ fn named2named_child_reverse() {
 
 #[test]
 fn named2named_child_ref() {
-    let p = &Parent {
-        parent_int: 123,
-        child: Child {
-            child_int: 321,
-            another_child_int: 456,
-        },
-    };
+    let p = &Parent { parent_int: 123, child: Child { child_int: 321, another_child_int: 456 } };
 
     let dto: ParentDto = p.into();
 
@@ -85,30 +70,21 @@ fn named2named_child_ref() {
 fn named2named_child_ref_reverse() {
     let dto = &ParentDto {
         parent_int: 123,
-        child: ChildDto {
-            child_int: 321,
-            diff_another_child_int: 456,
-        },
+        child: ChildDto { child_int: 321, diff_another_child_int: 456 },
     };
 
     let parent: Parent = dto.into();
 
     assert_eq!(dto.parent_int, parent.parent_int);
     assert_eq!(dto.child.child_int, parent.child.child_int);
-    assert_eq!(
-        dto.child.diff_another_child_int,
-        parent.child.another_child_int
-    );
+    assert_eq!(dto.child.diff_another_child_int, parent.child.another_child_int);
 }
 
 #[test]
 fn existing_named2named_child_reverse() {
     let dto = ParentDto {
         parent_int: 123,
-        child: ChildDto {
-            child_int: 321,
-            diff_another_child_int: 456,
-        },
+        child: ChildDto { child_int: 321, diff_another_child_int: 456 },
     };
 
     let mut parent: Parent = Default::default();
@@ -123,10 +99,7 @@ fn existing_named2named_child_reverse() {
 fn existing_named2named_child_ref_reverse() {
     let dto = &ParentDto {
         parent_int: 123,
-        child: ChildDto {
-            child_int: 321,
-            diff_another_child_int: 456,
-        },
+        child: ChildDto { child_int: 321, diff_another_child_int: 456 },
     };
 
     let mut parent: Parent = Default::default();
@@ -134,8 +107,5 @@ fn existing_named2named_child_ref_reverse() {
 
     assert_eq!(dto.parent_int, parent.parent_int);
     assert_eq!(dto.child.child_int, parent.child.child_int);
-    assert_eq!(
-        dto.child.diff_another_child_int,
-        parent.child.another_child_int
-    );
+    assert_eq!(dto.child.diff_another_child_int, parent.child.another_child_int);
 }

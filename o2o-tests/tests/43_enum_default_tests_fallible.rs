@@ -67,10 +67,7 @@ fn enum2enum_panic() {
 
 #[test]
 fn enum2enum_panic_2() {
-    let dto = EnumDto::Var4 {
-        _str: "test".into(),
-        _i: 123,
-    };
+    let dto = EnumDto::Var4 { _str: "test".into(), _i: 123 };
     let res: Result<Enum, String> = dto.try_into();
     assert!(res.is_err_and(|x| x == "unknown"))
 }
@@ -84,10 +81,7 @@ fn enum2enum_panic_3() {
 
 #[test]
 fn enum2enum_reverse() {
-    for data in vec![
-        (Enum2::Var1, EnumDto2::Var1),
-        (Enum2::Var22, EnumDto2::Var2),
-    ] {
+    for data in vec![(Enum2::Var1, EnumDto2::Var1), (Enum2::Var22, EnumDto2::Var2)] {
         let dto_ref = &data.1;
         let en: Enum2 = dto_ref.try_into().unwrap();
         assert!(en == data.0);
@@ -113,10 +107,7 @@ fn enum2enum_panic_reverse() {
 
 #[test]
 fn enum2enum_panic_reverse_2() {
-    let dto = EnumDto2::Var4 {
-        _str: "test".into(),
-        _i: 123,
-    };
+    let dto = EnumDto2::Var4 { _str: "test".into(), _i: 123 };
     let res: Result<Enum2, String> = dto.try_into();
     assert!(res.is_err_and(|x| x == "unknown"))
 }

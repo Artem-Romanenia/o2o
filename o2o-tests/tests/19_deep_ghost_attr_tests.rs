@@ -121,11 +121,7 @@ fn named2named() {
         number_of_doors: 2,
         vehicle: Vehicle {
             number_of_seats: 4,
-            machine: Machine {
-                id: 123,
-                brand: "Trabant".into(),
-                year: 1960,
-            },
+            machine: Machine { id: 123, brand: "Trabant".into(), year: 1960 },
         },
     };
 
@@ -139,12 +135,7 @@ fn named2named() {
 
 #[test]
 fn named2named_reverse() {
-    let car_dto = CarDto {
-        number_of_doors: 2,
-        number_of_seats: 4,
-        brand: "Trabant".into(),
-        year: 1960,
-    };
+    let car_dto = CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
 
     let car: Car = car_dto.into();
 
@@ -161,11 +152,7 @@ fn named2named_ref() {
         number_of_doors: 2,
         vehicle: Vehicle {
             number_of_seats: 4,
-            machine: Machine {
-                id: 123,
-                brand: "Trabant".into(),
-                year: 1960,
-            },
+            machine: Machine { id: 123, brand: "Trabant".into(), year: 1960 },
         },
     };
 
@@ -179,12 +166,7 @@ fn named2named_ref() {
 
 #[test]
 fn named2named_reverse_ref() {
-    let car_dto = &CarDto {
-        number_of_doors: 2,
-        number_of_seats: 4,
-        brand: "Trabant".into(),
-        year: 1960,
-    };
+    let car_dto = &CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
 
     let car: Car = car_dto.into();
 
@@ -197,12 +179,7 @@ fn named2named_reverse_ref() {
 
 #[test]
 fn existing_named2named() {
-    let car_dto = CarDto {
-        number_of_doors: 2,
-        number_of_seats: 4,
-        brand: "Trabant".into(),
-        year: 1960,
-    };
+    let car_dto = CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
 
     let mut car: Car = Default::default();
     car_dto.into_existing(&mut car);
@@ -216,12 +193,7 @@ fn existing_named2named() {
 
 #[test]
 fn existing_named2named_reverse() {
-    let car_dto = &CarDto {
-        number_of_doors: 2,
-        number_of_seats: 4,
-        brand: "Trabant".into(),
-        year: 1960,
-    };
+    let car_dto = &CarDto { number_of_doors: 2, number_of_seats: 4, brand: "Trabant".into(), year: 1960 };
 
     let mut car: Car = Default::default();
     car_dto.into_existing(&mut car);
@@ -236,23 +208,12 @@ fn existing_named2named_reverse() {
 #[test]
 fn named2named_2() {
     let team = Team {
-        base: Base {
-            id: 123,
-            name: "Test".into(),
-        },
+        base: Base { id: 123, name: "Test".into() },
         division_id: 456,
         division: Division {
-            base: Base {
-                id: 456,
-                name: "TestDivision".into(),
-            },
+            base: Base { id: 456, name: "TestDivision".into() },
             league_id: 789,
-            league: League {
-                base: Base {
-                    id: 789,
-                    name: "TestLeague".into(),
-                },
-            },
+            league: League { base: Base { id: 789, name: "TestLeague".into() } },
         },
     };
 
@@ -271,14 +232,8 @@ fn named2named_reverse_2() {
     let team_dto = TeamDto {
         id: 123,
         name: "Test".into(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".into(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".into(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".into() },
+        league: LeagueDto { id: 789, name: "TestLeague".into() },
     };
 
     let team: Team = team_dto.into();
@@ -296,23 +251,12 @@ fn named2named_reverse_2() {
 #[test]
 fn named2named_ref_2() {
     let team = &Team {
-        base: Base {
-            id: 123,
-            name: "Test".into(),
-        },
+        base: Base { id: 123, name: "Test".into() },
         division_id: 456,
         division: Division {
-            base: Base {
-                id: 456,
-                name: "TestDivision".into(),
-            },
+            base: Base { id: 456, name: "TestDivision".into() },
             league_id: 789,
-            league: League {
-                base: Base {
-                    id: 789,
-                    name: "TestLeague".into(),
-                },
-            },
+            league: League { base: Base { id: 789, name: "TestLeague".into() } },
         },
     };
 
@@ -333,14 +277,8 @@ fn named2named_ref_reverse_2() {
     let team_dto = &TeamDto {
         id: 123,
         name: "Test".into(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".into(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".into(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".into() },
+        league: LeagueDto { id: 789, name: "TestLeague".into() },
     };
 
     let team: Team = team_dto.into();
@@ -360,14 +298,8 @@ fn existing_named2named_2() {
     let team_dto = TeamDto {
         id: 123,
         name: "Test".into(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".into(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".into(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".into() },
+        league: LeagueDto { id: 789, name: "TestLeague".into() },
     };
 
     let mut team: Team = Default::default();
@@ -388,14 +320,8 @@ fn existing_named2named_ref_2() {
     let team_dto = &TeamDto {
         id: 123,
         name: "Test".into(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".into(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".into(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".into() },
+        league: LeagueDto { id: 789, name: "TestLeague".into() },
     };
 
     let mut team: Team = Default::default();

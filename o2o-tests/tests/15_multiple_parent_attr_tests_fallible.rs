@@ -2,13 +2,7 @@ use o2o::o2o;
 use o2o::traits::TryIntoExisting;
 
 #[derive(o2o)]
-#[o2o(
-    try_map(EntityDto, String),
-    try_map(TupleEntityDto, String),
-    try_map(EntityModel, String),
-    try_into_existing(EntityDto, String),
-    try_into_existing(TupleEntityDto, String)
-)]
+#[o2o(try_map(EntityDto, String), try_map(TupleEntityDto, String), try_map(EntityModel, String), try_into_existing(EntityDto, String), try_into_existing(TupleEntityDto, String))]
 struct Entity {
     #[map(TupleEntityDto| 0)]
     parent_int: i32,
@@ -82,11 +76,7 @@ struct EntityDto {
 #[try_map(EntityDto as {}, String)]
 #[try_into_existing(TupleEntityDto, String)]
 #[try_into_existing(EntityDto, String)]
-struct TupleEntity(
-    #[map(EntityDto| parent_int)] i32,
-    #[parent] TupleBaseEntity,
-    #[parent] TupleChild,
-);
+struct TupleEntity(#[map(EntityDto| parent_int)] i32, #[parent] TupleBaseEntity, #[parent] TupleChild);
 
 #[derive(o2o)]
 #[try_from(TupleEntityDto, String)]
@@ -179,17 +169,8 @@ fn named2unnamed() {
 fn named2named_reverse() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -206,17 +187,8 @@ fn named2named_reverse() {
 fn named2unnamed_reverse() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
@@ -275,17 +247,8 @@ fn named2unnamed_ref() {
 fn named2named_reverse_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -302,17 +265,8 @@ fn named2named_reverse_ref() {
 fn named2unnamed_reverse_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
@@ -355,11 +309,7 @@ fn unnamed2named() {
 
 #[test]
 fn unnamed2unnamed_reverse() {
-    let entity = TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 
@@ -373,11 +323,7 @@ fn unnamed2unnamed_reverse() {
 
 #[test]
 fn unnamed2named_reverse() {
-    let entity = TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -419,11 +365,7 @@ fn unnamed2named_ref() {
 
 #[test]
 fn unnamed2unnamed_reverse_ref() {
-    let entity = &TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = &TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 
@@ -437,11 +379,7 @@ fn unnamed2unnamed_reverse_ref() {
 
 #[test]
 fn unnamed2named_reverse_ref() {
-    let entity = &TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = &TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -457,17 +395,8 @@ fn unnamed2named_reverse_ref() {
 fn named2named_2() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let model: EntityModel = entity.try_into().unwrap();
@@ -484,50 +413,26 @@ fn named2named_2() {
 fn named2named_2_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let model: EntityModel = entity.try_into().unwrap();
 
     assert_eq!(entity.parent_int, model.parent_int);
     assert_eq!(entity.base.base.base_int_2, model.base.base.base_int_2);
-    assert_eq!(
-        entity.base.base.another_base_int,
-        model.base.base.another_base_int
-    );
+    assert_eq!(entity.base.base.another_base_int, model.base.base.another_base_int);
     assert_eq!(entity.base.base_entity_int, model.base.base_entity_int);
     assert_eq!(entity.child.child_int, model.child.child_int);
-    assert_eq!(
-        entity.child.another_child_int,
-        model.child.another_child_int
-    );
+    assert_eq!(entity.child.another_child_int, model.child.another_child_int);
 }
 
 #[test]
 fn named2named_2_reverse() {
     let model = EntityModel {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let entity: Entity = model.try_into().unwrap();
@@ -544,50 +449,26 @@ fn named2named_2_reverse() {
 fn named2named_2_ref_reverse() {
     let model = &EntityModel {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let entity: Entity = model.try_into().unwrap();
 
     assert_eq!(model.parent_int, entity.parent_int);
     assert_eq!(model.base.base.base_int_2, entity.base.base.base_int_2);
-    assert_eq!(
-        model.base.base.another_base_int,
-        entity.base.base.another_base_int
-    );
+    assert_eq!(model.base.base.another_base_int, entity.base.base.another_base_int);
     assert_eq!(model.base.base_entity_int, entity.base.base_entity_int);
     assert_eq!(model.child.child_int, entity.child.child_int);
-    assert_eq!(
-        model.child.another_child_int,
-        entity.child.another_child_int
-    );
+    assert_eq!(model.child.another_child_int, entity.child.another_child_int);
 }
 
 #[test]
 fn existing_named2named() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let mut dto: EntityDto = Default::default();
@@ -605,17 +486,8 @@ fn existing_named2named() {
 fn existing_named2unnamed() {
     let entity = Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let mut dto: TupleEntityDto = Default::default();
@@ -633,17 +505,8 @@ fn existing_named2unnamed() {
 fn existing_named2named_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let mut dto: EntityDto = Default::default();
@@ -661,17 +524,8 @@ fn existing_named2named_ref() {
 fn existing_named2unnamed_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: BaseEntity {
-            base: Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            base_entity_int: 654,
-        },
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: BaseEntity { base: Base { base_int_2: 321, another_base_int: 456 }, base_entity_int: 654 },
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let mut dto: TupleEntityDto = Default::default();
@@ -687,11 +541,7 @@ fn existing_named2unnamed_ref() {
 
 #[test]
 fn existing_unnamed2unnamed() {
-    let entity = TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let mut dto: TupleEntityDto = Default::default();
     entity.try_into_existing(&mut dto).unwrap();
@@ -706,11 +556,7 @@ fn existing_unnamed2unnamed() {
 
 #[test]
 fn existing_unnamed2named() {
-    let entity = TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let mut dto: EntityDto = Default::default();
     entity.try_into_existing(&mut dto).unwrap();
@@ -725,11 +571,7 @@ fn existing_unnamed2named() {
 
 #[test]
 fn existing_unnamed2unnamed_ref() {
-    let entity = &TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = &TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let mut dto: TupleEntityDto = Default::default();
     entity.try_into_existing(&mut dto).unwrap();
@@ -744,11 +586,7 @@ fn existing_unnamed2unnamed_ref() {
 
 #[test]
 fn existing_unnamed2named_ref() {
-    let entity = &TupleEntity(
-        123,
-        TupleBaseEntity(TupleBase(321, 456), 654),
-        TupleChild(789, 987),
-    );
+    let entity = &TupleEntity(123, TupleBaseEntity(TupleBase(321, 456), 654), TupleChild(789, 987));
 
     let mut dto: EntityDto = Default::default();
     entity.try_into_existing(&mut dto).unwrap();

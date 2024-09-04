@@ -107,17 +107,8 @@ fn named2named() {
 fn named2named_reverse() {
     let entity = Entity {
         parent_int: 123,
-        base: TupleBaseEntity(
-            Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            654,
-        ),
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: TupleBaseEntity(Base { base_int_2: 321, another_base_int: 456 }, 654),
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -155,17 +146,8 @@ fn named2named_ref() {
 fn named2named_reverse_ref() {
     let entity = &Entity {
         parent_int: 123,
-        base: TupleBaseEntity(
-            Base {
-                base_int_2: 321,
-                another_base_int: 456,
-            },
-            654,
-        ),
-        child: Child {
-            child_int: 789,
-            another_child_int: 987,
-        },
+        base: TupleBaseEntity(Base { base_int_2: 321, another_base_int: 456 }, 654),
+        child: Child { child_int: 789, another_child_int: 987 },
     };
 
     let dto: EntityDto = entity.try_into().unwrap();
@@ -194,14 +176,7 @@ fn unnamed2unnamed() {
 
 #[test]
 fn unnamed2unnamed_reverse() {
-    let entity = TupleEntity(
-        123,
-        BaseEntity {
-            base: TupleBase(321, 456),
-            base_entity_int: 654,
-        },
-        TupleChild(789, 987),
-    );
+    let entity = TupleEntity(123, BaseEntity { base: TupleBase(321, 456), base_entity_int: 654 }, TupleChild(789, 987));
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 
@@ -229,14 +204,7 @@ fn unnamed2unnamed_ref() {
 
 #[test]
 fn unnamed2unnamed_reverse_ref() {
-    let entity = &TupleEntity(
-        123,
-        BaseEntity {
-            base: TupleBase(321, 456),
-            base_entity_int: 654,
-        },
-        TupleChild(789, 987),
-    );
+    let entity = &TupleEntity(123, BaseEntity { base: TupleBase(321, 456), base_entity_int: 654 }, TupleChild(789, 987));
 
     let dto: TupleEntityDto = entity.try_into().unwrap();
 

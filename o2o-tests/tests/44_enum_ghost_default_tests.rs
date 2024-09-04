@@ -68,10 +68,7 @@ fn enum2enum_panic2() {
 
 #[test]
 fn enum2enum_reverse() {
-    for data in vec![
-        (Enum2::Var1, EnumDto2::Var1),
-        (Enum2::Var22, EnumDto2::Var2),
-    ] {
+    for data in vec![(Enum2::Var1, EnumDto2::Var1), (Enum2::Var22, EnumDto2::Var2)] {
         let dto_ref = &data.1;
         let en: Enum2 = dto_ref.try_into().unwrap();
         assert!(en == data.0);

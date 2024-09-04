@@ -117,7 +117,5 @@ use syn::{parse_macro_input, DeriveInput};
 // (given that all but one are essentially shortcuts and can be avoided with alternative instr syntax)
 pub fn derive_o2o(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    derive(&input)
-        .unwrap_or_else(|err| err.to_compile_error())
-        .into()
+    derive(&input).unwrap_or_else(|err| err.to_compile_error()).into()
 }

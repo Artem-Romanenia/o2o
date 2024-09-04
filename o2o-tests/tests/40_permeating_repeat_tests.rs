@@ -35,16 +35,7 @@ fn reqular_repeat() {
     }
 
     let data = vec![
-        (
-            Enum::Var1 {
-                field: 111,
-                field_2: 111,
-            },
-            EnumDto::Var1 {
-                field: 222,
-                field_2: 222,
-            },
-        ),
+        (Enum::Var1 { field: 111, field_2: 111 }, EnumDto::Var1 { field: 222, field_2: 222 }),
         (Enum::Var2 { field_3: 222 }, EnumDto::Var2 { field_3: 222 }),
         (Enum::Var3 { field_4: 333 }, EnumDto::Var3 { field_4: 333 }),
         (Enum::Var4 { field_5: 444 }, EnumDto::Var4 { field_5: 444 }),
@@ -97,16 +88,7 @@ fn permeating_repeat() {
     }
 
     let data = vec![
-        (
-            Enum::Var1 {
-                field: 111,
-                field_2: 111,
-            },
-            EnumDto::Var1 {
-                field: 222,
-                field_2: 222,
-            },
-        ),
+        (Enum::Var1 { field: 111, field_2: 111 }, EnumDto::Var1 { field: 222, field_2: 222 }),
         (Enum::Var2 { field_3: 222 }, EnumDto::Var2 { field_3: 444 }),
         (Enum::Var3 { field_4: 333 }, EnumDto::Var3 { field_4: 666 }),
         (Enum::Var4 { field_5: 444 }, EnumDto::Var4 { field_5: 888 }),

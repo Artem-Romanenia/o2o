@@ -14,9 +14,7 @@ fn derive_simple_benchmark(c: &mut Criterion) {
     };
 
     let input: DeriveInput = syn::parse2(tokens).unwrap();
-    c.bench_function("derive_simple_benchmark", |b| {
-        b.iter(|| derive(black_box(&input.clone())))
-    });
+    c.bench_function("derive_simple_benchmark", |b| b.iter(|| derive(black_box(&input.clone()))));
 }
 
 fn derive_complex_benchmark(c: &mut Criterion) {
@@ -59,9 +57,7 @@ fn derive_complex_benchmark(c: &mut Criterion) {
     };
 
     let input: DeriveInput = syn::parse2(tokens).unwrap();
-    c.bench_function("derive_complex_benchmark", |b| {
-        b.iter(|| derive(black_box(&input.clone())))
-    });
+    c.bench_function("derive_complex_benchmark", |b| b.iter(|| derive(black_box(&input.clone()))));
 }
 
 criterion_group!(benches, derive_simple_benchmark, derive_complex_benchmark);

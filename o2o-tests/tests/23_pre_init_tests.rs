@@ -22,11 +22,7 @@ struct PersonDto {
 
 #[test]
 fn named2named() {
-    let person = Person {
-        age: 42,
-        first_name: "Dohn".into(),
-        last_name: "Joe".into(),
-    };
+    let person = Person { age: 42, first_name: "Dohn".into(), last_name: "Joe".into() };
 
     let dto: PersonDto = person.into();
 
@@ -36,27 +32,17 @@ fn named2named() {
 
 #[test]
 fn named2named_ref() {
-    let person = &Person {
-        age: 42,
-        first_name: "Dohn".into(),
-        last_name: "Joe".into(),
-    };
+    let person = &Person { age: 42, first_name: "Dohn".into(), last_name: "Joe".into() };
 
     let dto: PersonDto = person.into();
 
     assert_eq!(person.age, dto.age);
-    assert_eq!(
-        format!("{} {}", person.first_name, person.last_name),
-        dto.full_name
-    );
+    assert_eq!(format!("{} {}", person.first_name, person.last_name), dto.full_name);
 }
 
 #[test]
 fn named2named_reverse() {
-    let dto = PersonDto {
-        age: 42,
-        full_name: "Test".into(),
-    };
+    let dto = PersonDto { age: 42, full_name: "Test".into() };
 
     let person: Person = dto.into();
 
@@ -67,10 +53,7 @@ fn named2named_reverse() {
 
 #[test]
 fn named2named_reverse_ref() {
-    let dto = &PersonDto {
-        age: 42,
-        full_name: "Test".into(),
-    };
+    let dto = &PersonDto { age: 42, full_name: "Test".into() };
 
     let person: Person = dto.into();
 
@@ -81,10 +64,7 @@ fn named2named_reverse_ref() {
 
 #[test]
 fn existing_named2named() {
-    let dto = PersonDto {
-        age: 42,
-        full_name: "Test".into(),
-    };
+    let dto = PersonDto { age: 42, full_name: "Test".into() };
 
     let mut person: Person = Default::default();
     dto.into_existing(&mut person);
@@ -96,10 +76,7 @@ fn existing_named2named() {
 
 #[test]
 fn existing_named2named_ref() {
-    let dto = &PersonDto {
-        age: 42,
-        full_name: "Test".into(),
-    };
+    let dto = &PersonDto { age: 42, full_name: "Test".into() };
 
     let mut person: Person = Default::default();
     dto.into_existing(&mut person);

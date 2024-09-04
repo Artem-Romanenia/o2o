@@ -14,10 +14,7 @@ pub struct Entity {
 
 #[test]
 fn named2nameless() {
-    let entity = Entity {
-        int: 123,
-        string: "Test".try_into().unwrap(),
-    };
+    let entity = Entity { int: 123, string: "Test".try_into().unwrap() };
 
     let (int, string) = entity.try_into().unwrap();
 
@@ -27,10 +24,7 @@ fn named2nameless() {
 
 #[test]
 fn named2nameless_ref() {
-    let entity = &Entity {
-        int: 123,
-        string: "Test".try_into().unwrap(),
-    };
+    let entity = &Entity { int: 123, string: "Test".try_into().unwrap() };
 
     let (int, string) = entity.try_into().unwrap();
 
@@ -60,10 +54,7 @@ fn named2nameless_reverse_ref() {
 
 #[test]
 fn existing_named2nameless() {
-    let entity = Entity {
-        int: 123,
-        string: "Test".try_into().unwrap(),
-    };
+    let entity = Entity { int: 123, string: "Test".try_into().unwrap() };
 
     let mut tpl = <(i32, String)>::default();
     entity.try_into_existing(&mut tpl).unwrap();
@@ -74,10 +65,7 @@ fn existing_named2nameless() {
 
 #[test]
 fn existing_named2nameless_ref() {
-    let entity = &Entity {
-        int: 123,
-        string: "Test".try_into().unwrap(),
-    };
+    let entity = &Entity { int: 123, string: "Test".try_into().unwrap() };
 
     let mut tpl = <(i32, String)>::default();
     entity.try_into_existing(&mut tpl).unwrap();

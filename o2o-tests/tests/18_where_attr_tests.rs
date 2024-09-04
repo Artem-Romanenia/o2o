@@ -59,10 +59,7 @@ where
 fn named2named_different_name_and_type() {
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let p: Parent<Child<i16>, i32> = dto.into();
@@ -73,10 +70,7 @@ fn named2named_different_name_and_type() {
 
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let model: ParentModel<i32> = dto.into();
@@ -88,13 +82,7 @@ fn named2named_different_name_and_type() {
 
 #[test]
 fn named2named_different_name_and_type_reverse() {
-    let p = Parent {
-        parent_int: 987,
-        child: Child {
-            child_int: 456,
-            another_child_int: 123,
-        },
-    };
+    let p = Parent { parent_int: 987, child: Child { child_int: 456, another_child_int: 123 } };
 
     let dto: ParentDto<i32> = p.into();
 
@@ -104,10 +92,7 @@ fn named2named_different_name_and_type_reverse() {
 
     let model = ParentModel {
         parent_int: 987,
-        child_diff: Child {
-            child_int: 456,
-            another_child_int: 123,
-        },
+        child_diff: Child { child_int: 456, another_child_int: 123 },
     };
 
     let dto: ParentDto<i32> = model.into();
@@ -121,76 +106,49 @@ fn named2named_different_name_and_type_reverse() {
 fn named2named_different_name_and_type_ref() {
     let dto = &ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let p: Parent<Child<i16>, i32> = dto.into();
 
     assert_eq!(dto.parent_int, p.parent_int);
     assert_eq!(dto.diff_child.child_int, p.child.child_int as i16);
-    assert_eq!(
-        dto.diff_child.diff_another_child_int,
-        p.child.another_child_int
-    );
+    assert_eq!(dto.diff_child.diff_another_child_int, p.child.another_child_int);
 
     let model: ParentModel<i16> = dto.into();
 
     assert_eq!(dto.parent_int, model.parent_int);
     assert_eq!(dto.diff_child.child_int, model.child_diff.child_int as i16);
-    assert_eq!(
-        dto.diff_child.diff_another_child_int,
-        model.child_diff.another_child_int as i16
-    );
+    assert_eq!(dto.diff_child.diff_another_child_int, model.child_diff.another_child_int as i16);
 }
 
 #[test]
 fn named2named_different_name_and_type_reverse_ref() {
-    let p = &Parent {
-        parent_int: 987,
-        child: Child {
-            child_int: 456,
-            another_child_int: 123,
-        },
-    };
+    let p = &Parent { parent_int: 987, child: Child { child_int: 456, another_child_int: 123 } };
 
     let dto: ParentDto<i32> = p.into();
 
     assert_eq!(p.parent_int, dto.parent_int);
     assert_eq!(p.child.child_int, dto.diff_child.child_int);
-    assert_eq!(
-        p.child.another_child_int,
-        dto.diff_child.diff_another_child_int
-    );
+    assert_eq!(p.child.another_child_int, dto.diff_child.diff_another_child_int);
 
     let model = &ParentModel {
         parent_int: 987,
-        child_diff: Child {
-            child_int: 456,
-            another_child_int: 123,
-        },
+        child_diff: Child { child_int: 456, another_child_int: 123 },
     };
 
     let dto: ParentDto<i32> = model.into();
 
     assert_eq!(model.parent_int, dto.parent_int);
     assert_eq!(model.child_diff.child_int, dto.diff_child.child_int);
-    assert_eq!(
-        model.child_diff.another_child_int,
-        dto.diff_child.diff_another_child_int
-    );
+    assert_eq!(model.child_diff.another_child_int, dto.diff_child.diff_another_child_int);
 }
 
 #[test]
 fn existing_named2named_different_name_and_type() {
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let mut p: Parent<Child<i16>, i32> = Default::default();
@@ -202,10 +160,7 @@ fn existing_named2named_different_name_and_type() {
 
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let mut model: ParentModel<i32> = Default::default();
@@ -220,10 +175,7 @@ fn existing_named2named_different_name_and_type() {
 fn existing_named2named_different_name_and_type_ref() {
     let dto = &ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let mut p: Parent<Child<i16>, i32> = Default::default();
@@ -231,17 +183,11 @@ fn existing_named2named_different_name_and_type_ref() {
 
     assert_eq!(dto.parent_int, p.parent_int);
     assert_eq!(dto.diff_child.child_int, p.child.child_int);
-    assert_eq!(
-        dto.diff_child.diff_another_child_int,
-        p.child.another_child_int
-    );
+    assert_eq!(dto.diff_child.diff_another_child_int, p.child.another_child_int);
 
     let dto = &ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let mut model: ParentModel<i32> = Default::default();
@@ -249,8 +195,5 @@ fn existing_named2named_different_name_and_type_ref() {
 
     assert_eq!(dto.parent_int, model.parent_int);
     assert_eq!(dto.diff_child.child_int, model.child_diff.child_int);
-    assert_eq!(
-        dto.diff_child.diff_another_child_int,
-        model.child_diff.another_child_int
-    );
+    assert_eq!(dto.diff_child.diff_another_child_int, model.child_diff.another_child_int);
 }

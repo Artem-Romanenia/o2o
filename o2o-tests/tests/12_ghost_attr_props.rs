@@ -69,11 +69,7 @@ struct TupleEntityDto(
 
 #[test]
 fn named2named_basic() {
-    let named2 = Entity2 {
-        some_int: 123,
-        another_int: 321,
-        _some_float: 456.0,
-    };
+    let named2 = Entity2 { some_int: 123, another_int: 321, _some_float: 456.0 };
 
     let named: Entity = named2.into();
 
@@ -83,11 +79,7 @@ fn named2named_basic() {
 
 #[test]
 fn named2named_ref_basic() {
-    let named2 = &Entity2 {
-        some_int: 123,
-        another_int: 321,
-        _some_float: 456.0,
-    };
+    let named2 = &Entity2 { some_int: 123, another_int: 321, _some_float: 456.0 };
 
     let named: Entity = named2.into();
 
@@ -97,10 +89,7 @@ fn named2named_ref_basic() {
 
 #[test]
 fn named2named() {
-    let named = Entity {
-        some_int: 123,
-        another_int: 321,
-    };
+    let named = Entity { some_int: 123, another_int: 321 };
 
     let dto: EntityDto = named.into();
 
@@ -113,10 +102,7 @@ fn named2named() {
 
 #[test]
 fn named2named_2() {
-    let named = Entity {
-        some_int: 123,
-        another_int: 321,
-    };
+    let named = Entity { some_int: 123, another_int: 321 };
 
     let model: EntityModel = named.into();
 
@@ -161,10 +147,7 @@ fn named2named_reverse_2() {
 
 #[test]
 fn named2named_ref() {
-    let named = &Entity {
-        some_int: 123,
-        another_int: 321,
-    };
+    let named = &Entity { some_int: 123, another_int: 321 };
 
     let dto: EntityDto = named.into();
 
@@ -177,10 +160,7 @@ fn named2named_ref() {
 
 #[test]
 fn named2named_ref_2() {
-    let named = &Entity {
-        some_int: 123,
-        another_int: 321,
-    };
+    let named = &Entity { some_int: 123, another_int: 321 };
 
     let model: EntityModel = named.into();
 
@@ -317,11 +297,7 @@ fn unnamed2unnamed_reverse_ref_2() {
 
 #[test]
 fn existing_named2named_basic() {
-    let named2 = Entity2 {
-        some_int: 123,
-        another_int: 321,
-        _some_float: 456.0,
-    };
+    let named2 = Entity2 { some_int: 123, another_int: 321, _some_float: 456.0 };
 
     let mut named: Entity = Default::default();
     named2.into_existing(&mut named);
@@ -332,11 +308,7 @@ fn existing_named2named_basic() {
 
 #[test]
 fn existing_named2named_ref_basic() {
-    let named2 = &Entity2 {
-        some_int: 123,
-        another_int: 321,
-        _some_float: 456.0,
-    };
+    let named2 = &Entity2 { some_int: 123, another_int: 321, _some_float: 456.0 };
 
     let mut named: Entity = Default::default();
     named2.into_existing(&mut named);
@@ -347,10 +319,7 @@ fn existing_named2named_ref_basic() {
 
 #[test]
 fn existing_named2named() {
-    let named = Entity {
-        some_int: 123,
-        another_int: 321,
-    };
+    let named = Entity { some_int: 123, another_int: 321 };
 
     let mut model: EntityModel = Default::default();
     named.into_existing(&mut model);
@@ -364,10 +333,7 @@ fn existing_named2named() {
 
 #[test]
 fn existing_named2named_ref() {
-    let named = &Entity {
-        some_int: 123,
-        another_int: 321,
-    };
+    let named = &Entity { some_int: 123, another_int: 321 };
 
     let mut model: EntityModel = Default::default();
     named.into_existing(&mut model);

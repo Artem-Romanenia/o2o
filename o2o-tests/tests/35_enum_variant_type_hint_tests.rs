@@ -31,20 +31,8 @@ enum EnumDto {
 fn enum2enum() {
     for data in vec![
         (EnumDto::Var1, Enum::Var1),
-        (
-            EnumDto::Var2(123, "test".into()),
-            Enum::Var2 {
-                field: 123,
-                str_field: "test".into(),
-            },
-        ),
-        (
-            EnumDto::Var3 {
-                field: 123,
-                str_field: "test".into(),
-            },
-            Enum::Var3(123, "test".into()),
-        ),
+        (EnumDto::Var2(123, "test".into()), Enum::Var2 { field: 123, str_field: "test".into() }),
+        (EnumDto::Var3 { field: 123, str_field: "test".into() }, Enum::Var3(123, "test".into())),
     ] {
         let dto_ref = &data.0;
         let en: Enum = dto_ref.into();

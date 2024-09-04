@@ -20,12 +20,7 @@ struct Child {
 }
 
 #[derive(o2o)]
-#[o2o(
-    map_owned(Parent),
-    map_owned(ParentModel),
-    owned_into_existing(Parent),
-    owned_into_existing(ParentModel)
-)]
+#[o2o(map_owned(Parent), map_owned(ParentModel), owned_into_existing(Parent), owned_into_existing(ParentModel))]
 struct ParentDto {
     #[o2o(
         from_owned(Parent| @.child.into()),
@@ -52,10 +47,7 @@ struct ChildDto {
 fn named2named_different_name_and_type() {
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let p: Parent = dto.into();
@@ -66,10 +58,7 @@ fn named2named_different_name_and_type() {
 
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let model: ParentModel = dto.into();
@@ -81,13 +70,7 @@ fn named2named_different_name_and_type() {
 
 #[test]
 fn named2named_different_name_and_type_reverse() {
-    let p = Parent {
-        parent_int: 987,
-        child: Child {
-            child_int: 456,
-            another_child_int: 123,
-        },
-    };
+    let p = Parent { parent_int: 987, child: Child { child_int: 456, another_child_int: 123 } };
 
     let dto: ParentDto = p.into();
 
@@ -97,10 +80,7 @@ fn named2named_different_name_and_type_reverse() {
 
     let model = ParentModel {
         parent_int: 987,
-        child_diff: Child {
-            child_int: 456,
-            another_child_int: 123,
-        },
+        child_diff: Child { child_int: 456, another_child_int: 123 },
     };
 
     let dto: ParentDto = model.into();
@@ -114,10 +94,7 @@ fn named2named_different_name_and_type_reverse() {
 fn existing_named2named_different_name_and_type() {
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let mut p: Parent = Default::default();
@@ -129,10 +106,7 @@ fn existing_named2named_different_name_and_type() {
 
     let dto = ParentDto {
         parent_int: 987,
-        diff_child: ChildDto {
-            child_int: 456,
-            diff_another_child_int: 123,
-        },
+        diff_child: ChildDto { child_int: 456, diff_another_child_int: 123 },
     };
 
     let mut model: ParentModel = Default::default();

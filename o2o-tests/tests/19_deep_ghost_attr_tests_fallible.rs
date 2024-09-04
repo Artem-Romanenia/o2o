@@ -121,11 +121,7 @@ fn named2named() {
         number_of_doors: 2,
         vehicle: Vehicle {
             number_of_seats: 4,
-            machine: Machine {
-                id: 123,
-                brand: "Trabant".try_into().unwrap(),
-                year: 1960,
-            },
+            machine: Machine { id: 123, brand: "Trabant".try_into().unwrap(), year: 1960 },
         },
     };
 
@@ -161,11 +157,7 @@ fn named2named_ref() {
         number_of_doors: 2,
         vehicle: Vehicle {
             number_of_seats: 4,
-            machine: Machine {
-                id: 123,
-                brand: "Trabant".try_into().unwrap(),
-                year: 1960,
-            },
+            machine: Machine { id: 123, brand: "Trabant".try_into().unwrap(), year: 1960 },
         },
     };
 
@@ -236,23 +228,12 @@ fn existing_named2named_reverse() {
 #[test]
 fn named2named_2() {
     let team = Team {
-        base: Base {
-            id: 123,
-            name: "Test".try_into().unwrap(),
-        },
+        base: Base { id: 123, name: "Test".try_into().unwrap() },
         division_id: 456,
         division: Division {
-            base: Base {
-                id: 456,
-                name: "TestDivision".try_into().unwrap(),
-            },
+            base: Base { id: 456, name: "TestDivision".try_into().unwrap() },
             league_id: 789,
-            league: League {
-                base: Base {
-                    id: 789,
-                    name: "TestLeague".try_into().unwrap(),
-                },
-            },
+            league: League { base: Base { id: 789, name: "TestLeague".try_into().unwrap() } },
         },
     };
 
@@ -271,14 +252,8 @@ fn named2named_reverse_2() {
     let team_dto = TeamDto {
         id: 123,
         name: "Test".try_into().unwrap(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".try_into().unwrap(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".try_into().unwrap(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".try_into().unwrap() },
+        league: LeagueDto { id: 789, name: "TestLeague".try_into().unwrap() },
     };
 
     let team: Team = team_dto.try_into().unwrap();
@@ -296,23 +271,12 @@ fn named2named_reverse_2() {
 #[test]
 fn named2named_ref_2() {
     let team = &Team {
-        base: Base {
-            id: 123,
-            name: "Test".try_into().unwrap(),
-        },
+        base: Base { id: 123, name: "Test".try_into().unwrap() },
         division_id: 456,
         division: Division {
-            base: Base {
-                id: 456,
-                name: "TestDivision".try_into().unwrap(),
-            },
+            base: Base { id: 456, name: "TestDivision".try_into().unwrap() },
             league_id: 789,
-            league: League {
-                base: Base {
-                    id: 789,
-                    name: "TestLeague".try_into().unwrap(),
-                },
-            },
+            league: League { base: Base { id: 789, name: "TestLeague".try_into().unwrap() } },
         },
     };
 
@@ -333,14 +297,8 @@ fn named2named_ref_reverse_2() {
     let team_dto = &TeamDto {
         id: 123,
         name: "Test".try_into().unwrap(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".try_into().unwrap(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".try_into().unwrap(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".try_into().unwrap() },
+        league: LeagueDto { id: 789, name: "TestLeague".try_into().unwrap() },
     };
 
     let team: Team = team_dto.try_into().unwrap();
@@ -360,14 +318,8 @@ fn existing_named2named_2() {
     let team_dto = TeamDto {
         id: 123,
         name: "Test".try_into().unwrap(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".try_into().unwrap(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".try_into().unwrap(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".try_into().unwrap() },
+        league: LeagueDto { id: 789, name: "TestLeague".try_into().unwrap() },
     };
 
     let mut team: Team = Default::default();
@@ -388,14 +340,8 @@ fn existing_named2named_ref_2() {
     let team_dto = &TeamDto {
         id: 123,
         name: "Test".try_into().unwrap(),
-        division: DivisionDto {
-            id: 456,
-            name: "TestDivision".try_into().unwrap(),
-        },
-        league: LeagueDto {
-            id: 789,
-            name: "TestLeague".try_into().unwrap(),
-        },
+        division: DivisionDto { id: 456, name: "TestDivision".try_into().unwrap() },
+        league: LeagueDto { id: 789, name: "TestLeague".try_into().unwrap() },
     };
 
     let mut team: Team = Default::default();
