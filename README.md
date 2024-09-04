@@ -147,7 +147,11 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Tuple structs](#tuple-structs)
   - [Tuples](#tuples)
   - [Type hints](#type-hints)
+  - [From ref with lifetime](#from-ref-with-lifetime)
+  - [Ref into with lifetime](#ref-into-with-lifetime)
+  - [Lifetime both ways](#lifetime-both-ways)
   - [Generics](#generics)
+  - [Generics both ways](#generics-both-ways)
   - [Where clauses](#where-clauses)
   - [Mapping to multiple structs](#mapping-to-multiple-structs)
   - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
@@ -168,6 +172,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
     - [Fallible conversions to primitive types](#fallible-conversions-to-primitive-types)
 - [Contributions](#contributions)
 - [License](#license)
+
 
 ## Traits and `o2o` *trait instructions*
 
@@ -1443,7 +1448,7 @@ struct EntityDto{
   ```
 </details>
 
-### Reference with lifetime
+### From ref with lifetime
 
 ```rust
 use o2o::o2o;
@@ -1474,6 +1479,43 @@ pub struct EntityDto<'a, 'b> {
           EntityDto {
               some_a: value.some_a.as_str(),
               some_b: value.some_b.as_str(),
+          }
+      }
+  }
+  ```
+</details>
+
+### Ref into with lifetime
+
+```rust
+use o2o::o2o;
+
+#[derive(o2o)]
+#[ref_into(EntityDto<'a, 'b>)]
+pub struct Entity {
+    #[into(~.as_str())]
+    pub some_a: String,
+    #[into(~.as_str())]
+    pub some_b: String,
+}
+
+pub struct EntityDto<'a, 'b> {
+    pub some_a: &'a str,
+    pub some_b: &'b str,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl<'a, 'b, 'o2o> ::core::convert::Into<EntityDto<'a, 'b>> for &'o2o Entity
+  where
+      'o2o: 'a + 'b,
+  {
+      fn into(self) -> EntityDto<'a, 'b> {
+          EntityDto {
+              some_a: self.some_a.as_str(),
+              some_b: self.some_b.as_str(),
           }
       }
   }
