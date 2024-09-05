@@ -9,7 +9,7 @@ use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Brace, Comma, Paren};
-use syn::{braced, parenthesized, Attribute, Error, Ident, Member, Result, Token, WherePredicate};
+use syn::{braced, parenthesized, Attribute, Error, GenericArgument, GenericParam, Ident, Member, Result, Token, WherePredicate};
 
 use crate::ast::SynDataTypeMember;
 use crate::kw;
@@ -78,6 +78,7 @@ pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
     pub path_str: String,
+    // pub lt: Vec<GenericParam>,
     pub nameless_tuple: bool,
 }
 
@@ -87,6 +88,10 @@ impl From<syn::Path> for TypePath {
             span: value.span(),
             path: value.to_token_stream(),
             path_str: value.to_token_stream().to_string(),
+            // lt: match value.segments.last().unwrap().arguments {
+            //     syn::PathArguments::AngleBracketed(a) => a.args.iter().filter(|g| matches!(g, GenericParam::Lifetime(_))).collect(),
+            //     _ => vec![]
+            // },
             nameless_tuple: false,
         }
     }
@@ -551,7 +556,7 @@ fn parse_trait_instruction_param_inner_1<T: Parse>(input: &syn::parse::ParseBuff
         Err(syn::Error::new(span(a), format!("Instruction parameter '{}' was already set.", name)))?
     } else {
         setter();
-        return Ok(true);
+        Ok(true)
     }
 }
 
@@ -567,7 +572,7 @@ fn parse_trait_instruction_param_inner_2<T: Parse, U>(input: &syn::parse::ParseB
         Err(syn::Error::new(span(a), format!("Instruction parameter '{}' was already set.", name)))?
     } else {
         setter(content);
-        return Ok(true);
+        Ok(true)
     }
 }
 

@@ -8,11 +8,7 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse2, parse_quote,
-    punctuated::Punctuated,
-    Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime,
-    Member::{self, Named, Unnamed},
-    PathArguments, Result, Token, TypePath,
+    parse2, parse_quote, punctuated::Punctuated, token::Comma, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime, Member::{self, Named, Unnamed}, PathArguments::{self, AngleBracketed}, Result, Token, TypePath
 };
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
@@ -51,6 +47,8 @@ struct ImplContext<'a> {
     kind: Kind,
     dst_ty: &'a TokenStream,
     src_ty: &'a TokenStream,
+    // dst_lts: Option<Vec<Lifetime>>,
+    // impl_lts: Option<Vec<Lifetime>>,
     has_post_init: bool,
     impl_type: ImplType,
     fallible: bool,
@@ -85,12 +83,20 @@ fn data_type_impl(input: DataType) -> TokenStream {
         DataType::Enum(_) => ImplType::Enum,
     };
 
+    // let these_lts: Vec<Lifetime> = input.get_generics().params.iter().filter_map(|g| match g {
+    //     GenericParam::Lifetime(l) => Some(l.lifetime.clone()),
+    //     _ => None
+    // }).collect();
+    // let those_lts = vec![];
+
     let from_owned_impls = attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|struct_attr| {
         let ctx = ImplContext {
             struct_attr,
             kind: Kind::FromOwned,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
+            // dst_lts: Some(these_lts.clone()),
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -106,6 +112,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::FromOwned,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -121,6 +129,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::FromRef,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -136,6 +146,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::FromRef,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -151,6 +163,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -168,6 +182,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -185,6 +201,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -202,6 +220,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -219,6 +239,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -235,6 +257,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -251,6 +275,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -267,6 +293,8 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
+            // dst_lts: None,
+            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -911,6 +939,8 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
     let new_ctx = ImplContext {
         struct_attr: &struct_attr,
         impl_type: ImplType::Variant,
+        // dst_lts: None,
+        // impl_lts: None,
         ..*ctx
     };
 
@@ -1074,26 +1104,20 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
         // The idea is to check if all lifetimes of the dst are included in the input generics or not.
         // If not, we will add the missing ones to the input generics.
 
-        let dst_generics = match &dst_ty.path.segments.last().unwrap().arguments {
-            PathArguments::None => syn::punctuated::Punctuated::new(),
-            PathArguments::AngleBracketed(args) => args.args.clone(),
-            PathArguments::Parenthesized(_) => {
-                unimplemented!("Only Struct<T> syntax is supported")
-            }
-        };
-
-        for dst_generic in dst_generics {
-            if let GenericArgument::Lifetime(arg) = &dst_generic {
-                lifetimes.push(parse_quote!(#dst_generic));
-                if generics.params.iter().all(|param| {
-                    if let GenericParam::Lifetime(param) = param {
-                        &param.lifetime != arg
-                    } else {
-                        // Skip any other generic param
-                        false
+        if let AngleBracketed(args) = &dst_ty.path.segments.last().unwrap().arguments {
+            for dst_generic in args.args.clone() {
+                if let GenericArgument::Lifetime(arg) = &dst_generic {
+                    lifetimes.push(parse_quote!(#dst_generic));
+                    if generics.params.iter().all(|param| {
+                        if let GenericParam::Lifetime(param) = param {
+                            &param.lifetime != arg
+                        } else {
+                            // Skip any other generic param
+                            false
+                        }
+                    }) {
+                        generics_impl.params.push(parse_quote!(#dst_generic));
                     }
-                }) {
-                    generics_impl.params.push(parse_quote!(#dst_generic));
                 }
             }
         }
