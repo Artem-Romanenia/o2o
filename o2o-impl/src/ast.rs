@@ -4,7 +4,7 @@ use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
+use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, GenericParam, Generics, Ident, Index, Lifetime, Member, Result};
 
 #[derive(Default)]
 struct Context {
@@ -190,6 +190,13 @@ impl<'a> DataType<'a> {
             DataType::Struct(s) => s.generics,
             DataType::Enum(e) => e.generics,
         }
+    }
+
+    pub fn get_lifetimes(&'a self) -> Vec<Lifetime> {
+        self.get_generics().params.iter().filter_map(|g| match g {
+            GenericParam::Lifetime(l) => Some(l.lifetime.clone()),
+            _ => None
+        }).collect()
     }
 }
 

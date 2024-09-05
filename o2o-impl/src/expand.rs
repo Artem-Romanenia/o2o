@@ -1,4 +1,4 @@
-use std::{collections::HashSet, iter::Peekable, slice::Iter};
+use std::{collections::{HashMap, HashSet}, iter::Peekable, slice::Iter};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
@@ -47,8 +47,6 @@ struct ImplContext<'a> {
     kind: Kind,
     dst_ty: &'a TokenStream,
     src_ty: &'a TokenStream,
-    // dst_lts: Option<Vec<Lifetime>>,
-    // impl_lts: Option<Vec<Lifetime>>,
     has_post_init: bool,
     impl_type: ImplType,
     fallible: bool,
@@ -83,20 +81,12 @@ fn data_type_impl(input: DataType) -> TokenStream {
         DataType::Enum(_) => ImplType::Enum,
     };
 
-    // let these_lts: Vec<Lifetime> = input.get_generics().params.iter().filter_map(|g| match g {
-    //     GenericParam::Lifetime(l) => Some(l.lifetime.clone()),
-    //     _ => None
-    // }).collect();
-    // let those_lts = vec![];
-
     let from_owned_impls = attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|struct_attr| {
         let ctx = ImplContext {
             struct_attr,
             kind: Kind::FromOwned,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
-            // dst_lts: Some(these_lts.clone()),
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -112,8 +102,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::FromOwned,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -129,8 +117,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::FromRef,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -146,8 +132,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::FromRef,
             dst_ty: &ty,
             src_ty: &struct_attr.ty.path,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -163,8 +147,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -182,8 +164,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -201,8 +181,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -220,8 +198,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefInto,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -239,8 +215,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -257,8 +231,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::OwnedIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -275,8 +247,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: false,
@@ -293,8 +263,6 @@ fn data_type_impl(input: DataType) -> TokenStream {
             kind: Kind::RefIntoExisting,
             dst_ty: &struct_attr.ty.path,
             src_ty: &ty,
-            // dst_lts: None,
-            // impl_lts: None,
             has_post_init: false,
             impl_type,
             fallible: true,
@@ -939,8 +907,6 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
     let new_ctx = ImplContext {
         struct_attr: &struct_attr,
         impl_type: ImplType::Variant,
-        // dst_lts: None,
-        // impl_lts: None,
         ..*ctx
     };
 
@@ -1096,6 +1062,10 @@ struct QuoteTraitParams<'a> {
 }
 
 fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
+    let these_lts = input.get_lifetimes();
+    let those_lts = ctx.struct_attr.ty.lt.clone();
+    let mut merged_lts: Vec<Lifetime> = these_lts.iter().chain(those_lts.iter()).into_iter().map(|l| l.clone()).collect::<HashSet<_>>().into_iter().collect();
+
     let generics = input.get_generics();
     let mut generics_impl = generics.clone();
     let mut lifetimes: Vec<Lifetime> = vec![];

@@ -9,7 +9,7 @@ use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Brace, Comma, Paren};
-use syn::{braced, parenthesized, Attribute, Error, GenericArgument, GenericParam, Ident, Member, Result, Token, WherePredicate};
+use syn::{braced, parenthesized, parse2, Attribute, Error, GenericArgument, GenericParam, Ident, Lifetime, Member, Result, Token, WherePredicate};
 
 use crate::ast::SynDataTypeMember;
 use crate::kw;
@@ -78,7 +78,7 @@ pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
     pub path_str: String,
-    // pub lt: Vec<GenericParam>,
+    pub lt: Vec<Lifetime>,
     pub nameless_tuple: bool,
 }
 
@@ -88,10 +88,13 @@ impl From<syn::Path> for TypePath {
             span: value.span(),
             path: value.to_token_stream(),
             path_str: value.to_token_stream().to_string(),
-            // lt: match value.segments.last().unwrap().arguments {
-            //     syn::PathArguments::AngleBracketed(a) => a.args.iter().filter(|g| matches!(g, GenericParam::Lifetime(_))).collect(),
-            //     _ => vec![]
-            // },
+            lt: match &value.segments.last().unwrap().arguments {
+                syn::PathArguments::AngleBracketed(a) => a.args.iter().filter_map(|g| match g {
+                    GenericArgument::Lifetime(l) => Some(l.clone()),
+                    _ => None
+                }).collect(),
+                _ => vec![]
+            },
             nameless_tuple: false,
         }
     }
@@ -99,12 +102,7 @@ impl From<syn::Path> for TypePath {
 
 impl From<TokenStream> for TypePath {
     fn from(value: TokenStream) -> Self {
-        TypePath {
-            span: value.span(),
-            path_str: value.to_string(),
-            path: value,
-            nameless_tuple: true,
-        }
+        syn::parse2::<syn::Path>(value).unwrap().into()
     }
 }
 
