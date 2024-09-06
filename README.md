@@ -147,9 +147,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Tuple structs](#tuple-structs)
   - [Tuples](#tuples)
   - [Type hints](#type-hints)
-  - [From ref with lifetime](#from-ref-with-lifetime)
-  - [Ref into with lifetime](#ref-into-with-lifetime)
-  - [Lifetime both ways](#lifetime-both-ways)
+  - [Lifetimes](#lifetimes)
   - [Generics](#generics)
   - [Generics both ways](#generics-both-ways)
   - [Where clauses](#where-clauses)
@@ -1448,7 +1446,19 @@ struct EntityDto{
   ```
 </details>
 
-### From ref with lifetime
+### Lifetimes
+
+When creating reference implementations including lifetimes, such as 
+``` rust ignore
+#[from_ref(Entity)]
+pub struct EntityDto<'a, 'b> 
+```
+or 
+``` rust ignore
+#[ref_into(EntityDto<'a, 'b>)]
+pub struct Entity
+```
+a reference lifetime may need to be introduced. **o2o** is able to recognize such cases.
 
 ```rust
 use o2o::o2o;
@@ -1471,21 +1481,19 @@ pub struct EntityDto<'a, 'b> {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl<'a, 'b, 'o2o> ::core::convert::From<&'o2o Entity> for EntityDto<'a, 'b>
-  where
-      'o2o: 'a + 'b,
-  {
+  // o2o will generate additional lifetime 'o2o here
+  impl<'a, 'b, 'o2o: 'a + 'b> ::core::convert::From<&'o2o Entity> for EntityDto<'a, 'b> {
       fn from(value: &'o2o Entity) -> EntityDto<'a, 'b> {
           EntityDto {
-              some_a: value.some_a.as_str(),
-              some_b: value.some_b.as_str(),
+            some_a: value.some_a.as_str(),
+            some_b: value.some_b.as_str()
           }
       }
   }
   ```
 </details>
 
-### Ref into with lifetime
+Mirror scenario:
 
 ```rust
 use o2o::o2o;
@@ -1508,47 +1516,13 @@ pub struct EntityDto<'a, 'b> {
   <summary>View generated code</summary>
 
   ``` rust ignore
-  impl<'a, 'b, 'o2o> ::core::convert::Into<EntityDto<'a, 'b>> for &'o2o Entity
-  where
-      'o2o: 'a + 'b,
-  {
+  // o2o will generate additional lifetime 'o2o here
+  impl<'a, 'b, 'o2o: 'a + 'b> ::core::convert::Into<EntityDto<'a, 'b>> for &'o2o Entity {
       fn into(self) -> EntityDto<'a, 'b> {
           EntityDto {
-              some_a: self.some_a.as_str(),
-              some_b: self.some_b.as_str(),
+            some_a: self.some_a.as_str(),
+            some_b: self.some_b.as_str()
           }
-      }
-  }
-  ```
-</details>
-
-### Lifetime both ways
-
-```rust
-use o2o::o2o;
-
-struct Entity<'a> {
-    some_str: &'a str,
-}
-
-#[derive(o2o)]
-#[map_owned(Entity<'a>)]
-struct EntityDto<'a> {
-    some_str: &'a str,
-}
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl<'a> ::core::convert::From<Entity<'a>> for EntityDto<'a> {
-      fn from(value: Entity<'a>) -> EntityDto<'a> {
-          EntityDto { some_str: value.some_str }
-      }
-  }
-  impl<'a> ::core::convert::Into<Entity<'a>> for EntityDto<'a> {
-      fn into(self) -> Entity<'a> {
-          Entity { some_str: self.some_str }
       }
   }
   ```
