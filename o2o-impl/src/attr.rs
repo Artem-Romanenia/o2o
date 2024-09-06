@@ -78,7 +78,7 @@ pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
     pub path_str: String,
-    pub lt: Vec<Lifetime>,
+    pub generics: Option<Punctuated<GenericArgument, Token![,]>>,
     pub nameless_tuple: bool,
 }
 
@@ -88,12 +88,9 @@ impl From<syn::Path> for TypePath {
             span: value.span(),
             path: value.to_token_stream(),
             path_str: value.to_token_stream().to_string(),
-            lt: match &value.segments.last().unwrap().arguments {
-                syn::PathArguments::AngleBracketed(a) => a.args.iter().filter_map(|g| match g {
-                    GenericArgument::Lifetime(l) => Some(l.clone()),
-                    _ => None
-                }).collect(),
-                _ => vec![]
+            generics: match &value.segments.last().unwrap().arguments {
+                syn::PathArguments::AngleBracketed(a) => Some(a.args.clone()),
+                _ => None
             },
             nameless_tuple: false,
         }
@@ -102,7 +99,13 @@ impl From<syn::Path> for TypePath {
 
 impl From<TokenStream> for TypePath {
     fn from(value: TokenStream) -> Self {
-        syn::parse2::<syn::Path>(value).unwrap().into()
+        TypePath {
+            span: value.span(),
+            path_str: value.to_string(),
+            path: value,
+            generics: None,
+            nameless_tuple: true,
+        }
     }
 }
 

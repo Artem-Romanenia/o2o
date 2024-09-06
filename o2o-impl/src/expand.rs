@@ -8,7 +8,7 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse2, parse_quote, punctuated::Punctuated, token::Comma, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime, Member::{self, Named, Unnamed}, PathArguments::{self, AngleBracketed}, Result, Token, TypePath
+    parse2, parse_quote, punctuated::Punctuated, token::Comma, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime, LifetimeDef, Member::{self, Named, Unnamed}, PathArguments::{self, AngleBracketed}, Result, Token, TypePath
 };
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
@@ -1056,15 +1056,58 @@ struct QuoteTraitParams<'a> {
     pub dst: &'a TokenStream,
     pub src: &'a TokenStream,
     pub gens: TokenStream,
-    pub gens_impl: TokenStream,
+    pub impl_gens: TokenStream,
     pub where_clause: Option<TokenStream>,
     pub r: Option<TokenStream>,
 }
 
 fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
-    let these_lts = input.get_lifetimes();
-    let those_lts = ctx.struct_attr.ty.lt.clone();
-    let mut merged_lts: Vec<Lifetime> = these_lts.iter().chain(those_lts.iter()).into_iter().map(|l| l.clone()).collect::<HashSet<_>>().into_iter().collect();
+    let mut these_lts = input.get_generics().params.clone();
+    let those_lts: Vec<&Lifetime> = ctx.struct_attr.ty.generics.unwrap().iter().filter_map(|g| match g {
+        GenericArgument::Lifetime(l) => Some(l),
+        _ => None
+    }).collect();
+
+    let ref_lts = if ctx.kind.is_ref() {
+        if ctx.kind.is_from() {
+            Some(those_lts.clone())
+        } else {
+            Some(these_lts.iter().filter_map(|g| match g {
+                GenericParam::Lifetime(l) => Some(&l.lifetime.clone()),
+                _ => None
+            }).collect())
+        }
+    } else { None };
+
+    for lt in those_lts {
+        let new_lt = these_lts.iter().all(|param| {
+            if let GenericParam::Lifetime(param) = param {
+                &param.lifetime != lt
+            } else { false }
+        });
+
+        if new_lt {
+            let gen = GenericArgument::Lifetime(lt.clone());
+            these_lts.push(parse_quote!(#gen));
+        }
+    }
+
+    // QuoteTraitParams { 
+    //     attr: ctx.struct_attr.attribute.as_ref(), 
+    //     impl_attr: ctx.struct_attr.impl_attribute.as_ref(), 
+    //     inner_attr: ctx.struct_attr.inner_attribute.as_ref(), 
+    //     dst: ctx.dst_ty, 
+    //     src: ctx.src_ty, 
+    //     gens: input.get_generics().to_token_stream(), 
+    //     where_clause: input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
+    //         let where_clause = x.where_clause.to_token_stream();
+    //         quote!(where #where_clause)
+    //     }), 
+    //     r: ctx.kind.is_ref().then_some(quote!(&)) 
+    // }
+
+    // panic!("These: {}, Those: {}", these_lts.to_token_stream(), those_lts.to_token_stream());
+    // let mut merged_lts: Vec<Lifetime> = these_lts.iter().chain(those_lts.iter()).into_iter().map(|l| l.clone()).collect::<HashSet<_>>().into_iter().collect();
 
     let generics = input.get_generics();
     let mut generics_impl = generics.clone();
@@ -1136,10 +1179,10 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
 }
 
 fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
-    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, gens_impl, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, impl_gens, where_clause, r } = get_quote_trait_params(input, ctx);
     quote! {
         #impl_attr
-        impl #gens_impl ::core::convert::From<#r #src> for #dst #gens #where_clause {
+        impl #impl_gens ::core::convert::From<#r #src> for #dst #gens #where_clause {
             #attr
             fn from(value: #r #src) -> #dst #gens {
                 #inner_attr
@@ -1151,11 +1194,11 @@ fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 }
 
 fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
-    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, gens_impl, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, impl_gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
     quote! {
         #impl_attr
-        impl #gens_impl ::core::convert::TryFrom<#r #src> for #dst #gens #where_clause {
+        impl #impl_gens ::core::convert::TryFrom<#r #src> for #dst #gens #where_clause {
             type Error = #err_ty;
             #attr
             fn try_from(value: #r #src) -> Result<#dst #gens, #err_ty> {
@@ -1168,7 +1211,7 @@ fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 }
 
 fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, gens_impl, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, impl_gens, where_clause, r } = get_quote_trait_params(input, ctx);
 
     let body = match post_init {
         Some(post_init) => quote! {
@@ -1185,7 +1228,7 @@ fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 
     quote! {
         #impl_attr
-        impl #gens_impl ::core::convert::Into<#dst> for #r #src #gens #where_clause {
+        impl #impl_gens ::core::convert::Into<#dst> for #r #src #gens #where_clause {
             #attr
             fn into(self) -> #dst {
                 #inner_attr
@@ -1196,7 +1239,7 @@ fn quote_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
 }
 
 fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, gens_impl, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, impl_gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
 
     let body = match post_init {
@@ -1214,7 +1257,7 @@ fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 
     quote! {
         #impl_attr
-        impl #gens_impl ::core::convert::TryInto<#dst> for #r #src #gens #where_clause {
+        impl #impl_gens ::core::convert::TryInto<#dst> for #r #src #gens #where_clause {
             type Error = #err_ty;
             #attr
             fn try_into(self) -> Result<#dst, #err_ty> {
@@ -1226,10 +1269,10 @@ fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
 }
 
 fn quote_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, gens_impl, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, impl_gens, where_clause, r } = get_quote_trait_params(input, ctx);
     quote! {
         #impl_attr
-        impl #gens_impl o2o::traits::IntoExisting<#dst> for #r #src #gens #where_clause {
+        impl #impl_gens o2o::traits::IntoExisting<#dst> for #r #src #gens #where_clause {
             #attr
             fn into_existing(self, other: &mut #dst) {
                 #inner_attr
@@ -1242,11 +1285,11 @@ fn quote_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Opti
 }
 
 fn quote_try_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream, post_init: Option<TokenStream>) -> TokenStream {
-    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, gens_impl, where_clause, r } = get_quote_trait_params(input, ctx);
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, gens, impl_gens, where_clause, r } = get_quote_trait_params(input, ctx);
     let err_ty = &ctx.struct_attr.err_ty.as_ref().unwrap().path;
     quote! {
         #impl_attr
-        impl #gens_impl o2o::traits::TryIntoExisting<#dst> for #r #src #gens #where_clause {
+        impl #impl_gens o2o::traits::TryIntoExisting<#dst> for #r #src #gens #where_clause {
             type Error = #err_ty;
             #attr
             fn try_into_existing(self, other: &mut #dst) -> Result<(), #err_ty> {
