@@ -806,6 +806,8 @@ fn dedicated_field_instruction_mismatch(code_fragment: TokenStream, errs: Vec<&s
 
 // endregion: dedicated_field_instruction_mismatch
 
+// region: trait_instruction_defined_twice
+
 #[test_case(quote!{
     #[map(TestDto| vars(test: {123}), vars(test2: {123}))]
     struct Test;
@@ -877,6 +879,8 @@ fn trait_instruction_defined_twice(code_fragment: TokenStream, err: &str) {
 
     assert_eq!(message, err);
 }
+
+// endregion: trait_instruction_defined_twice
 
 // region: missing_children_instruction
 
@@ -1862,6 +1866,277 @@ fn item_attributes(code_fragment: TokenStream, expected_output: TokenStream) {
 }
 
 // endregion: item_attributes
+
+// region: lifetimes
+
+#[test_case(quote!{
+    #[owned_into(Entity)]
+    #[map_ref(Entity)]
+    #[into_existing(Entity)]
+    pub struct EntityDto<'a, 'b> {
+        some_int: i16,
+        #[into(~.to_string())]
+        #[from(~.as_str())]
+        pub some_str: &'a str,
+        #[into(another_str, ~.to_string())]
+        #[from(another_str, ~.as_str())]
+        #[owned_into_existing(another_str, "123".into())]
+        #[ref_into_existing(another_str, "321".into())]
+        pub different_str: &'b str,
+    }
+},
+quote!{
+    impl<'a, 'b, 'o2o: 'a + 'b> ::core::convert::From<&'o2o Entity> for EntityDto<'a, 'b> {
+        fn from(value: &'o2o Entity) -> EntityDto<'a, 'b> {
+            EntityDto {
+                some_int: value.some_int,
+                some_str: value.some_str.as_str(),
+                different_str: value.another_str.as_str(),
+            }
+        }
+    }
+    impl<'a, 'b> ::core::convert::Into<Entity> for EntityDto<'a, 'b> {
+        fn into(self) -> Entity {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str.to_string(),
+                another_str: self.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b> ::core::convert::Into<Entity> for &EntityDto<'a, 'b> {
+        fn into(self) -> Entity {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str.to_string(),
+                another_str: self.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b> o2o::traits::IntoExisting<Entity> for EntityDto<'a, 'b> {
+        fn into_existing(self, other: &mut Entity) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str.to_string();
+            other.another_str = "123".into();
+        }
+    }
+    impl<'a, 'b> o2o::traits::IntoExisting<Entity> for &EntityDto<'a, 'b> {
+        fn into_existing(self, other: &mut Entity) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str.to_string();
+            other.another_str = "321".into();
+        }
+    }
+}; "1")]
+#[test_case(quote!{
+    #[from_owned(EntityDto<'a, 'b>)]
+    #[map_ref(EntityDto<'a, 'b>)]
+    #[ref_into_existing(EntityDto<'a, 'b>)]
+    pub struct Entity {
+        some_int: i16,
+        #[into(~.as_str())]
+        #[from(~.to_string())]
+        pub some_str: String,
+        #[into(different_str, ~.as_str())]
+        #[from(different_str, ~.to_string())]
+        #[ref_into_existing(different_str, "123".into())]
+        pub another_str: String,
+    }
+},
+quote!{
+    impl<'a, 'b> ::core::convert::From<EntityDto<'a, 'b>> for Entity {
+        fn from(value: EntityDto<'a, 'b>) -> Entity {
+            Entity {
+                some_int: value.some_int,
+                some_str: value.some_str.to_string(),
+                another_str: value.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b> ::core::convert::From<&EntityDto<'a, 'b>> for Entity {
+        fn from(value: &EntityDto<'a, 'b>) -> Entity {
+            Entity {
+                some_int: value.some_int,
+                some_str: value.some_str.to_string(),
+                another_str: value.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b, 'o2o: 'a + 'b> ::core::convert::Into<EntityDto<'a, 'b>> for &'o2o Entity {
+        fn into(self) -> EntityDto<'a, 'b> {
+            EntityDto {
+                some_int: self.some_int,
+                some_str: self.some_str.as_str(),
+                different_str: self.another_str.as_str(),
+            }
+        }
+    }
+    impl<'a, 'b, 'o2o: 'a + 'b> o2o::traits::IntoExisting<EntityDto<'a, 'b>> for &'o2o Entity {
+        fn into_existing(self, other: &mut EntityDto<'a, 'b>) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str.as_str();
+            other.different_str = "123".into();
+        }
+    }
+}; "2")]
+#[test_case(quote!{
+    #[map(Entity<'a, 'b>)]
+    #[into_existing(Entity<'a, 'b>)]
+    pub struct EntityDto<'a, 'b> {
+        some_int: i16,
+        pub some_str: &'a str,
+        #[map(another_str)]
+        #[owned_into_existing(another_str, "123".into())]
+        #[ref_into_existing(another_str, "321".into())]
+        pub different_str: &'b str,
+    }
+},
+quote!{
+    impl<'a, 'b> ::core::convert::From<Entity<'a, 'b>> for EntityDto<'a, 'b> {
+        fn from(value: Entity<'a, 'b>) -> EntityDto<'a, 'b> {
+            EntityDto {
+                some_int: value.some_int,
+                some_str: value.some_str,
+                different_str: value.another_str,
+            }
+        }
+    }
+    impl<'a, 'b, 'o2o: 'a + 'b> ::core::convert::From<&'o2o Entity<'a, 'b>> for EntityDto<'a, 'b> {
+        fn from(value: &'o2o Entity<'a, 'b>) -> EntityDto<'a, 'b> {
+            EntityDto {
+                some_int: value.some_int,
+                some_str: value.some_str,
+                different_str: value.another_str,
+            }
+        }
+    }
+    impl<'a, 'b> ::core::convert::Into<Entity<'a, 'b>> for EntityDto<'a, 'b> {
+        fn into(self) -> Entity<'a, 'b> {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str,
+                another_str: self.different_str,
+            }
+        }
+    }
+    impl<'a, 'b, 'o2o: 'a + 'b> ::core::convert::Into<Entity<'a, 'b>> for &'o2o EntityDto<'a, 'b> {
+        fn into(self) -> Entity<'a, 'b> {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str,
+                another_str: self.different_str,
+            }
+        }
+    }
+    impl<'a, 'b> o2o::traits::IntoExisting<Entity<'a, 'b>> for EntityDto<'a, 'b> {
+        fn into_existing(self, other: &mut Entity<'a, 'b>) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str;
+            other.another_str = "123".into();
+        }
+    }
+    impl<'a, 'b, 'o2o: 'a + 'b> o2o::traits::IntoExisting<Entity<'a, 'b>> for &'o2o EntityDto<'a, 'b> {
+        fn into_existing(self, other: &mut Entity<'a, 'b>) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str;
+            other.another_str = "321".into();
+        }
+    }
+}; "3")]
+#[test_case(quote!{
+    #[try_map(Entity<'c, 'd>, String)]
+    #[try_into_existing(Entity<'c, 'd>, String)]
+    #[where_clause('c: 'a, 'd: 'b, 'a: 'c, 'b: 'd)]
+    pub struct EntityDto<'a, 'b> {
+        some_int: i16,
+        pub some_str: &'a str,
+        #[map(another_str)]
+        #[owned_into_existing(another_str, "123".into())]
+        #[ref_into_existing(another_str, "321".into())]
+        pub different_str: &'b str,
+    }
+},
+quote!{
+    impl<'a, 'b, 'c, 'd> ::core::convert::TryFrom<Entity<'c, 'd>> for EntityDto<'a, 'b>
+    where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
+    {
+        type Error = String;
+        fn try_from(value: Entity<'c, 'd>) -> Result<EntityDto<'a, 'b>, String> {
+            Ok(EntityDto {
+                some_int: value.some_int,
+                some_str: value.some_str,
+                different_str: value.another_str,
+            })
+        }
+    }
+    impl<'a, 'b, 'c, 'd, 'o2o: 'a + 'b> ::core::convert::TryFrom<&'o2o Entity<'c, 'd>> for EntityDto<'a, 'b>
+    where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
+    {
+        type Error = String;
+        fn try_from(value: &'o2o Entity<'c, 'd>) -> Result<EntityDto<'a, 'b>, String> {
+            Ok(EntityDto {
+                some_int: value.some_int,
+                some_str: value.some_str,
+                different_str: value.another_str,
+            })
+        }
+    }
+    impl<'a, 'b, 'c, 'd> ::core::convert::TryInto<Entity<'c, 'd>> for EntityDto<'a, 'b>
+    where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
+    {
+        type Error = String;
+        fn try_into(self) -> Result<Entity<'c, 'd>, String> {
+            Ok(Entity {
+                some_int: self.some_int,
+                some_str: self.some_str,
+                another_str: self.different_str,
+            })
+        }
+    }
+    impl<'a, 'b, 'c, 'd, 'o2o: 'c + 'd> ::core::convert::TryInto<Entity<'c, 'd>> for &'o2o EntityDto<'a, 'b>
+    where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
+    {
+        type Error = String;
+        fn try_into(self) -> Result<Entity<'c, 'd>, String> {
+            Ok(Entity {
+                some_int: self.some_int,
+                some_str: self.some_str,
+                another_str: self.different_str,
+            })
+        }
+    }
+    impl<'a, 'b, 'c, 'd> o2o::traits::TryIntoExisting<Entity<'c, 'd>> for EntityDto<'a, 'b>
+    where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
+    {
+        type Error = String;
+        fn try_into_existing(self, other: &mut Entity<'c, 'd>) -> Result<(), String> {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str;
+            other.another_str = "123".into();
+            Ok(())
+        }
+    }
+    impl<'a, 'b, 'c, 'd, 'o2o: 'c + 'd> o2o::traits::TryIntoExisting<Entity<'c, 'd>> for &'o2o EntityDto<'a, 'b>
+    where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
+    {
+        type Error = String;
+        fn try_into_existing(self, other: &mut Entity<'c, 'd>) -> Result<(), String> {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str;
+            other.another_str = "321".into();
+            Ok(())
+        }
+    }
+}; "4")]
+fn lifetimes(code_fragment: TokenStream, expected_output: TokenStream) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    assert!(output.is_ok());
+    assert_eq!(output.unwrap().to_string().trim().replace(" ", ""), expected_output.to_string().trim().replace(" ", ""));
+}
+
+// endregion: lifetimes
 
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());

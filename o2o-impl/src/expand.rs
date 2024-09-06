@@ -1078,9 +1078,9 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
         _ => None
     }).collect()).unwrap_or_default();
 
-    let ref_lts = if ctx.kind.is_ref() {
+    let ref_lts = ctx.kind.is_ref().then_some(
         if ctx.kind.is_from() { this_side_lts } else { other_side_lts.clone() }
-    } else { vec![] };
+    ).unwrap_or_default();
 
     for lt in other_side_lts {
         let missing_lt = impl_gens.params.iter().all(|param| {
