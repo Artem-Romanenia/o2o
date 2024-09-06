@@ -182,7 +182,7 @@ fn tuple2unit_no_ghost() {
     #[derive(o2o::o2o)]
     #[into(A as Unit)]
     #[into_existing(A as Unit)]
-    struct B(i32);
+    struct B(#[allow(dead_code)] i32);
 
     let b = B(111);
     let a: A = b.into();
@@ -226,7 +226,7 @@ fn unit2tuple_no_ghost() {
     #[from(B)]
     struct A;
 
-    struct B(i32);
+    struct B(#[allow(dead_code)] i32);
 
     let b = B(111);
     let a: A = b.into();

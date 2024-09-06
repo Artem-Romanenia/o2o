@@ -182,7 +182,7 @@ fn tuple2unit_no_ghost() {
     #[derive(o2o::o2o)]
     #[try_into(A as Unit, String)]
     #[try_into_existing(A as Unit, String)]
-    struct B(i32);
+    struct B(#[allow(dead_code)] i32);
 
     let b = B(111);
     let a: A = b.try_into().unwrap();
@@ -226,7 +226,7 @@ fn unit2tuple_no_ghost() {
     #[try_from(B, String)]
     struct A;
 
-    struct B(i32);
+    struct B(#[allow(dead_code)] i32);
 
     let b = B(111);
     let a: A = b.try_into().unwrap();
