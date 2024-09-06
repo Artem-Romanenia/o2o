@@ -9,7 +9,7 @@ use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Brace, Comma, Paren};
-use syn::{braced, parenthesized, parse2, Attribute, Error, GenericArgument, GenericParam, Ident, Lifetime, Member, Result, Token, WherePredicate};
+use syn::{braced, parenthesized, Attribute, Error, GenericArgument, Ident, Member, Result, Token, WherePredicate};
 
 use crate::ast::SynDataTypeMember;
 use crate::kw;

@@ -12,14 +12,15 @@ use std::io::Write;
 #[test]
 fn debuger() {
     let code_fragment = quote!{
-        #[from_ref(Entity<'c, 'd>)]
-        pub struct EntityDto<'a, T, 'b> {
-            some_int: i16,
-            #[from(~.as_str())]
-            pub some_str: &'a str,
-            #[from(another_str, ~.as_str())]
-            pub different_str: &'b str,
-        }
+        #[derive(o2o::o2o)]
+    #[from_ref(Entity)]
+    pub struct EntityDto<'a, 'b> {
+        some_int: i16,
+        #[from(~.as_str())]
+        pub some_str: &'a str,
+        #[from(another_str, ~.as_str())]
+        pub different_str: &'b str,
+    }
     };
 
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();

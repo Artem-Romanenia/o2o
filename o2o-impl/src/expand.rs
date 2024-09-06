@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, iter::Peekable, slice::Iter};
+use std::{collections::HashSet, iter::Peekable, slice::Iter};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
@@ -8,7 +8,7 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse2, parse_quote, punctuated::Punctuated, token::Comma, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime, LifetimeDef, Member::{self, Named, Unnamed}, PathArguments::{self, AngleBracketed}, Result, Token, TypePath
+    parse2, parse_quote, punctuated::Punctuated, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime, Member::{self, Named, Unnamed}, PathArguments, Result, Token, TypePath
 };
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
@@ -1063,21 +1063,21 @@ struct QuoteTraitParams<'a> {
 
 fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
     let mut these_lts = input.get_generics().params.clone();
-    let those_lts: Vec<&Lifetime> = ctx.struct_attr.ty.generics.unwrap().iter().filter_map(|g| match g {
+    let those_lts: Vec<&Lifetime> = ctx.struct_attr.ty.generics.as_ref().map(|g| g.iter().filter_map(|g| match g {
         GenericArgument::Lifetime(l) => Some(l),
         _ => None
-    }).collect();
+    }).collect()).unwrap_or_default();
 
     let ref_lts = if ctx.kind.is_ref() {
         if ctx.kind.is_from() {
-            Some(those_lts.clone())
-        } else {
-            Some(these_lts.iter().filter_map(|g| match g {
-                GenericParam::Lifetime(l) => Some(&l.lifetime.clone()),
+            input.get_generics().params.iter().filter_map(|g| match g {
+                GenericParam::Lifetime(l) => Some(&l.lifetime),
                 _ => None
-            }).collect())
+            }).collect()
+        } else {
+            those_lts.clone()
         }
-    } else { None };
+    } else { vec![] };
 
     for lt in those_lts {
         let new_lt = these_lts.iter().all(|param| {
@@ -1092,89 +1092,23 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
         }
     }
 
-    // QuoteTraitParams { 
-    //     attr: ctx.struct_attr.attribute.as_ref(), 
-    //     impl_attr: ctx.struct_attr.impl_attribute.as_ref(), 
-    //     inner_attr: ctx.struct_attr.inner_attribute.as_ref(), 
-    //     dst: ctx.dst_ty, 
-    //     src: ctx.src_ty, 
-    //     gens: input.get_generics().to_token_stream(), 
-    //     where_clause: input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
-    //         let where_clause = x.where_clause.to_token_stream();
-    //         quote!(where #where_clause)
-    //     }), 
-    //     r: ctx.kind.is_ref().then_some(quote!(&)) 
-    // }
-
-    // panic!("These: {}, Those: {}", these_lts.to_token_stream(), those_lts.to_token_stream());
-    // let mut merged_lts: Vec<Lifetime> = these_lts.iter().chain(those_lts.iter()).into_iter().map(|l| l.clone()).collect::<HashSet<_>>().into_iter().collect();
-
-    let generics = input.get_generics();
-    let mut generics_impl = generics.clone();
-    let mut lifetimes: Vec<Lifetime> = vec![];
-
-    if let Ok(dst_ty) = parse2::<syn::TypePath>(ctx.dst_ty.clone()) {
-        // The idea is to check if all lifetimes of the dst are included in the input generics or not.
-        // If not, we will add the missing ones to the input generics.
-
-        if let AngleBracketed(args) = &dst_ty.path.segments.last().unwrap().arguments {
-            for dst_generic in args.args.clone() {
-                if let GenericArgument::Lifetime(arg) = &dst_generic {
-                    lifetimes.push(parse_quote!(#dst_generic));
-                    if generics.params.iter().all(|param| {
-                        if let GenericParam::Lifetime(param) = param {
-                            &param.lifetime != arg
-                        } else {
-                            // Skip any other generic param
-                            false
-                        }
-                    }) {
-                        generics_impl.params.push(parse_quote!(#dst_generic));
-                    }
-                }
-            }
-        }
+    if !ref_lts.is_empty() {
+        these_lts.push(parse_quote!('o2o: #( #ref_lts )+*));
     }
 
-    // If there is at least one lifetime in generics, we add a new lifetime `'o2o` and add a bound `'o2o: 'a + 'b`.
-    let (gens_impl, where_clause, r) = if ctx.kind.is_ref() {
-        // If lifetime is empty, we assume that lifetime generics come from the other structure (src <-> dst).
-        let lifetimes: Vec<_> = if lifetimes.is_empty() { generics.lifetimes().map(|params| params.lifetime.clone()).collect() } else { lifetimes };
-
-        let mut where_clause = input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| x.where_clause.clone());
-
-        let r = if !lifetimes.is_empty() {
-            generics_impl.params.push(parse_quote!('o2o));
-            let mut where_clause_punctuated = where_clause.unwrap_or_default();
-            where_clause_punctuated.push(parse_quote!('o2o: #( #lifetimes )+*));
-            where_clause = Some(where_clause_punctuated);
-            Some(quote!(&'o2o))
-        } else {
-            Some(quote!(&))
-        };
-
-        (generics_impl.to_token_stream(), where_clause.map(|where_clause| quote!(where #where_clause)), r)
-    } else {
-        (
-            input.get_generics().to_token_stream(),
-            input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
-                let where_clause = x.where_clause.to_token_stream();
-                quote!(where #where_clause)
-            }),
-            ctx.kind.is_ref().then_some(quote!(&)),
-        )
-    };
-
-    QuoteTraitParams {
-        attr: ctx.struct_attr.attribute.as_ref(),
-        impl_attr: ctx.struct_attr.impl_attribute.as_ref(),
-        inner_attr: ctx.struct_attr.inner_attribute.as_ref(),
-        dst: ctx.dst_ty,
-        src: ctx.src_ty,
-        gens: generics.to_token_stream(),
-        gens_impl,
-        where_clause,
-        r,
+    QuoteTraitParams { 
+        attr: ctx.struct_attr.attribute.as_ref(), 
+        impl_attr: ctx.struct_attr.impl_attribute.as_ref(), 
+        inner_attr: ctx.struct_attr.inner_attribute.as_ref(), 
+        dst: ctx.dst_ty, 
+        src: ctx.src_ty, 
+        gens: input.get_generics().to_token_stream(),
+        impl_gens: if these_lts.is_empty() { TokenStream::new() } else { quote!(<#these_lts>) }, 
+        where_clause: input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
+            let where_clause = x.where_clause.to_token_stream();
+            quote!(where #where_clause)
+        }), 
+        r: ctx.kind.is_ref().then_some(if ref_lts.is_empty() { quote!(&) } else { quote!(&'o2o) }) 
     }
 }
 
