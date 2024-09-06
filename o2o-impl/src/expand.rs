@@ -1066,38 +1066,37 @@ struct QuoteTraitParams<'a> {
 }
 
 fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTraitParams<'a> {
-    let mut these_lts = input.get_generics().params.clone();
-    let those_lts: Vec<&Lifetime> = ctx.struct_attr.ty.generics.as_ref().map(|g| g.iter().filter_map(|g| match g {
+    let mut impl_gens = input.get_generics().clone();
+
+    let this_side_lts: Vec<&Lifetime> = input.get_generics().params.iter().filter_map(|g| match g {
+        GenericParam::Lifetime(l) => Some(&l.lifetime),
+        _ => None
+    }).collect();
+
+    let other_side_lts: Vec<&Lifetime> = ctx.struct_attr.ty.generics.as_ref().map(|g| g.iter().filter_map(|g| match g {
         GenericArgument::Lifetime(l) => Some(l),
         _ => None
     }).collect()).unwrap_or_default();
 
     let ref_lts = if ctx.kind.is_ref() {
-        if ctx.kind.is_from() {
-            input.get_generics().params.iter().filter_map(|g| match g {
-                GenericParam::Lifetime(l) => Some(&l.lifetime),
-                _ => None
-            }).collect()
-        } else {
-            those_lts.clone()
-        }
+        if ctx.kind.is_from() { this_side_lts } else { other_side_lts.clone() }
     } else { vec![] };
 
-    for lt in those_lts {
-        let new_lt = these_lts.iter().all(|param| {
+    for lt in other_side_lts {
+        let missing_lt = impl_gens.params.iter().all(|param| {
             if let GenericParam::Lifetime(param) = param {
                 &param.lifetime != lt
             } else { false }
         });
 
-        if new_lt {
+        if missing_lt {
             let gen = GenericArgument::Lifetime(lt.clone());
-            these_lts.push(parse_quote!(#gen));
+            impl_gens.params.push(parse_quote!(#gen));
         }
     }
 
     if !ref_lts.is_empty() {
-        these_lts.push(parse_quote!('o2o: #( #ref_lts )+*));
+        impl_gens.params.push(parse_quote!('o2o: #( #ref_lts )+*));
     }
 
     QuoteTraitParams { 
@@ -1107,9 +1106,9 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
         dst: ctx.dst_ty, 
         src: ctx.src_ty, 
         gens: input.get_generics().to_token_stream(),
-        impl_gens: if these_lts.is_empty() { TokenStream::new() } else { quote!(<#these_lts>) }, 
+        impl_gens: impl_gens.to_token_stream(), 
         where_clause: input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
-            let where_clause = x.where_clause.to_token_stream();
+            let where_clause = &x.where_clause;
             quote!(where #where_clause)
         }), 
         r: ctx.kind.is_ref().then_some(if ref_lts.is_empty() { quote!(&) } else { quote!(&'o2o) }) 
