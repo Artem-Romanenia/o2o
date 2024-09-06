@@ -8,37 +8,28 @@ use test_case::test_case;
 
 // region: Debuger
 
-use std::io::Write;
-#[test]
-fn debuger() {
-    let code_fragment = quote!{
-        #[derive(o2o::o2o)]
-    #[from_ref(Entity)]
-    pub struct EntityDto<'a, 'b> {
-        some_int: i16,
-        #[from(~.as_str())]
-        pub some_str: &'a str,
-        #[from(another_str, ~.as_str())]
-        pub different_str: &'b str,
-    }
-    };
+// use std::io::Write;
+// #[test]
+// fn debuger() {
+//     let code_fragment = quote!{
+//     };
 
-    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
-    let output = derive(&input);
+//     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+//     let output = derive(&input);
 
-    match output {
-        Ok(output) => {
-            let text = output.to_string();
-            _ = std::io::stdout().write_all(format!("\nOutput:\n\n{}\n\n", text).as_ref());
-        },
-        Err(err) => {
-            let mut err_iter = err.into_iter();
-            let error = err_iter.next();
-            let message = error.expect("One error expected").to_string();
-            _ = std::io::stdout().write_all(format!("\nError:\n\n{}\n\n", message).as_ref());
-        }
-    }
-}
+//     match output {
+//         Ok(output) => {
+//             let text = output.to_string();
+//             _ = std::io::stdout().write_all(format!("\nOutput:\n\n{}\n\n", text).as_ref());
+//         },
+//         Err(err) => {
+//             let mut err_iter = err.into_iter();
+//             let error = err_iter.next();
+//             let message = error.expect("One error expected").to_string();
+//             _ = std::io::stdout().write_all(format!("\nError:\n\n{}\n\n", message).as_ref());
+//         }
+//     }
+// }
 
 // endregion: Debuger
 

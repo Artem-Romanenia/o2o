@@ -8,7 +8,11 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse2, parse_quote, punctuated::Punctuated, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime, Member::{self, Named, Unnamed}, PathArguments, Result, Token, TypePath
+    parse2, parse_quote,
+    punctuated::Punctuated,
+    Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime,
+    Member::{self, Named, Unnamed},
+    PathArguments, Result, Token, TypePath,
 };
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {

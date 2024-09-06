@@ -8,7 +8,7 @@ fn from_ref() {
         pub some_str: String,
         pub another_str: String,
     }
-    
+
     #[derive(o2o::o2o)]
     #[owned_try_into(Entity, String)]
     #[try_map_ref(Entity, String)]
@@ -25,11 +25,7 @@ fn from_ref() {
         pub different_str: &'b str,
     }
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -37,11 +33,7 @@ fn from_ref() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let entity = &Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = &Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -49,11 +41,7 @@ fn from_ref() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -61,11 +49,7 @@ fn from_ref() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -74,11 +58,7 @@ fn from_ref() {
     assert_eq!("A", entity.some_str);
     assert_eq!("123", entity.another_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -112,11 +92,7 @@ fn ref_into() {
         pub different_str: &'b str,
     }
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -124,11 +100,7 @@ fn ref_into() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let entity = &Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = &Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -136,11 +108,7 @@ fn ref_into() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -148,11 +116,7 @@ fn ref_into() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let entity = Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let mut dto: EntityDto = Default::default();
     entity.try_into_existing(&mut dto).unwrap();
@@ -161,11 +125,7 @@ fn ref_into() {
     assert_eq!("A", dto.some_str);
     assert_eq!("123", dto.different_str);
 
-    let entity = &Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = &Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let mut dto: EntityDto = Default::default();
     entity.try_into_existing(&mut dto).unwrap();
@@ -196,11 +156,7 @@ fn lt2lt() {
         pub different_str: &'b str,
     }
 
-    let entity = Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -208,11 +164,7 @@ fn lt2lt() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -220,11 +172,7 @@ fn lt2lt() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let entity = &Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = &Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -232,11 +180,7 @@ fn lt2lt() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -244,11 +188,7 @@ fn lt2lt() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -257,11 +197,7 @@ fn lt2lt() {
     assert_eq!("A", entity.some_str);
     assert_eq!("123", entity.another_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -293,11 +229,7 @@ fn lt2lt_2() {
         pub different_str: &'b str,
     }
 
-    let entity = Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -305,11 +237,7 @@ fn lt2lt_2() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -317,11 +245,7 @@ fn lt2lt_2() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let entity = &Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = &Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -329,11 +253,7 @@ fn lt2lt_2() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -341,11 +261,7 @@ fn lt2lt_2() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -354,11 +270,7 @@ fn lt2lt_2() {
     assert_eq!("A", entity.some_str);
     assert_eq!("123", entity.another_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -400,11 +312,7 @@ fn lt2lt_3() {
         pub different_str: &'b str,
     }
 
-    let entity = Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -412,11 +320,7 @@ fn lt2lt_3() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -424,11 +328,7 @@ fn lt2lt_3() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let entity = &Entity {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let entity = &Entity { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = entity.try_into().unwrap();
 
@@ -436,11 +336,7 @@ fn lt2lt_3() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let entity: Entity = dto.try_into().unwrap();
 
@@ -448,11 +344,7 @@ fn lt2lt_3() {
     assert_eq!("A", entity.some_str);
     assert_eq!("B", entity.another_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -461,11 +353,7 @@ fn lt2lt_3() {
     assert_eq!("A", entity.some_str);
     assert_eq!("123", entity.another_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut entity: Entity = Default::default();
     dto.try_into_existing(&mut entity).unwrap();
@@ -474,11 +362,7 @@ fn lt2lt_3() {
     assert_eq!("A", entity.some_str);
     assert_eq!("321", entity.another_str);
 
-    let model = EntityModel {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let model = EntityModel { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = model.try_into().unwrap();
 
@@ -486,11 +370,7 @@ fn lt2lt_3() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let model: EntityModel = dto.try_into().unwrap();
 
@@ -498,11 +378,7 @@ fn lt2lt_3() {
     assert_eq!("A", model.some_str);
     assert_eq!("B", model.another_str);
 
-    let model = &EntityModel {
-        some_int: 123,
-        some_str: "A".into(),
-        another_str: "B".into()
-    };
+    let model = &EntityModel { some_int: 123, some_str: "A".into(), another_str: "B".into() };
 
     let dto: EntityDto = model.try_into().unwrap();
 
@@ -510,11 +386,7 @@ fn lt2lt_3() {
     assert_eq!("A", dto.some_str);
     assert_eq!("B", dto.different_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let model: EntityModel = dto.try_into().unwrap();
 
@@ -522,11 +394,7 @@ fn lt2lt_3() {
     assert_eq!("A", model.some_str);
     assert_eq!("B", model.another_str);
 
-    let dto = EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut model: EntityModel = Default::default();
     dto.try_into_existing(&mut model).unwrap();
@@ -535,11 +403,7 @@ fn lt2lt_3() {
     assert_eq!("A", model.some_str);
     assert_eq!("123", model.another_str);
 
-    let dto = &EntityDto {
-        some_int: 123,
-        some_str: "A",
-        different_str: "B"
-    };
+    let dto = &EntityDto { some_int: 123, some_str: "A", different_str: "B" };
 
     let mut model: EntityModel = Default::default();
     dto.try_into_existing(&mut model).unwrap();
