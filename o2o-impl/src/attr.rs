@@ -9,7 +9,7 @@ use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Brace, Comma, Paren};
-use syn::{braced, parenthesized, Attribute, Error, GenericArgument, Ident, Member, Result, Token, WherePredicate};
+use syn::{braced, parenthesized, AngleBracketedGenericArguments, Attribute, Error, Ident, Member, PathArguments, Result, Token, WherePredicate};
 
 use crate::ast::SynDataTypeMember;
 use crate::kw;
@@ -78,20 +78,25 @@ pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
     pub path_str: String,
-    pub generics: Option<Punctuated<GenericArgument, Token![,]>>,
+    pub generics: Option<AngleBracketedGenericArguments>,
     pub nameless_tuple: bool,
 }
 
 impl From<syn::Path> for TypePath {
     fn from(value: syn::Path) -> Self {
+        let (path, generics) = if let PathArguments::AngleBracketed(g) = &value.segments.last().unwrap().arguments {
+            let mut cl = value.clone();
+            cl.segments.last_mut().unwrap().arguments = PathArguments::None;
+            (cl.to_token_stream(), Some(g.clone()))
+        } else {
+            (value.to_token_stream(), None)
+        };
+
         TypePath {
             span: value.span(),
-            path: value.to_token_stream(),
+            path,
             path_str: value.to_token_stream().to_string(),
-            generics: match &value.segments.last().unwrap().arguments {
-                syn::PathArguments::AngleBracketed(a) => Some(a.args.clone()),
-                _ => None
-            },
+            generics,
             nameless_tuple: false,
         }
     }
