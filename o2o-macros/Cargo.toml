@@ -1,6 +1,6 @@
 [package]
 name = "o2o-macros"
-version = "0.4.9"
+version = "0.4.10"
 edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 description = "Macro definitions of 'o2o' crate"
@@ -11,5 +11,5 @@ repository = "https://github.com/Artem-Romanenia/o2o"
 proc-macro = true
 
 [dependencies]
-o2o-impl = { version = "0.4.9", path = "../o2o-impl" }
+o2o-impl = { version = "0.4.10", path = "../o2o-impl" }
 syn = "1.0.3"
