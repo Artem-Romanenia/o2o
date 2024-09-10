@@ -149,7 +149,6 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Type hints](#type-hints)
   - [Lifetimes](#lifetimes)
   - [Generics](#generics)
-  - [Generics both ways](#generics-both-ways)
   - [Where clauses](#where-clauses)
   - [Mapping to multiple structs](#mapping-to-multiple-structs)
   - [Avoiding proc macro attribute name collisions (alternative instruction syntax)](#avoiding-proc-macro-attribute-name-collisions-alternative-instruction-syntax)
@@ -1561,42 +1560,6 @@ struct EntityDto {
       fn into(self) -> Entity<f32> {
           Entity::<f32> {
               some_int: self.some_int,
-              something: self.something,
-          }
-      }
-  }
-  ```
-</details>
-
-### Generics both ways
-
-```rust
-use o2o::o2o;
-
-struct Entity<T> {
-    something: T,
-}
-
-#[derive(o2o)]
-#[map_owned(Entity<T>)]
-struct EntityDto<T> {
-    something: T,
-}
-```
-<details>
-  <summary>View generated code</summary>
-
-  ``` rust ignore
-  impl<T> ::core::convert::From<Entity<T>> for EntityDto<T> {
-      fn from(value: Entity<T>) -> EntityDto<T> {
-          EntityDto {
-              something: value.something,
-          }
-      }
-  }
-  impl<T> ::core::convert::Into<Entity<T>> for EntityDto<T> {
-      fn into(self) -> Entity<T> {
-          Entity {
               something: self.something,
           }
       }

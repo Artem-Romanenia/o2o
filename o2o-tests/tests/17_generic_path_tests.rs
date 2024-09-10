@@ -22,32 +22,32 @@ struct Child<T> {
 #[derive(o2o)]
 #[o2o(
     map(Parent::<i32>),
-    map(ParentModel::<i32>),
+    map(ParentModel<i32>),
     into_existing(Parent::<i32>),
-    into_existing(ParentModel::<i32>),
+    into_existing(ParentModel<i32>),
 )]
 struct ParentDto {
     parent_int: i32,
     #[o2o(
         from(Parent::<i32>| (&@.child).into()),
         into(Parent::<i32>| child, (&@.diff_child).into()),
-        from(ParentModel::<i32>| (&@.child_diff).into()),
-        into(ParentModel::<i32>| child_diff, (&@.diff_child).into()),
+        from(ParentModel<i32>| (&@.child_diff).into()),
+        into(ParentModel<i32>| child_diff, (&@.diff_child).into()),
     )]
     diff_child: ChildDto,
 }
 
 #[derive(o2o)]
 #[map(Child::<i32>)]
-#[map(Child::<i16>)]
+#[map(Child<i16>)]
 struct ChildDto {
     #[o2o(from(Child::<i32>| @.child_int as i16))]
     #[o2o(into(Child::<i32>| @.child_int as i32))]
     child_int: i16,
     #[from(Child::<i32>| @.another_child_int as i8)]
     #[into(Child::<i32>| another_child_int, @.diff_another_child_int as i32)]
-    #[from(Child::<i16>| @.another_child_int as i8)]
-    #[into(Child::<i16>| another_child_int, @.diff_another_child_int as i16)]
+    #[from(Child<i16>| @.another_child_int as i8)]
+    #[into(Child<i16>| another_child_int, @.diff_another_child_int as i16)]
     diff_another_child_int: i8,
 }
 
