@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
-use std::ops::Index;
+use std::ops::{Index, Not};
 
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
@@ -365,6 +365,17 @@ impl<'a> MemberAttrs {
 
     pub(crate) fn has_parent_attr(&'a self, container_ty: &TypePath) -> bool {
         self.parent_attrs.iter().any(|x| x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty)
+    }
+
+    pub(crate) fn has_parameterless_parent_attr(&'a self, container_ty: &TypePath) -> bool {
+        self.parent_attrs.iter().any(|x| x.child_fields.is_none() && (x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty))
+    }
+
+    pub(crate) fn parameterized_parent_attr(&'a self, container_ty: &TypePath) -> Option<&Punctuated<ParentChildField, Comma>> {
+        self.parent_attrs.iter()
+            .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty && x.child_fields.is_some())
+            .or_else(|| self.parent_attrs.iter().find(|x| x.container_ty.is_none() && x.child_fields.is_some()))
+            .map(|x| x.child_fields.as_ref().unwrap())
     }
 
     pub(crate) fn field_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&MemberAttr> {
@@ -805,14 +816,53 @@ impl Parse for MemberAttrCore {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone)] // TODO: Is there a reason to ever #[repeat] parent instr?
 pub(crate) struct ParentAttr {
     pub container_ty: Option<TypePath>,
+    pub child_fields: Option<Punctuated<ParentChildField, Comma>>,
 }
 
 impl Parse for ParentAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(ParentAttr { container_ty: try_parse_container_ident(input, true) })
+        let container_ty = try_parse_container_ident(input, true);
+        let child_fields = input.is_empty().not().then(|| Punctuated::parse_separated_nonempty(&input)).transpose()?;
+
+        Ok(ParentAttr { container_ty, child_fields })
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct ParentChildField {
+    pub this_member: Member,
+    pub that_member: Option<Member>,
+    pub action: Option<TokenStream>,
+}
+
+impl Parse for ParentChildField {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let this_member = input.parse()?;
+
+        let (that_member, action) = if input.peek(Token![:]) {
+            input.parse::<Token![:]>()?;
+            if input.peek(Paren) {
+                let content;
+                parenthesized!(content in input);
+                let m = content.parse::<Member>()?;
+                content.parse::<Token![,]>()?;
+                let a = content.parse()?;
+                (Some(m), Some(a))
+            } else if input.peek(Brace) {
+                let content;
+                braced!(content in input);
+                (None, Some(content.parse()?))
+            } else {
+                (Some(input.parse()?), None)
+            }
+        } else {
+            (None, None)
+        };
+
+        Ok(ParentChildField { this_member, that_member, action })
     }
 }
 
@@ -840,6 +890,7 @@ impl Parse for FieldGhostAttrCore {
 pub(crate) enum ApplicableAttr<'a> {
     Field(&'a MemberAttrCore),
     Ghost(&'a FieldGhostAttrCore),
+    ParentChildField(&'a ParentChildField),
 }
 
 #[derive(Clone)]

@@ -2,7 +2,7 @@ use std::{collections::HashSet, iter::Peekable, slice::Iter};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
-    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, InitData, Kind, TraitAttrCore, TypeHint},
+    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, InitData, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
     validate::validate,
 };
 use proc_macro2::{Span, TokenStream};
@@ -57,6 +57,7 @@ struct ImplContext<'a> {
 enum FieldData<'a> {
     Field(&'a Field),
     GhostData(&'a GhostData),
+    ParentChildField(&'a Field, &'a ParentChildField),
 }
 
 enum VariantData<'a> {
@@ -384,7 +385,7 @@ fn struct_init_block<'a>(input: &'a Struct, ctx: &ImplContext) -> TokenStream {
             let path = x.attrs.child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or("");
             unique_paths.insert(path);
             make_tuple(path, FieldData::Field(x))
-        }).collect::<Vec<(usize, &str, FieldData)>>());
+        }));
 
     fields.extend(input.attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
@@ -393,6 +394,11 @@ fn struct_init_block<'a>(input: &'a Struct, ctx: &ImplContext) -> TokenStream {
             let path: &str = x.get_child_path_str(None);
             make_tuple(path, FieldData::GhostData(x))
         }));
+
+    fields.extend(input.fields.iter()
+        .filter_map(|f| f.attrs.parameterized_parent_attr(&ctx.struct_attr.ty).map(|a| (f, a)))
+        .flat_map(|(f, a)| a.iter().map(move |p| (f,p)))
+        .map(|(f, p)| make_tuple("", FieldData::ParentChildField(f, p))));
 
     fields.sort_by(|(ga, a, _), (gb, b, _)| ga.cmp(gb).then(a.cmp(b)));
 
@@ -442,19 +448,25 @@ fn struct_init_block_inner(
                 }
 
                 let fragment = match attrs.child(&ctx.struct_attr.ty) {
-                    Some(child_attr) => render_child_fragment(&child_attr.child_path, members, input, ctx, field_ctx, type_hint, || render_struct_line(f, ctx, type_hint, idx)),
+                    Some(child_attr) => render_child_fragment(&child_attr.child_path, members, input, ctx, field_ctx, type_hint, || render_struct_line(f, ctx, type_hint, idx, None)),
                     None => {
                         members.next();
-                        render_struct_line(f, ctx, type_hint, idx)
+                        render_struct_line(f, ctx, type_hint, idx, None)
                     }
                 };
                 fragments.push(fragment);
                 idx += 1;
             },
-            FieldData::GhostData(ghost_data) => {
-                let child_path = &ghost_data.child_path.as_ref().unwrap();
+            FieldData::GhostData(g) => {
+                let child_path = &g.child_path.as_ref().unwrap();
                 let fragment = render_child_fragment(child_path, members, input, ctx, field_ctx, type_hint, TokenStream::new);
                 fragments.push(fragment);
+                idx += 1;
+            },
+            FieldData::ParentChildField(f, p) => {
+                let fragment = render_struct_line(f, ctx, type_hint, idx, Some(p));
+                fragments.push(fragment);
+                members.next();
                 idx += 1;
             }
         }
@@ -655,7 +667,7 @@ fn struct_post_init(input: &DataType, ctx: &ImplContext) -> Option<TokenStream> 
     let mut fragments: Vec<TokenStream> = vec![];
 
     input.get_members().iter().for_each(|f| {
-        if !ctx.kind.is_from() && f.get_attrs().has_parent_attr(&ctx.struct_attr.ty) {
+        if !ctx.kind.is_from() && f.get_attrs().has_parameterless_parent_attr(&ctx.struct_attr.ty) {
             match f {
                 DataTypeMember::Field(f) => fragments.push(render_parent(f, ctx)),
                 DataTypeMember::Variant(_) => todo!(),
@@ -723,12 +735,14 @@ fn render_existing_child(
 
 fn render_struct_line(
     f: &Field,
-    ctx: &ImplContext, 
-    hint: TypeHint, 
-    idx: usize
+    ctx: &ImplContext,
+    hint: TypeHint,
+    idx: usize,
+    parent_child: Option<&ParentChildField>
 ) -> TokenStream
 {
-    let attr = f.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
+    let attr = parent_child.map(|p| ApplicableAttr::ParentChildField(p))
+        .or_else(|| f.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty));
     let get_field_path = |x: &Member| match f.attrs.child(&ctx.struct_attr.ty) {
         Some(child_attr) => {
             let ch = child_attr.child_path.child_path.to_token_stream();
@@ -1236,7 +1250,8 @@ fn quote_try_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: 
 impl<'a> ApplicableAttr<'a> {
     fn get_ident(&self) -> &'a Member {
         match self {
-            ApplicableAttr::Field(field_attr) => match &field_attr.member {
+            ApplicableAttr::Field(MemberAttrCore { member, .. }) |
+            ApplicableAttr::ParentChildField(ParentChildField { that_member: member, .. }) => match member {
                 Some(val) => val,
                 None => unreachable!("8"),
             },
@@ -1248,22 +1263,26 @@ impl<'a> ApplicableAttr<'a> {
         match self {
             ApplicableAttr::Field(f) => f.action.is_some(),
             ApplicableAttr::Ghost(g) => g.action.is_some(),
+            ApplicableAttr::ParentChildField(p) => p.action.is_some(),
         }
     }
 
     fn get_field_name_or(&'a self, field: &'a Member) -> &'a Member {
         match self {
-            ApplicableAttr::Field(field_attr) => match &field_attr.member {
+            ApplicableAttr::Field(MemberAttrCore { member, .. }) |
+            ApplicableAttr::ParentChildField(ParentChildField { that_member: member, .. }) => match member {
                 Some(val) => val,
                 None => field,
             },
             ApplicableAttr::Ghost(_) => unreachable!("10"),
+            ApplicableAttr::ParentChildField(p) => &p.this_member,
         }
     }
 
     fn get_action_or<F: Fn() -> TokenStream>(&self, field_path: Option<TokenStream>, ctx: &ImplContext, or: F) -> TokenStream {
         match self {
-            ApplicableAttr::Field(field_attr) => match &field_attr.action {
+            ApplicableAttr::Field(MemberAttrCore { action, .. }) |
+            ApplicableAttr::ParentChildField(ParentChildField { action, .. }) => match action {
                 Some(val) => quote_action(val, field_path, ctx),
                 None => or(),
             },
@@ -1273,7 +1292,8 @@ impl<'a> ApplicableAttr<'a> {
 
     fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, obj: &TokenStream, field_path: F1, ctx: &ImplContext, or: F2) -> TokenStream {
         match self {
-            ApplicableAttr::Field(field_attr) => match (&field_attr.member, &field_attr.action) {
+            ApplicableAttr::Field(MemberAttrCore { member, action, .. }) |
+            ApplicableAttr::ParentChildField(ParentChildField { that_member: member, action, .. }) => match (member, action) {
                 (Some(ident), Some(action)) => if let Unnamed(index) = ident {
                         if ctx.impl_type.is_variant() {
                             let ident = Named(format_ident!("f{}", index.index));
