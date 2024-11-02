@@ -1,10 +1,11 @@
 use crate::attr::{self};
 use crate::attr::{DataTypeAttrs, MemberAttrs};
 use proc_macro2::Span;
+use quote::ToTokens;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
+use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Path, Result};
 
 #[derive(Default)]
 struct Context {
@@ -41,6 +42,8 @@ pub(crate) struct Field {
     pub attrs: MemberAttrs,
     pub idx: usize,
     pub member: Member,
+    pub member_str: String,
+    pub ty: Option<Path>
 }
 
 impl<'a> Field {
@@ -80,6 +83,11 @@ impl<'a> Field {
                     span: node.ty.span(),
                 })
             }),
+            member_str: node.ident.to_token_stream().to_string(),
+            ty: match &node.ty {
+                syn::Type::Path(p) => Some(p.path.clone()),
+                _ => None
+            }
         })
     }
 }

@@ -1,26 +1,36 @@
 use o2o::o2o;
 
 struct EntityNew {
-    name: String,
-    description: String
+    same_name: i32,
+    another_name: i32,
+    action: String,
+    action_another_name: i32
 }
 
 #[derive(o2o)]
-#[map_owned(EntityNewBO)]
+#[owned_into(EntityNewBO)]
+#[owned_into_existing(EntityNewBO)]
 struct EntityNewWrapper {
-	#[parent(sameName, another_name: different_name, action: { ~.to_str() }, both: (name, ~.to_str()))]
+	#[parent(
+        same_name,
+        another_name: different_name,
+        action: { ~.to_string() },
+        action_another_name: (action_and_diff_name, ~.parse::<i32>().unwrap())
+    )]
     wrapped: EntityNew,
     id: i32,
     user_id: i32,
-    computed_field: i8
+    computed_field: i8,
 }
 
 struct EntityNewBO {
     id: i32,
     user_id: i32,
     computed_field: i8,
-    name: String,
-    description: String
+    same_name: i32,
+    different_name: i32,
+    action: i32,
+    action_and_diff_name: String
 }
 
 // impl Into<EntityNewBO> for EntityNewWrapper {
