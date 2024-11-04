@@ -773,7 +773,7 @@ fn render_struct_line(
     parent_child: Option<&ParentChildField>
 ) -> TokenStream
 {
-    let attr = parent_child.map(|p| ApplicableAttr::ParentChildField(p))
+    let attr = parent_child.map(|p| ApplicableAttr::ParentChildField(p, ctx.kind))
         .or_else(|| f.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty));
     let get_field_path = |x: &Member| match f.attrs.child(&ctx.struct_attr.ty) {
         Some(child_attr) => {
@@ -1290,13 +1290,22 @@ fn quote_try_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: 
 }
 
 impl<'a> ApplicableAttr<'a> {
-    fn get_ident(&self) -> &'a Member {
+    fn get_ident(&'a self) -> &'a Member {
         match self {
-            ApplicableAttr::Field(MemberAttrCore { member, .. }) |
-            ApplicableAttr::ParentChildField(ParentChildField { that_member: member, .. }) => match member {
+            ApplicableAttr::Field(MemberAttrCore { member, .. }) => match member {
                 Some(val) => val,
                 None => unreachable!("8"),
             },
+            ApplicableAttr::ParentChildField(p, kind) => {
+                let attr = p.get_for_kind(kind);
+                match attr.as_ref() {
+                    Some(attr) => match attr.that_member.as_ref() {
+                        Some(val) => val,
+                        None => unreachable!("8"),
+                    },
+                    None => unreachable!("")
+                }
+            }
             ApplicableAttr::Ghost(_) => unreachable!("9"),
         }
     }
@@ -1305,7 +1314,7 @@ impl<'a> ApplicableAttr<'a> {
         match self {
             ApplicableAttr::Field(f) => f.action.is_some(),
             ApplicableAttr::Ghost(g) => g.action.is_some(),
-            ApplicableAttr::ParentChildField(p) => p.action.is_some(),
+            ApplicableAttr::ParentChildField(p, kind) => p.get_for_kind(kind).is_some_and(|x| x.action.is_some()),
         }
     }
 
@@ -1316,20 +1325,37 @@ impl<'a> ApplicableAttr<'a> {
                 None => field,
             },
             ApplicableAttr::Ghost(_) => unreachable!("10"),
-            ApplicableAttr::ParentChildField(ParentChildField { this_member, that_member, .. }) => match that_member {
-                Some(val) => val,
-                None => &this_member,
+            ApplicableAttr::ParentChildField(p, kind) => {
+                let attr = p.get_for_kind(kind);
+
+                match attr.as_ref() {
+                    Some(attr) =>  match attr.that_member.as_ref() {
+                        Some(val) => val,
+                        None => &p.this_member,
+                    },
+                    None => &p.this_member
+                }
             }
         }
     }
 
     fn get_action_or<F: Fn() -> TokenStream>(&self, field_path: Option<&TokenStream>, ctx: &ImplContext, or: F) -> TokenStream {
         match self {
-            ApplicableAttr::Field(MemberAttrCore { action, .. }) |
-            ApplicableAttr::ParentChildField(ParentChildField { action, .. }) => match action {
+            ApplicableAttr::Field(MemberAttrCore { action, .. }) => match action {
                 Some(val) => quote_action(val, field_path, ctx),
                 None => or(),
             },
+            ApplicableAttr::ParentChildField(p, kind) => {
+                let attr = p.get_for_kind(kind);
+
+                match attr.as_ref() {
+                    Some(attr) => match attr.action.as_ref() {
+                        Some(val) => quote_action(val, field_path, ctx),
+                        None => or()
+                    },
+                    None => or()
+                }
+            }
             ApplicableAttr::Ghost(_) => unreachable!("11"),
         }
     }
@@ -1357,11 +1383,14 @@ impl<'a> ApplicableAttr<'a> {
         };
         match self {
             ApplicableAttr::Field(MemberAttrCore { member, action, .. }) => get_stuff(member, action),
-            ApplicableAttr::ParentChildField(ParentChildField { this_member, that_member, action, .. }) => {
-                if that_member.is_some() {
-                    get_stuff(that_member, action)
+            ApplicableAttr::ParentChildField(p, kind) => {
+                let attr = p.get_for_kind(kind);
+
+                if attr.is_some_and(|x|x.that_member.is_some()) {
+                    let attr = attr.unwrap();
+                    get_stuff(&attr.that_member, &attr.action)
                 } else {
-                    get_stuff(&Some(this_member.clone()), action)
+                    get_stuff(&Some(p.this_member.clone()), attr.map_or(&None, |x| &x.action))
                 }
             },
             ApplicableAttr::Ghost(ghost_attr) => quote_action(ghost_attr.action.as_ref().unwrap(), None, ctx),

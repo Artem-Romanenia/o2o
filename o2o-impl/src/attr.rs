@@ -834,35 +834,69 @@ impl Parse for ParentAttr {
 #[derive(Clone)]
 pub(crate) struct ParentChildField {
     pub this_member: Member,
-    pub that_member: Option<Member>,
-    pub action: Option<TokenStream>,
+    pub member_attrs: Punctuated<ParentChildFieldAttr, Comma>
 }
 
 impl Parse for ParentChildField {
     fn parse(input: ParseStream) -> Result<Self> {
-        let this_member = input.parse()?;
-
-        let (that_member, action) = if input.peek(Token![:]) {
-            input.parse::<Token![:]>()?;
-            if input.peek(Paren) {
-                let content;
-                parenthesized!(content in input);
-                let m = content.parse::<Member>()?;
-                content.parse::<Token![,]>()?;
-                let a = content.parse()?;
-                (Some(m), Some(a))
-            } else if input.peek(Brace) {
-                let content;
-                braced!(content in input);
-                (None, Some(content.parse()?))
-            } else {
-                (Some(input.parse()?), None)
-            }
+        let member_attrs = if input.peek(Paren) {
+            let content;
+            parenthesized!(content in input);
+            Punctuated::parse_separated_nonempty(&content)?
         } else {
-            (None, None)
+            Punctuated::new()
         };
 
-        Ok(ParentChildField { this_member, that_member, action })
+        let this_member = input.parse()?;
+
+        Ok(ParentChildField { this_member, member_attrs })
+    }
+}
+
+impl<'a> ParentChildField {
+    pub(crate) fn get_for_kind(&'a self, kind: &'a Kind) -> Option<&ParentChildFieldAttr> {
+        // self.field_attr(kind, fallible, container_ty)
+        // .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, fallible, container_ty) } else { None })
+        // .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, fallible, container_ty) } else { None })
+
+        self.member_attrs.iter()
+            .find(|x| x.applicable_to[kind])
+            .or_else(|| if kind == &Kind::OwnedIntoExisting { self.get_for_kind(&Kind::OwnedInto) } else { None })
+            .or_else(|| if kind == &Kind::RefIntoExisting { self.get_for_kind(&Kind::RefInto) } else { None })
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct ParentChildFieldAttr {
+    pub that_member: Option<Member>,
+    pub action: Option<TokenStream>,
+    pub applicable_to: ApplicableTo,
+}
+
+impl Parse for ParentChildFieldAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let instr = input.parse::<Ident>()?;
+        let instr_str = &instr.to_string();
+
+        let content;
+        parenthesized!(content in input);
+
+        match instr_str.as_ref() {
+            "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => {
+                Ok(ParentChildFieldAttr { 
+                    that_member: try_parse_optional_ident(&content),
+                    action: try_parse_action(&content, true)?,
+                    applicable_to: [
+                    appl_owned_into(instr_str),
+                    appl_ref_into(instr_str),
+                    appl_from_owned(instr_str),
+                    appl_from_ref(instr_str),
+                    appl_owned_into_existing(instr_str),
+                    appl_ref_into_existing(instr_str),
+                ]})
+            },
+            _ => Err(syn::Error::new(instr.span(), format!("Instruction {} is not recognized in this context", instr_str)))?
+        }
     }
 }
 
@@ -890,7 +924,7 @@ impl Parse for FieldGhostAttrCore {
 pub(crate) enum ApplicableAttr<'a> {
     Field(&'a MemberAttrCore),
     Ghost(&'a FieldGhostAttrCore),
-    ParentChildField(&'a ParentChildField),
+    ParentChildField(&'a ParentChildField, Kind),
 }
 
 #[derive(Clone)]
@@ -980,6 +1014,7 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
 
     let mut instrs: Vec<DataTypeInstruction> = vec![];
     for x in input.iter() {
+        let _f = x.tokens.to_string();
         if x.path.is_ident("doc") {
             continue;
         } else if x.path.is_ident("o2o") {
@@ -1043,6 +1078,7 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
 pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<MemberAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
     for x in input.get_attrs().iter() {
+        let _f = x.tokens.to_string();
         if x.path.is_ident("doc") {
             continue;
         } else if x.path.is_ident("o2o") {

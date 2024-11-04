@@ -8,14 +8,14 @@ struct EntityNew {
 }
 
 #[derive(o2o)]
-#[owned_into(EntityNewBO)]
-#[owned_into_existing(EntityNewBO)]
+#[map(EntityNewBO)]
+#[into_existing(EntityNewBO)]
 struct EntityNewWrapper {
 	#[parent(
         same_name,
-        another_name: different_name,
-        action: { ~.to_string() },
-        action_another_name: (action_and_diff_name, ~.parse::<i32>().unwrap())
+        (map(different_name)) another_name,
+        (from(~.to_string()), into(~.parse::<i32>().unwrap())) action,
+        (from(action_and_diff_name, ~.parse::<i32>().unwrap()), into(action_and_diff_name, ~.to_string())) action_another_name
     )]
     wrapped: EntityNew,
     id: i32,
