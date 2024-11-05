@@ -8,8 +8,8 @@ use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::token::{Brace, Comma, Paren};
-use syn::{braced, parenthesized, AngleBracketedGenericArguments, Attribute, Error, Ident, Member, PathArguments, Result, Token, WherePredicate};
+use syn::token::{Brace, Bracket, Comma, Paren};
+use syn::{braced, bracketed, parenthesized, AngleBracketedGenericArguments, Attribute, Error, Ident, Member, PathArguments, Result, Token, WherePredicate};
 
 use crate::ast::SynDataTypeMember;
 use crate::kw;
@@ -371,11 +371,10 @@ impl<'a> MemberAttrs {
         self.parent_attrs.iter().any(|x| x.child_fields.is_none() && (x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty))
     }
 
-    pub(crate) fn parameterized_parent_attr(&'a self, container_ty: &TypePath) -> Option<&Punctuated<ParentChildField, Comma>> {
+    pub(crate) fn parameterized_parent_attr(&'a self, container_ty: &TypePath) -> Option<&ParentAttr> {
         self.parent_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty && x.child_fields.is_some())
             .or_else(|| self.parent_attrs.iter().find(|x| x.container_ty.is_none() && x.child_fields.is_some()))
-            .map(|x| x.child_fields.as_ref().unwrap())
     }
 
     pub(crate) fn field_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&MemberAttr> {
@@ -825,7 +824,7 @@ pub(crate) struct ParentAttr {
 impl Parse for ParentAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let container_ty = try_parse_container_ident(input, true);
-        let child_fields = input.is_empty().not().then(|| Punctuated::parse_separated_nonempty(&input)).transpose()?;
+        let child_fields = input.is_empty().not().then(|| Punctuated::parse_terminated(&input)).transpose()?;
 
         Ok(ParentAttr { container_ty, child_fields })
     }
@@ -834,32 +833,35 @@ impl Parse for ParentAttr {
 #[derive(Clone)]
 pub(crate) struct ParentChildField {
     pub this_member: Member,
-    pub member_attrs: Punctuated<ParentChildFieldAttr, Comma>
+    pub attrs: Vec<ParentChildFieldAttr>
 }
 
 impl Parse for ParentChildField {
     fn parse(input: ParseStream) -> Result<Self> {
-        let member_attrs = if input.peek(Paren) {
+        let mut attrs = vec![];
+
+        while input.peek(Bracket) {
             let content;
-            parenthesized!(content in input);
-            Punctuated::parse_separated_nonempty(&content)?
-        } else {
-            Punctuated::new()
-        };
+            bracketed!(content in input);
+            attrs.push(content.parse()?);
+        }
 
         let this_member = input.parse()?;
 
-        Ok(ParentChildField { this_member, member_attrs })
+        Ok(ParentChildField { this_member, attrs })
     }
 }
 
 impl<'a> ParentChildField {
-    pub(crate) fn get_for_kind(&'a self, kind: &'a Kind) -> Option<&ParentChildFieldAttr> {
-        // self.field_attr(kind, fallible, container_ty)
-        // .or_else(|| if kind == &Kind::OwnedIntoExisting { self.field_attr(&Kind::OwnedInto, fallible, container_ty) } else { None })
-        // .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, fallible, container_ty) } else { None })
+    pub(crate) fn named_fields(&'a self) -> bool {
+        match self.this_member {
+            Member::Named(_) => true,
+            Member::Unnamed(_) => false,
+        }
+    }
 
-        self.member_attrs.iter()
+    pub(crate) fn get_for_kind(&'a self, kind: &'a Kind) -> Option<&ParentChildFieldAttr> {
+        self.attrs.iter()
             .find(|x| x.applicable_to[kind])
             .or_else(|| if kind == &Kind::OwnedIntoExisting { self.get_for_kind(&Kind::OwnedInto) } else { None })
             .or_else(|| if kind == &Kind::RefIntoExisting { self.get_for_kind(&Kind::RefInto) } else { None })

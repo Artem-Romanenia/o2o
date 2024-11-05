@@ -52,15 +52,15 @@ struct EntityDto {
     base_int: i32,
     #[child(base.base)]
     another_base_int: i32,
-    #[child(base.base)]
-    #[map_ref(~.clone())]
-    some_string: String,
     #[child(base)]
     base_entity_int: i32,
     #[child(child)]
     child_int: i32,
     #[child(child)]
     another_child_int: i32,
+    #[child(base.base)]
+    #[map_ref(~.clone())]
+    some_string: String,
 }
 
 #[derive(o2o)]
