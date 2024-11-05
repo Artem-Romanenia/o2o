@@ -824,7 +824,7 @@ pub(crate) struct ParentAttr {
 impl Parse for ParentAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let container_ty = try_parse_container_ident(input, true);
-        let child_fields = input.is_empty().not().then(|| Punctuated::parse_terminated(&input)).transpose()?;
+        let child_fields = input.is_empty().not().then(|| Punctuated::parse_terminated(input)).transpose()?;
 
         Ok(ParentAttr { container_ty, child_fields })
     }
@@ -1016,7 +1016,6 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
 
     let mut instrs: Vec<DataTypeInstruction> = vec![];
     for x in input.iter() {
-        let _f = x.tokens.to_string();
         if x.path.is_ident("doc") {
             continue;
         } else if x.path.is_ident("o2o") {
@@ -1080,7 +1079,6 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
 pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<MemberAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
     for x in input.get_attrs().iter() {
-        let _f = x.tokens.to_string();
         if x.path.is_ident("doc") {
             continue;
         } else if x.path.is_ident("o2o") {

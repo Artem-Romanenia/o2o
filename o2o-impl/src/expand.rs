@@ -2,7 +2,7 @@ use std::{collections::HashMap, iter::Peekable, slice::Iter};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
-    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, InitData, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
+    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
     validate::validate,
 };
 use proc_macro2::{Span, TokenStream};
@@ -10,7 +10,7 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_quote, punctuated::Punctuated,
     Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime,
-    Member::{self, Named, Unnamed}, Result, Token,
+    Member::{self, Named, Unnamed}, Result
 };
 
 pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
@@ -87,243 +87,130 @@ fn data_type_impl(input: DataType) -> TokenStream {
     let ty = input.get_ident().to_token_stream();
     let attrs = input.get_attrs();
 
-    let main_code_block = |x: &DataType, ctx: &ImplContext| match x {
-        DataType::Struct(s) => main_code_block(ctx, || struct_main_code_block(s, ctx)),
-        DataType::Enum(e) => main_code_block(ctx, || enum_main_code_block(e, ctx)),
-    };
-
-    let main_code_block_ok = |x: &DataType, ctx: &ImplContext| match x {
-        DataType::Struct(s) => main_code_block_ok(ctx, || struct_main_code_block(s, ctx)),
-        DataType::Enum(e) => main_code_block_ok(ctx, || enum_main_code_block(e, ctx)),
-    };
-
     let impl_type = match input {
         DataType::Struct(_) => ImplType::Struct,
         DataType::Enum(_) => ImplType::Enum,
     };
 
-    let from_owned_impls = attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|struct_attr| {
-        let ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::FromOwned,
-            dst_ty: &ty,
-            src_ty: &struct_attr.ty.path,
-            has_post_init: false,
-            fallible: false,
-        };
+    let impls = std::iter::empty().chain(attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::FromOwned,
+        dst_ty: &ty,
+        src_ty: &struct_attr.ty.path,
+        has_post_init: false,
+        fallible: false,
+    })).chain(attrs.iter_for_kind_core(&Kind::FromOwned, true).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::FromOwned,
+        dst_ty: &ty,
+        src_ty: &struct_attr.ty.path,
+        has_post_init: false,
+        fallible: true,
+    })).chain(attrs.iter_for_kind_core(&Kind::FromRef, false).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::FromRef,
+        dst_ty: &ty,
+        src_ty: &struct_attr.ty.path,
+        has_post_init: false,
+        fallible: false,
+    })).chain(attrs.iter_for_kind_core(&Kind::FromRef, true).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::FromRef,
+        dst_ty: &ty,
+        src_ty: &struct_attr.ty.path,
+        has_post_init: false,
+        fallible: true,
+    })).chain(attrs.iter_for_kind_core(&Kind::OwnedInto, false).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::OwnedInto,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: false,
+    })).chain(attrs.iter_for_kind_core(&Kind::OwnedInto, true).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::OwnedInto,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: true,
+    })).chain(attrs.iter_for_kind_core(&Kind::RefInto, false).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::RefInto,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: false,
+    })).chain(attrs.iter_for_kind_core(&Kind::RefInto, true).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::RefInto,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: true,
+    })).chain(attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, false).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::OwnedIntoExisting,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: false,
+    })).chain(attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, true).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::OwnedIntoExisting,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: true,
+    })).chain(attrs.iter_for_kind_core(&Kind::RefIntoExisting, false).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::RefIntoExisting,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: false,
+    })).chain(attrs.iter_for_kind_core(&Kind::RefIntoExisting, true).map(|struct_attr| ImplContext {
+        input: &input, impl_type, struct_attr,
+        kind: Kind::RefIntoExisting,
+        dst_ty: &struct_attr.ty.path,
+        src_ty: &ty,
+        has_post_init: false,
+        fallible: true,
+    })).map(|mut ctx| quote_trait(&input, &mut ctx));
 
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        quote_from_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx))
-    });
+    quote! { #(#impls)* }
+}
 
-    let try_from_owned_impls = attrs.iter_for_kind_core(&Kind::FromOwned, true).map(|struct_attr| {
-        let ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::FromOwned,
-            dst_ty: &ty,
-            src_ty: &struct_attr.ty.path,
-            has_post_init: false,
-            fallible: true,
-        };
+fn main_code_block(ctx: &ImplContext) -> TokenStream {
+    if let Some(quick_return) = &ctx.struct_attr.quick_return {
+        //TODO: Consider removing quick returns for into_existing because they are confusing
+        if ctx.kind.is_into_existing() {
+            let action = quote_action(quick_return, None, ctx);
+            return quote!(*other = #action;);
+        }
+        return quote_action(quick_return, None, ctx);
+    }
 
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        quote_try_from_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx))
-    });
+    match ctx.input {
+        DataType::Struct(s) => struct_main_code_block(s, ctx),
+        DataType::Enum(e) => enum_main_code_block(e, ctx),
+    }
+}
 
-    let from_ref_impls = attrs.iter_for_kind_core(&Kind::FromRef, false).map(|struct_attr| {
-        let ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::FromRef,
-            dst_ty: &ty,
-            src_ty: &struct_attr.ty.path,
-            has_post_init: false,
-            fallible: false,
-        };
+fn main_code_block_ok(ctx: &ImplContext) -> TokenStream {
+    if let Some(quick_return) = &ctx.struct_attr.quick_return {
+        //TODO: Consider removing quick returns for into_existing because they are confusing
+        if ctx.kind.is_into_existing() {
+            let action = quote_action(quick_return, None, ctx);
+            return quote!(*other = #action;);
+        }
+        return quote_action(quick_return, None, ctx);
+    }
 
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        quote_from_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx))
-    });
-
-    let try_from_ref_impls = attrs.iter_for_kind_core(&Kind::FromRef, true).map(|struct_attr| {
-        let ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::FromRef,
-            dst_ty: &ty,
-            src_ty: &struct_attr.ty.path,
-            has_post_init: false,
-            fallible: true,
-        };
-
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        quote_try_from_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx))
-    });
-
-    let owned_into_impls = attrs.iter_for_kind_core(&Kind::OwnedInto, false).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::OwnedInto,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: false,
-        };
-
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_into_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
-    });
-
-    let owned_try_into_impls = attrs.iter_for_kind_core(&Kind::OwnedInto, true).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::OwnedInto,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: true,
-        };
-
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_try_into_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx), post_init)
-    });
-
-    let ref_into_impls = attrs.iter_for_kind_core(&Kind::RefInto, false).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::RefInto,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: false,
-        };
-
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_into_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
-    });
-
-    let ref_try_into_impls = attrs.iter_for_kind_core(&Kind::RefInto, true).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::RefInto,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: true,
-        };
-
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_try_into_trait(&input, &ctx, pre_init, main_code_block_ok(&input, &ctx), post_init)
-    });
-
-    let owned_into_existing_impls = attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, false).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::OwnedIntoExisting,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: false,
-        };
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
-    });
-
-    let owned_try_into_existing_impls = attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, true).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::OwnedIntoExisting,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: true,
-        };
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_try_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
-    });
-
-    let ref_into_existing_impls = attrs.iter_for_kind_core(&Kind::RefIntoExisting, false).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::RefIntoExisting,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: false,
-        };
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
-    });
-
-    let ref_try_into_existing_impls = attrs.iter_for_kind_core(&Kind::RefIntoExisting, true).map(|struct_attr| {
-        let mut ctx = ImplContext {
-            input: &input, impl_type, struct_attr,
-            kind: Kind::RefIntoExisting,
-            dst_ty: &struct_attr.ty.path,
-            src_ty: &ty,
-            has_post_init: false,
-            fallible: true,
-        };
-        let pre_init = struct_pre_init(&ctx, &struct_attr.init_data);
-        let post_init = struct_post_init(&input, &ctx);
-        ctx.has_post_init = post_init.is_some();
-        quote_try_into_existing_trait(&input, &ctx, pre_init, main_code_block(&input, &ctx), post_init)
-    });
-
-    let result = quote! {
-        #(#from_owned_impls)*
-        #(#try_from_owned_impls)*
-        #(#from_ref_impls)*
-        #(#try_from_ref_impls)*
-        #(#owned_into_impls)*
-        #(#owned_try_into_impls)*
-        #(#ref_into_impls)*
-        #(#ref_try_into_impls)*
-        #(#owned_into_existing_impls)*
-        #(#owned_try_into_existing_impls)*
-        #(#ref_into_existing_impls)*
-        #(#ref_try_into_existing_impls)*
+    let inner = match ctx.input {
+        DataType::Struct(s) => struct_main_code_block(s, ctx),
+        DataType::Enum(e) => enum_main_code_block(e, ctx),
     };
-
-    result
-}
-
-fn main_code_block<F: Fn() -> TokenStream>(ctx: &ImplContext, inner: F) -> TokenStream {
-    if let Some(quick_return) = &ctx.struct_attr.quick_return {
-        //TODO: Consider removing quick returns for into_existing because they are confusing
-        if ctx.kind.is_into_existing() {
-            let action = quote_action(quick_return, None, ctx);
-            return quote!(*other = #action;);
-        }
-        return quote_action(quick_return, None, ctx);
-    }
-
-    inner()
-}
-
-fn main_code_block_ok<F: Fn() -> TokenStream>(ctx: &ImplContext, inner: F) -> TokenStream {
-    if let Some(quick_return) = &ctx.struct_attr.quick_return {
-        //TODO: Consider removing quick returns for into_existing because they are confusing
-        if ctx.kind.is_into_existing() {
-            let action = quote_action(quick_return, None, ctx);
-            return quote!(*other = #action;);
-        }
-        return quote_action(quick_return, None, ctx);
-    }
-
-    let inner = inner();
 
     if ctx.has_post_init {
         inner
@@ -465,7 +352,7 @@ fn struct_init_block_inner(
             },
             FieldData::ParentChildField(f, p) => {
                 let type_hint = if type_hint == TypeHint::Unspecified { if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple} } else { type_hint };
-                let fragment = render_parent_child_fragment(&f, members, p.named_fields(), ctx, field_ctx.map(|x|x.2), || render_struct_line(f, ctx, type_hint, idx, Some(p)));
+                let fragment = render_parent_child_fragment(f, members, p.named_fields(), ctx, field_ctx.map(|x|x.2), || render_struct_line(f, ctx, type_hint, idx, Some(p)));
                 fragments.push(fragment);
                 idx += 1;
             }
@@ -652,7 +539,7 @@ fn render_parent_child_fragment<F: Fn() -> TokenStream>(
     render_line: F
 ) -> TokenStream
 {
-    if depth.is_none() || depth.unwrap() < 0 {
+    if depth.is_none() {
         let new_depth = depth.map_or(0, |x|x+1);
         if ctx.kind.is_from() {
             let child_data = ChildRenderContext {
@@ -661,7 +548,7 @@ fn render_parent_child_fragment<F: Fn() -> TokenStream>(
             };
             let mut f = Punctuated::new();
             f.push(field.member.clone());
-            render_child(&child_data, fields, named_fields, ctx, (&ChildPath { child_path: f, child_path_str: vec![field.member.to_token_stream().to_string().into()] }, new_depth), if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple})
+            render_child(&child_data, fields, named_fields, ctx, (&ChildPath { child_path: f, child_path_str: vec![field.member.to_token_stream().to_string()] }, new_depth), if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple})
         } else {
             fields.next();
             render_line()
@@ -672,8 +559,8 @@ fn render_parent_child_fragment<F: Fn() -> TokenStream>(
     }
 }
 
-fn struct_pre_init(ctx: &ImplContext, init_data: &Option<Punctuated<InitData, Token![,]>>) -> Option<TokenStream> {
-    if let Some(init_data) = init_data {
+fn struct_pre_init(ctx: &ImplContext) -> Option<TokenStream> {
+    if let Some(init_data) = &ctx.struct_attr.init_data {
         let g = init_data.iter().map(|x| {
             let a = &x.ident;
             let b = quote_action(&x.action, None, ctx);
@@ -730,7 +617,7 @@ fn render_child(
     let child_path = field_ctx.0;
     let child_name = child_path.child_path[field_ctx.1].to_token_stream();
     let ty = &child_data.ty;
-    let init = struct_init_block_inner(fields, named_fields, ctx, Some((field_ctx.0, Some(&child_data), field_ctx.1)));
+    let init = struct_init_block_inner(fields, named_fields, ctx, Some((field_ctx.0, Some(child_data), field_ctx.1)));
     match (ctx.input.named_fields(), hint) {
         (true, TypeHint::Struct | TypeHint::Unspecified) => quote!(#child_name: #ty #init,),
         (true, TypeHint::Tuple) => quote!(#ty #init,),
@@ -854,30 +741,30 @@ fn render_struct_line(
             } else {
                 unreachable!("6")
             },
-        (Named(ident), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Struct | TypeHint::Unspecified) => {
+        (Named(_), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Struct | TypeHint::Unspecified) => {
             let field_name = attr.get_field_name_or(&f.member);
             let field_path = get_child_field_path(&f.member);
             let right_side = attr.get_action_or(Some(&field_path), ctx, || quote!(#obj #field_path));
             if ctx.has_post_init { quote!(obj.#field_name = #right_side;) } else { quote!(#field_name: #right_side,) }
         },
-        (Named(ident), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Struct | TypeHint::Unspecified) => {
+        (Named(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Struct | TypeHint::Unspecified) => {
             let left_field_path = get_field_path(attr.get_field_name_or(&f.member));
             let right_field_path = get_child_field_path(&f.member);
             let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#obj #right_field_path));
             quote!(other.#left_field_path = #right_side;)
         },
-        (Named(ident), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple) => {
+        (Named(_), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple) => {
             let right_field_path = get_child_field_path(&f.member);
             let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#obj #right_field_path));
             quote!(#right_side,)
         },
-        (Named(ident), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple) => {
+        (Named(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple) => {
             let left_field_path = get_field_path(&Unnamed(Index { index: idx as u32, span: Span::call_site() }));
             let right_field_path = get_child_field_path(&f.member);
             let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#obj #right_field_path));
             quote!(other.#left_field_path = #right_side;)
         },
-        (Named(ident), Some(attr), Kind::FromOwned | Kind::FromRef, TypeHint::Struct | TypeHint::Unspecified | TypeHint::Unit) => {
+        (Named(_), Some(attr), Kind::FromOwned | Kind::FromRef, TypeHint::Struct | TypeHint::Unspecified | TypeHint::Unit) => {
             let right_side = attr.get_stuff(&obj, get_field_path, ctx, || &f.member);
             let idnt = parent_child.map_or(&f.member, |g| &g.this_member);
             quote!(#idnt: #right_side,)
@@ -889,11 +776,11 @@ fn render_struct_line(
         },
         (Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple | TypeHint::Unspecified) => {
             let index = if ctx.impl_type.is_variant() { &Member::Named(format_ident!("f{}", index.index)) } else { &f.member };
-            let field_path = get_child_field_path(&index);
+            let field_path = get_child_field_path(index);
             let right_side = attr.get_action_or(Some(&field_path), ctx, || quote!(#obj #field_path));
             quote!(#right_side,)
         },
-        (Unnamed(index), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple | TypeHint::Unspecified) => {
+        (Unnamed(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple | TypeHint::Unspecified) => {
             let left_field_path = get_field_path(attr.get_field_name_or(&f.member));
             let right_field_path = get_child_field_path(&f.member);
             let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#obj #right_field_path));
@@ -910,7 +797,7 @@ fn render_struct_line(
                 quote!(#field_name: #right_side,)
             }
         },
-        (Unnamed(index), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Struct) => {
+        (Unnamed(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Struct) => {
             let left_field_path = get_field_path(attr.get_ident());
             let right_field_path = get_child_field_path(&f.member);
             let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#obj #right_field_path));
@@ -1156,6 +1043,23 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
             quote!(where #where_clause)
         }), 
         r: ctx.kind.is_ref().then_some(if ref_lts.is_empty() { quote!(&) } else { quote!(&'o2o) }) 
+    }
+}
+
+fn quote_trait(input: &DataType, ctx: &mut ImplContext) -> TokenStream {
+    let pre_init = struct_pre_init(ctx);
+    let post_init = if ctx.kind.is_from() { None } else {
+        struct_post_init(input, ctx)
+    };
+    ctx.has_post_init = post_init.is_some();
+
+    match (ctx.kind, ctx.fallible) {
+        (Kind::FromOwned, false) | (Kind::FromRef, false) => quote_from_trait(input, ctx, pre_init, main_code_block(ctx)),
+        (Kind::FromOwned, true) | (Kind::FromRef, true) => quote_try_from_trait(input, ctx, pre_init, main_code_block_ok(ctx)),
+        (Kind::OwnedInto, false) | (Kind::RefInto, false) => quote_into_trait(input, ctx, pre_init, main_code_block(ctx), post_init),
+        (Kind::OwnedInto, true) | (Kind::RefInto, true) => quote_try_into_trait(input, ctx, pre_init, main_code_block_ok(ctx), post_init),
+        (Kind::OwnedIntoExisting, false) | (Kind::RefIntoExisting, false) => quote_into_existing_trait(input, ctx, pre_init, main_code_block(ctx), post_init),
+        (Kind::OwnedIntoExisting, true) | (Kind::RefIntoExisting, true) => quote_try_into_existing_trait(input, ctx, pre_init, main_code_block(ctx), post_init),
     }
 }
 
