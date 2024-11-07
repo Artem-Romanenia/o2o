@@ -2138,6 +2138,144 @@ fn lifetimes(code_fragment: TokenStream, expected_output: TokenStream) {
 
 // endregion: lifetimes
 
+// region: parent_attr_member_instr
+
+#[test_case(quote! {
+    #[map(Entity as {})]
+    struct EntityDto {
+        #[parent(field_1, field_2)]
+        child: Child
+    }
+}, None; "1")]
+#[test_case(quote! {
+    #[map(Entity as {})]
+    struct EntityDto {
+        #[parent(field_1, [test()] field_2)]
+        child: Child
+    }
+}, Some("Instruction 'test' is not recognized in this context"); "2")]
+fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    if err.is_some() {
+        let error = get_error(output, false);
+        assert_eq!(error, err.unwrap());
+    } else {
+        assert!(output.is_ok())
+    }
+}
+
+// endregion: parent_attr_member_instr
+
+// region: incomplete_parent_attr_member_instr
+
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "1")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
+        #[parent(EntityDto| 0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "2")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    #[map(EntityModel)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]",
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]",
+] ; "3")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
+        #[parent(0, 1)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]",
+    "Member 1 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent(..., [map(field_name)] 1, ...)]",
+] ; "4")]
+#[test_case(quote! {
+    #[from(EntityDto)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+] ; "5")]
+#[test_case(quote! {
+    #[from(EntityDto)]
+    #[into(EntityModel)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]",
+] ; "6")]
+#[test_case(quote! {
+    #[derive(o2o::o2o)]
+    #[map(EntityDto as {})]
+    struct Entity (
+        #[parent(0)]
+        Child
+    );
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "7")]
+#[test_case(quote! {
+    #[derive(o2o::o2o)]
+    #[map(EntityDto)]
+    struct Entity (
+        #[parent(0)]
+        Child
+    );
+}, vec![
+] ; "8")]
+#[test_case(quote! {
+    #[derive(o2o::o2o)]
+    #[map(EntityDto)]
+    #[map(EntityModel)]
+    struct Entity {
+        #[parent(EntityModel| 0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "9")]
+fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&str>) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    if errs.len() > 0 {
+        let errors: Vec<Error> = get_error_iter(output).collect();
+
+        assert_eq!(errs.len(), errors.len());
+
+        for err in errs {
+            assert!(errors.iter().any(|x| x.to_string() == err))
+        }
+    } else {
+        assert!(output.is_ok())
+    }
+}
+
+// endregion: incomplete_parent_attr_member_instr
+
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
     let mut err_iter = output.unwrap_err().into_iter();
@@ -2159,7 +2297,7 @@ fn get_error_iter(output: Result<TokenStream, Error>) -> impl Iterator<Item = Er
     let mut err_iter = output.unwrap_err().into_iter();
 
     let error = err_iter.next();
-    assert!(error.expect("Root error expected").to_string() == "Cannot expand o2o macro");
+    assert_eq!(error.expect("Root error expected").to_string(), "Cannot expand o2o macro");
 
     err_iter
 }

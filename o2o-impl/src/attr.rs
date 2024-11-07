@@ -815,7 +815,7 @@ impl Parse for MemberAttrCore {
     }
 }
 
-#[derive(Clone)] // TODO: Is there a reason to ever #[repeat] parent instr?
+#[derive(Clone)]
 pub(crate) struct ParentAttr {
     pub container_ty: Option<TypePath>,
     pub child_fields: Option<Punctuated<ParentChildField, Comma>>,
@@ -833,22 +833,61 @@ impl Parse for ParentAttr {
 #[derive(Clone)]
 pub(crate) struct ParentChildField {
     pub this_member: Member,
-    pub attrs: Vec<ParentChildFieldAttr>
+    pub member_str: String,
+    pub ty: Option<TypePath>,
+    pub attrs: Vec<ParentChildFieldAttr>,
+    pub parent_attr: Option<ParentAttr>,
 }
 
 impl Parse for ParentChildField {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut attrs = vec![];
+        let mut parent_attr = None;
 
         while input.peek(Bracket) {
             let content;
             bracketed!(content in input);
-            attrs.push(content.parse()?);
+
+            let instr = content.parse::<Ident>()?;
+            let instr_str = &instr.to_string();
+
+            let content_inner;
+            parenthesized!(content_inner in content);
+
+            match instr_str.as_ref() {
+                "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => {
+                    attrs.push(ParentChildFieldAttr { 
+                        that_member: try_parse_optional_ident(&content_inner),
+                        action: try_parse_action(&content_inner, true)?,
+                        applicable_to: [
+                            appl_owned_into(instr_str),
+                            appl_ref_into(instr_str),
+                            appl_from_owned(instr_str),
+                            appl_from_ref(instr_str),
+                            appl_owned_into_existing(instr_str),
+                            appl_ref_into_existing(instr_str),
+                    ]});
+                },
+                "parent" => {
+                    if parent_attr.is_none() {
+                        parent_attr = Some(content_inner.parse()?)
+                    } else {
+                        Err(syn::Error::new(instr.span(), format!("Cannot have more than one parent attr")))?
+                    }
+                }
+                _ => Err(syn::Error::new(instr.span(), format!("Instruction '{}' is not recognized in this context", instr_str)))?
+            }
         }
 
-        let this_member = input.parse()?;
+        let this_member: Member = input.parse()?;
+        let member_str = this_member.to_token_stream().to_string();
 
-        Ok(ParentChildField { this_member, attrs })
+        let ty: Option<syn::Path> = if input.peek(Token![:]) {
+            input.parse::<Token![:]>()?;
+            Some(input.parse()?)
+        } else { None };
+
+        Ok(ParentChildField { this_member, member_str, ty: ty.map(|x|x.into()), attrs, parent_attr })
     }
 }
 
@@ -873,33 +912,6 @@ pub(crate) struct ParentChildFieldAttr {
     pub that_member: Option<Member>,
     pub action: Option<TokenStream>,
     pub applicable_to: ApplicableTo,
-}
-
-impl Parse for ParentChildFieldAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let instr = input.parse::<Ident>()?;
-        let instr_str = &instr.to_string();
-
-        let content;
-        parenthesized!(content in input);
-
-        match instr_str.as_ref() {
-            "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => {
-                Ok(ParentChildFieldAttr { 
-                    that_member: try_parse_optional_ident(&content),
-                    action: try_parse_action(&content, true)?,
-                    applicable_to: [
-                    appl_owned_into(instr_str),
-                    appl_ref_into(instr_str),
-                    appl_from_owned(instr_str),
-                    appl_from_ref(instr_str),
-                    appl_owned_into_existing(instr_str),
-                    appl_ref_into_existing(instr_str),
-                ]})
-            },
-            _ => Err(syn::Error::new(instr.span(), format!("Instruction {} is not recognized in this context", instr_str)))?
-        }
-    }
 }
 
 #[derive(Clone)]

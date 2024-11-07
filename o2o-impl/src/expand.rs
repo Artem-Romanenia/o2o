@@ -1,8 +1,8 @@
-use std::{collections::HashMap, iter::Peekable, slice::Iter};
+use std::{collections::{HashMap, VecDeque}, iter::Peekable, slice::Iter};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
-    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
+    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentAttr, ParentChildField, TraitAttrCore, TypeHint},
     validate::validate,
 };
 use proc_macro2::{Span, TokenStream};
@@ -68,14 +68,14 @@ impl<'a> From<&'a ChildData> for ChildRenderContext<'a> {
 
 struct FieldContainer<'a> {
     gr_idx: usize,
-    path: &'a str,
+    path: String,
     field_data: FieldData<'a>
 }
 
 enum FieldData<'a> {
     Field(&'a Field),
     GhostData(&'a GhostData),
-    ParentChildField(&'a Field, &'a ParentChildField),
+    ParentChildField(&'a Field, &'a ParentChildField, ChildPath),
 }
 
 enum VariantData<'a> {
@@ -258,36 +258,46 @@ fn struct_init_block<'a>(input: &'a Struct, ctx: &ImplContext) -> TokenStream {
         return TokenStream::new();
     }
 
-    let mut group_paths = HashMap::<&str, usize>::new();
-    group_paths.insert("", 0);
+    let mut group_paths = HashMap::<String, usize>::new();
+    group_paths.insert("".into(), 0);
 
-    let mut make_tuple = |path: &'a str, field_data: FieldData<'a>| {
+    let mut make_tuple = |path: String, field_data: FieldData<'a>| {
         if group_paths.contains_key(&path) {
-            let gr_idx = *group_paths.get(path).unwrap();
+            let gr_idx = *group_paths.get(&path).unwrap();
             (FieldContainer { gr_idx, path, field_data }, false)
         } else {
-            group_paths.insert(path, group_paths.len());
+            group_paths.insert(path.clone(), group_paths.len());
             (FieldContainer { gr_idx: group_paths.len() - 1, path, field_data}, true)
         }
     };
 
     let mut fields: Vec<FieldContainer> = vec![];
 
-    fields.extend(input.fields.iter()
-        .flat_map(|x| {
-            let fields: Vec<FieldContainer> = if let Some((f, p)) = x.attrs.parameterized_parent_attr(&ctx.struct_attr.ty).map(|a| (x, a.child_fields.as_ref().unwrap())) {
-                p.iter().map(|p| make_tuple(f.member_str.as_ref(), FieldData::ParentChildField(f, p)).0).collect()
-            } else {
-                let path = x.attrs.child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or(&x.member_str);
-                vec![make_tuple(path, FieldData::Field(x)).0]
-            };
-            fields.into_iter()
-        }));
+    for x in input.fields.iter() {
+        let mut ps: VecDeque<(&ParentAttr, String)> = VecDeque::from([]);
+
+        if let Some(p) = x.attrs.parameterized_parent_attr(&ctx.struct_attr.ty) {
+            ps.push_back((p, x.member_str.clone()));
+
+            while let Some((p, str)) = ps.pop_front() {
+                for f in p.child_fields.as_ref().unwrap().iter() {
+                    if let Some(nested_p) = &f.parent_attr {
+                        ps.push_back((nested_p, format!("{}.{}", str, f.member_str)));
+                    } else {
+                        fields.push(make_tuple(str.clone(), FieldData::ParentChildField(x, f, todo!())).0);
+                    }
+                }
+            }
+        } else {
+            let path = x.attrs.child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or(&x.member_str);
+            fields.push(make_tuple(path.into(), FieldData::Field(x)).0);
+        }
+    }
 
     fields.extend(input.attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
         .filter_map(|x| {
-            let res = make_tuple(x.get_child_path_str(None), FieldData::GhostData(x));
+            let res = make_tuple(x.get_child_path_str(None).into(), FieldData::GhostData(x));
             res.1.then_some(res.0)
         }));
 
@@ -350,9 +360,9 @@ fn struct_init_block_inner(
                 fragments.push(fragment);
                 idx += 1;
             },
-            FieldData::ParentChildField(f, p) => {
+            FieldData::ParentChildField(f, p, child_path) => {
                 let type_hint = if type_hint == TypeHint::Unspecified { if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple} } else { type_hint };
-                let fragment = render_parent_child_fragment(f, members, p.named_fields(), ctx, field_ctx.map(|x|x.2), || render_struct_line(f, ctx, type_hint, idx, Some(p)));
+                let fragment = render_parent_child_fragment(f, child_path, members, p.named_fields(), ctx, field_ctx.map(|x|x.2), || render_struct_line(f, ctx, type_hint, idx, Some(p)));
                 fragments.push(fragment);
                 idx += 1;
             }
@@ -532,6 +542,7 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
 
 fn render_parent_child_fragment<F: Fn() -> TokenStream>(
     field: &Field,
+    child_path: &ChildPath,
     fields: &mut Peekable<Iter<FieldContainer>>,
     named_fields: bool,
     ctx: &ImplContext,
@@ -539,16 +550,14 @@ fn render_parent_child_fragment<F: Fn() -> TokenStream>(
     render_line: F
 ) -> TokenStream
 {
-    if depth.is_none() {
+    if depth.is_none() || depth.unwrap() < child_path.child_path_str.len() - 1 {
         let new_depth = depth.map_or(0, |x|x+1);
         if ctx.kind.is_from() {
             let child_data = ChildRenderContext {
                 ty: field.ty.as_ref().unwrap(),
                 type_hint: ctx.struct_attr.type_hint
             };
-            let mut f = Punctuated::new();
-            f.push(field.member.clone());
-            render_child(&child_data, fields, named_fields, ctx, (&ChildPath { child_path: f, child_path_str: vec![field.member.to_token_stream().to_string()] }, new_depth), if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple})
+            render_child(&child_data, fields, named_fields, ctx, (child_path, new_depth), if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple})
         } else {
             fields.next();
             render_line()
