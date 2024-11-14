@@ -703,6 +703,15 @@ impl ChildPath {
             Some(depth) => &self.child_path_str[depth],
         }
     }
+
+    pub(crate) fn new<I: Iterator<Item = Member>>(root: Member, sub_path: I) -> ChildPath {
+        let mut child_path = Punctuated::new();
+        child_path.push(root);
+        sub_path.for_each(|x|child_path.push(x));
+
+        let child_path_str = build_child_path_str(&child_path);
+        ChildPath { child_path, child_path_str }
+    }
 }
 
 impl Parse for GhostData {
@@ -818,7 +827,7 @@ impl Parse for MemberAttrCore {
 #[derive(Clone)]
 pub(crate) struct ParentAttr {
     pub container_ty: Option<TypePath>,
-    pub child_fields: Option<Punctuated<ParentChildField, Comma>>,
+    pub child_fields: Option<Vec<ParentChildField>>,
 }
 
 impl Parse for ParentAttr {
@@ -826,20 +835,36 @@ impl Parse for ParentAttr {
         let container_ty = try_parse_container_ident(input, true);
         let child_fields = input.is_empty().not().then(|| Punctuated::parse_terminated(input)).transpose()?;
 
-        Ok(ParentAttr { container_ty, child_fields })
+        Ok(ParentAttr { container_ty, child_fields: child_fields.map(|x|convert_parent_child_field(x, vec![])) })
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct ParentChildField {
-    pub this_member: Member,
-    pub member_str: String,
-    pub ty: Option<TypePath>,
-    pub attrs: Vec<ParentChildFieldAttr>,
-    pub parent_attr: Option<ParentAttr>,
+fn convert_parent_child_field(child_fields_as_parsed: Punctuated<ParentChildFieldAsParsed, Comma>, path: Vec<(Member, Option<syn::Path>)>) -> Vec<ParentChildField> {
+    let mut child_fields_as_used = vec![];
+
+    for child_field in child_fields_as_parsed {
+        if let Some(parent_attr) = child_field.parent_attr {
+            let mut path = path.clone();
+            path.push((child_field.this_member, child_field.ty));
+            child_fields_as_used.extend(convert_parent_child_field(parent_attr, path));
+        } else {
+            let path_tokens = path.iter().map(|x|x.0.to_token_stream()).fold(TokenStream::new(), |a,b| quote!(#a.#b));
+            child_fields_as_used.push(ParentChildField { this_member: child_field.this_member, attrs: child_field.attrs, path: path.clone(), path_tokens });
+        }
+    }
+
+    child_fields_as_used
 }
 
-impl Parse for ParentChildField {
+#[derive(Clone)]
+struct ParentChildFieldAsParsed {
+    pub this_member: Member,
+    pub ty: Option<syn::Path>,
+    pub attrs: Vec<ParentChildFieldAttr>,
+    pub parent_attr: Option<Punctuated<ParentChildFieldAsParsed, Comma>>,
+}
+
+impl Parse for ParentChildFieldAsParsed {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut attrs = vec![];
         let mut parent_attr = None;
@@ -870,7 +895,7 @@ impl Parse for ParentChildField {
                 },
                 "parent" => {
                     if parent_attr.is_none() {
-                        parent_attr = Some(content_inner.parse()?)
+                        parent_attr = Some(Punctuated::parse_terminated(&content_inner)?)
                     } else {
                         Err(syn::Error::new(instr.span(), format!("Cannot have more than one parent attr")))?
                     }
@@ -880,15 +905,22 @@ impl Parse for ParentChildField {
         }
 
         let this_member: Member = input.parse()?;
-        let member_str = this_member.to_token_stream().to_string();
 
         let ty: Option<syn::Path> = if input.peek(Token![:]) {
             input.parse::<Token![:]>()?;
             Some(input.parse()?)
         } else { None };
 
-        Ok(ParentChildField { this_member, member_str, ty: ty.map(|x|x.into()), attrs, parent_attr })
+        Ok(ParentChildFieldAsParsed { this_member, ty: ty.map(|x|x.into()), attrs, parent_attr })
     }
+}
+
+#[derive(Clone)]
+pub(crate) struct ParentChildField {
+    pub this_member: Member,
+    pub attrs: Vec<ParentChildFieldAttr>,
+    pub path: Vec<(Member, Option<syn::Path>)>,
+    pub path_tokens: TokenStream,
 }
 
 impl<'a> ParentChildField {

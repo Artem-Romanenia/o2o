@@ -1,15 +1,14 @@
-use std::{collections::{HashMap, VecDeque}, iter::Peekable, slice::Iter};
+use std::{collections::HashMap, iter::Peekable, slice::Iter};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
-    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentAttr, ParentChildField, TraitAttrCore, TypeHint},
+    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
     validate::validate,
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse_quote, punctuated::Punctuated,
-    Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime,
+    parse_quote, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime,
     Member::{self, Named, Unnamed}, Result
 };
 
@@ -75,7 +74,7 @@ struct FieldContainer<'a> {
 enum FieldData<'a> {
     Field(&'a Field),
     GhostData(&'a GhostData),
-    ParentChildField(&'a Field, &'a ParentChildField, ChildPath),
+    ParentChildField(&'a Field, &'a ParentChildField),
 }
 
 enum VariantData<'a> {
@@ -273,26 +272,16 @@ fn struct_init_block<'a>(input: &'a Struct, ctx: &ImplContext) -> TokenStream {
 
     let mut fields: Vec<FieldContainer> = vec![];
 
-    for x in input.fields.iter() {
-        let mut ps: VecDeque<(&ParentAttr, String)> = VecDeque::from([]);
-
-        if let Some(p) = x.attrs.parameterized_parent_attr(&ctx.struct_attr.ty) {
-            ps.push_back((p, x.member_str.clone()));
-
-            while let Some((p, str)) = ps.pop_front() {
-                for f in p.child_fields.as_ref().unwrap().iter() {
-                    if let Some(nested_p) = &f.parent_attr {
-                        ps.push_back((nested_p, format!("{}.{}", str, f.member_str)));
-                    } else {
-                        fields.push(make_tuple(str.clone(), FieldData::ParentChildField(x, f, todo!())).0);
-                    }
-                }
-            }
-        } else {
-            let path = x.attrs.child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or(&x.member_str);
-            fields.push(make_tuple(path.into(), FieldData::Field(x)).0);
-        }
-    }
+    fields.extend(input.fields.iter()
+        .flat_map(|x| {
+            let fields: Vec<FieldContainer> = if let Some(p) = x.attrs.parameterized_parent_attr(&ctx.struct_attr.ty).map(|a| a.child_fields.as_ref().unwrap()) {
+                p.iter().map(|p| make_tuple(format!("{}{}", &x.member_str, &p.path_tokens.to_string().replace(' ', "")), FieldData::ParentChildField(x, p)).0).collect()
+            } else {
+                let path = x.attrs.child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or(&x.member_str);
+                vec![make_tuple(path.to_string(), FieldData::Field(x)).0]
+            };
+            fields.into_iter()
+        }));
 
     fields.extend(input.attrs.ghosts_attrs.iter()
         .flat_map(|x| &x.attr.ghost_data)
@@ -360,9 +349,9 @@ fn struct_init_block_inner(
                 fragments.push(fragment);
                 idx += 1;
             },
-            FieldData::ParentChildField(f, p, child_path) => {
+            FieldData::ParentChildField(f, p) => {
                 let type_hint = if type_hint == TypeHint::Unspecified { if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple} } else { type_hint };
-                let fragment = render_parent_child_fragment(f, child_path, members, p.named_fields(), ctx, field_ctx.map(|x|x.2), || render_struct_line(f, ctx, type_hint, idx, Some(p)));
+                let fragment = render_parent_child_fragment(f, p, members, p.named_fields(), ctx, field_ctx.map(|x|x.2), || render_struct_line(f, ctx, type_hint, idx, Some(p)));
                 fragments.push(fragment);
                 idx += 1;
             }
@@ -542,7 +531,7 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
 
 fn render_parent_child_fragment<F: Fn() -> TokenStream>(
     field: &Field,
-    child_path: &ChildPath,
+    parent_child_field: &ParentChildField,
     fields: &mut Peekable<Iter<FieldContainer>>,
     named_fields: bool,
     ctx: &ImplContext,
@@ -550,14 +539,13 @@ fn render_parent_child_fragment<F: Fn() -> TokenStream>(
     render_line: F
 ) -> TokenStream
 {
-    if depth.is_none() || depth.unwrap() < child_path.child_path_str.len() - 1 {
+    if depth.is_none() || depth.unwrap() < parent_child_field.path.len() {
         let new_depth = depth.map_or(0, |x|x+1);
         if ctx.kind.is_from() {
-            let child_data = ChildRenderContext {
-                ty: field.ty.as_ref().unwrap(),
-                type_hint: ctx.struct_attr.type_hint
-            };
-            render_child(&child_data, fields, named_fields, ctx, (child_path, new_depth), if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple})
+            let ty = if let Some(depth) = depth { &parent_child_field.path[depth].1.as_ref().unwrap() } else { field.ty.as_ref().unwrap() };
+            let child_data = ChildRenderContext { ty, type_hint: ctx.struct_attr.type_hint };
+            let child_path = ChildPath::new(field.member.clone(), parent_child_field.path.iter().map(|x|x.0.clone()));
+            render_child(&child_data, fields, named_fields, ctx, (&child_path, new_depth), if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple})
         } else {
             fields.next();
             render_line()
@@ -670,7 +658,10 @@ fn render_struct_line(
         None => x.to_token_stream(),
     };
     let get_child_field_path = |x: &Member| match parent_child {
-        Some(_) => quote!(#x.#member),
+        Some(p) => {
+            let sub_path = &p.path_tokens;
+            quote!(#x #sub_path.#member)
+        },
         None => x.to_token_stream()
     };
 
