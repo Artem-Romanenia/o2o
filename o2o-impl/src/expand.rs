@@ -275,7 +275,7 @@ fn struct_init_block<'a>(input: &'a Struct, ctx: &ImplContext) -> TokenStream {
     fields.extend(input.fields.iter()
         .flat_map(|x| {
             let fields: Vec<FieldContainer> = if let Some(p) = x.attrs.parameterized_parent_attr(&ctx.struct_attr.ty).map(|a| a.child_fields.as_ref().unwrap()) {
-                p.iter().map(|p| make_tuple(format!("{}{}", &x.member_str, &p.path_tokens.to_string().replace(' ', "")), FieldData::ParentChildField(x, p)).0).collect()
+                p.iter().map(|p| make_tuple(format!("{}{}", &x.member_str, &p.sub_path_tokens.to_string().replace(' ', "")), FieldData::ParentChildField(x, p)).0).collect()
             } else {
                 let path = x.attrs.child(&ctx.struct_attr.ty).map(|x| x.get_child_path_str(None)).unwrap_or(&x.member_str);
                 vec![make_tuple(path.to_string(), FieldData::Field(x)).0]
@@ -311,7 +311,7 @@ fn struct_init_block_inner(
     while let Some(FieldContainer { path, field_data, .. }) = members.peek() {
         if let Some(field_ctx) = field_ctx {
             let p = field_ctx.0.get_child_path_str(Some(field_ctx.2));
-            if path != &p && !path.starts_with(format!("{p}.").as_str()) {
+            if path != p && !path.starts_with(format!("{p}.").as_str()) {
                 break;
             }
         }
@@ -539,12 +539,12 @@ fn render_parent_child_fragment<F: Fn() -> TokenStream>(
     render_line: F
 ) -> TokenStream
 {
-    if depth.is_none() || depth.unwrap() < parent_child_field.path.len() {
+    if depth.is_none() || depth.unwrap() < parent_child_field.sub_path.len() {
         let new_depth = depth.map_or(0, |x|x+1);
         if ctx.kind.is_from() {
-            let ty = if let Some(depth) = depth { &parent_child_field.path[depth].1.as_ref().unwrap() } else { field.ty.as_ref().unwrap() };
+            let ty = if let Some(depth) = depth { parent_child_field.sub_path[depth].1.as_ref().unwrap() } else { field.ty.as_ref().unwrap() };
             let child_data = ChildRenderContext { ty, type_hint: ctx.struct_attr.type_hint };
-            let child_path = ChildPath::new(field.member.clone(), parent_child_field.path.iter().map(|x|x.0.clone()));
+            let child_path = ChildPath::new(field.member.clone(), parent_child_field.sub_path.iter().map(|x|x.0.clone()));
             render_child(&child_data, fields, named_fields, ctx, (&child_path, new_depth), if ctx.input.named_fields() {TypeHint::Struct} else {TypeHint::Tuple})
         } else {
             fields.next();
@@ -659,7 +659,7 @@ fn render_struct_line(
     };
     let get_child_field_path = |x: &Member| match parent_child {
         Some(p) => {
-            let sub_path = &p.path_tokens;
+            let sub_path = &p.sub_path_tokens;
             quote!(#x #sub_path.#member)
         },
         None => x.to_token_stream()

@@ -257,12 +257,12 @@ fn validate_dedicated_member_attrs<T, U: Fn(&T) -> Option<&TypePath>>(attrs: &Ve
 fn validate_parent_attrs(named_root_struct: bool, parent_attrs: &[ParentAttr], data_type_attrs_by_kind: &[(&TraitAttrCore, Kind)], errors: &mut HashMap<String, Span>) {
     for p in parent_attrs {
         for (attr, _) in data_type_attrs_by_kind.iter().filter(|(x, kind)| !kind.is_from() && (p.container_ty.is_none() || &x.ty == p.container_ty.as_ref().unwrap())) {
-            p.child_fields.as_ref().map(|fields| fields.iter().for_each(|f| {
-                if (attr.type_hint == TypeHint::Struct || named_root_struct) && !f.named_fields() && f.attrs.len() == 0 {
+            if let Some(fields) = p.child_fields.as_ref() { fields.iter().for_each(|f| {
+                if (attr.type_hint == TypeHint::Struct || named_root_struct) && !f.named_fields() && f.attrs.is_empty() {
                     let s = f.this_member.to_token_stream().to_string(); 
                     errors.insert(format!("Member {0} should have an instruction that specifies corresponding field name of type {2}, e.g. #[parent({1}[map(field_name)] {0}, ...)]", s, if s == "0" { "" } else { "..., " }, attr.ty.path_str), f.this_member.span());
                 }
-            }));
+            })}
         }
     }
 }
@@ -330,11 +330,11 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, data_type_at
         for (data_type_attr, kind) in data_type_attrs_by_kind {
             if data_type_attr.quick_return.is_none() && data_type_attr.type_hint == TypeHint::Struct {
                 for field in &input.fields {
-                    if field.attrs.ghost(&data_type_attr.ty, &kind).is_some() || field.attrs.has_parent_attr(&data_type_attr.ty) {
+                    if field.attrs.ghost(&data_type_attr.ty, kind).is_some() || field.attrs.has_parent_attr(&data_type_attr.ty) {
                         continue;
                     }
 
-                    if let Some(field_attr) = field.attrs.applicable_field_attr(&kind, false, &data_type_attr.ty) {
+                    if let Some(field_attr) = field.attrs.applicable_field_attr(kind, false, &data_type_attr.ty) {
                         if kind.is_from() {
                             if field_attr.attr.member.is_none() && field_attr.attr.action.is_none() {
                                 errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {} or an action", field_attr.original_instr, field.member.to_token_stream(), data_type_attr.ty.path), field.member.span());

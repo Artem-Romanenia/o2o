@@ -833,23 +833,23 @@ pub(crate) struct ParentAttr {
 impl Parse for ParentAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let container_ty = try_parse_container_ident(input, true);
-        let child_fields = input.is_empty().not().then(|| Punctuated::parse_terminated(input)).transpose()?;
+        let child_fields: Option<Punctuated<ParentChildFieldAsParsed, Comma>> = input.is_empty().not().then(|| Punctuated::parse_terminated(input)).transpose()?;
 
         Ok(ParentAttr { container_ty, child_fields: child_fields.map(|x|convert_parent_child_field(x, vec![])) })
     }
 }
 
-fn convert_parent_child_field(child_fields_as_parsed: Punctuated<ParentChildFieldAsParsed, Comma>, path: Vec<(Member, Option<syn::Path>)>) -> Vec<ParentChildField> {
+fn convert_parent_child_field(child_fields_as_parsed: Punctuated<ParentChildFieldAsParsed, Comma>, sub_path: Vec<(Member, Option<syn::Path>)>) -> Vec<ParentChildField> {
     let mut child_fields_as_used = vec![];
 
     for child_field in child_fields_as_parsed {
         if let Some(parent_attr) = child_field.parent_attr {
-            let mut path = path.clone();
+            let mut path = sub_path.clone();
             path.push((child_field.this_member, child_field.ty));
             child_fields_as_used.extend(convert_parent_child_field(parent_attr, path));
         } else {
-            let path_tokens = path.iter().map(|x|x.0.to_token_stream()).fold(TokenStream::new(), |a,b| quote!(#a.#b));
-            child_fields_as_used.push(ParentChildField { this_member: child_field.this_member, attrs: child_field.attrs, path: path.clone(), path_tokens });
+            let path_tokens = sub_path.iter().map(|x|x.0.to_token_stream()).fold(TokenStream::new(), |a,b| quote!(#a.#b));
+            child_fields_as_used.push(ParentChildField { this_member: child_field.this_member, attrs: child_field.attrs, sub_path: sub_path.clone(), sub_path_tokens: path_tokens });
         }
     }
 
@@ -897,7 +897,7 @@ impl Parse for ParentChildFieldAsParsed {
                     if parent_attr.is_none() {
                         parent_attr = Some(Punctuated::parse_terminated(&content_inner)?)
                     } else {
-                        Err(syn::Error::new(instr.span(), format!("Cannot have more than one parent attr")))?
+                        Err(syn::Error::new(instr.span(), "Cannot have more than one [parent] instruction here"))?
                     }
                 }
                 _ => Err(syn::Error::new(instr.span(), format!("Instruction '{}' is not recognized in this context", instr_str)))?
@@ -911,7 +911,7 @@ impl Parse for ParentChildFieldAsParsed {
             Some(input.parse()?)
         } else { None };
 
-        Ok(ParentChildFieldAsParsed { this_member, ty: ty.map(|x|x.into()), attrs, parent_attr })
+        Ok(ParentChildFieldAsParsed { this_member, ty, attrs, parent_attr })
     }
 }
 
@@ -919,8 +919,8 @@ impl Parse for ParentChildFieldAsParsed {
 pub(crate) struct ParentChildField {
     pub this_member: Member,
     pub attrs: Vec<ParentChildFieldAttr>,
-    pub path: Vec<(Member, Option<syn::Path>)>,
-    pub path_tokens: TokenStream,
+    pub sub_path: Vec<(Member, Option<syn::Path>)>,
+    pub sub_path_tokens: TokenStream,
 }
 
 impl<'a> ParentChildField {
