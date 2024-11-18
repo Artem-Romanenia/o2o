@@ -1243,36 +1243,27 @@ struct CarDto {
   ```
 </details>
 
-The reverse case, where you have to put **o2o** insturctions on the side that has field that are being flatened, is slightly tricky:
+The reverse case:
 
 ``` rust
-use o2o::o2o;
-use o2o::traits::IntoExisting;
-
-#[derive(o2o)]
+#[derive(o2o::o2o)]
 #[owned_into(CarDto)]
 struct Car {
     number_of_doors: i8,
-    #[parent]
+    #[parent(number_of_seats, [parent(brand, year)] machine)]
     vehicle: Vehicle
 }
 
-#[derive(o2o)]
-#[owned_into_existing(CarDto)]
 struct Vehicle {
     number_of_seats: i16,
-    #[parent]
     machine: Machine,
 }
 
-#[derive(o2o)]
-#[owned_into_existing(CarDto)]
 struct Machine {
     brand: String,
     year: i16
 }
 
-// CarDto has to implement `Default` trait in this case.
 #[derive(Default)]
 struct CarDto {
     number_of_doors: i8,
@@ -1287,22 +1278,59 @@ struct CarDto {
   ``` rust ignore
   impl ::core::convert::Into<CarDto> for Car {
       fn into(self) -> CarDto {
-          let mut obj: CarDto = Default::default();
-          obj.number_of_doors = self.number_of_doors;
-          self.vehicle.into_existing(&mut obj);
-          obj
+          CarDto {
+              number_of_doors: self.number_of_doors,
+              number_of_seats: self.vehicle.number_of_seats,
+              brand: self.vehicle.machine.brand,
+              year: self.vehicle.machine.year,
+          }
       }
   }
-  impl o2o::traits::IntoExisting<CarDto> for Vehicle {
-      fn into_existing(self, other: &mut CarDto) {
-          other.number_of_seats = self.number_of_seats;
-          self.machine.into_existing(other);
-      }
-  }
-  impl o2o::traits::IntoExisting<CarDto> for Machine {
-      fn into_existing(self, other: &mut CarDto) {
-          other.brand = self.brand;
-          other.year = self.year;
+  ```
+</details>
+
+When you need an `From<T>` conversion, **o2o** also expects you to provide types for flatened properties:
+
+``` rust
+#[derive(o2o::o2o)]
+#[from_owned(CarDto)]
+struct Car {
+    number_of_doors: i8,
+    #[parent(number_of_seats, [parent(brand, year)] machine: Machine)] // 'machine' needs to have type here
+    vehicle: Vehicle
+}
+
+struct Vehicle {
+    number_of_seats: i16,
+    machine: Machine,
+}
+
+struct Machine {
+    brand: String,
+    year: i16
+}
+
+#[derive(Default)]
+struct CarDto {
+    number_of_doors: i8,
+    number_of_seats: i16,
+    brand: String,
+    year: i16
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl ::core::convert::From<CarDto> for Car {
+      fn from(value: CarDto) -> Car {
+          Car {
+              number_of_doors: value.number_of_doors,
+              vehicle: Vehicle {
+                  number_of_seats: value.number_of_seats,
+                  machine: Machine { brand: value.brand, year: value.year },
+              },
+          }
       }
   }
   ```

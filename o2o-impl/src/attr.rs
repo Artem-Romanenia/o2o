@@ -897,7 +897,7 @@ impl Parse for ParentChildFieldAsParsed {
                     if parent_attr.is_none() {
                         parent_attr = Some(Punctuated::parse_terminated(&content_inner)?)
                     } else {
-                        Err(syn::Error::new(instr.span(), "Cannot have more than one [parent] instruction here"))?
+                        Err(syn::Error::new(instr.span(), "Cannot have more than one [parent(...)] instruction here"))?
                     }
                 }
                 _ => Err(syn::Error::new(instr.span(), format!("Instruction '{}' is not recognized in this context", instr_str)))?

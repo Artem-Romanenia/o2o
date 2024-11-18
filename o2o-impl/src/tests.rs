@@ -2154,6 +2154,34 @@ fn lifetimes(code_fragment: TokenStream, expected_output: TokenStream) {
         child: Child
     }
 }, Some("Instruction 'test' is not recognized in this context"); "2")]
+#[test_case(quote! {
+    #[map(Entity as {})]
+    struct EntityDto {
+        #[parent(field_1, [parent(test)] [parent(test)] field_2)]
+        child: Child
+    }
+}, Some("Cannot have more than one [parent(...)] instruction here"); "3")]
+#[test_case(quote! {
+    #[try_map(Entity as {}, String)]
+    struct EntityDto {
+        #[parent(field_1, field_2)]
+        child: Child
+    }
+}, None; "4")]
+#[test_case(quote! {
+    #[try_map(Entity as {}, String)]
+    struct EntityDto {
+        #[parent(field_1, [test()] field_2)]
+        child: Child
+    }
+}, Some("Instruction 'test' is not recognized in this context"); "5")]
+#[test_case(quote! {
+    #[try_map(Entity as {}, String)]
+    struct EntityDto {
+        #[parent(field_1, [parent(test)] [parent(test)] field_2)]
+        child: Child
+    }
+}, Some("Cannot have more than one [parent(...)] instruction here"); "6")]
 fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
@@ -2189,8 +2217,8 @@ fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
     "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
 ] ; "2")]
 #[test_case(quote! {
-    #[map(EntityDto)]
-    #[map(EntityModel)]
+    #[try_map(EntityDto, String)]
+    #[try_map(EntityModel, String)]
     struct Entity {
         #[parent(0)]
         child: Child
@@ -2228,8 +2256,7 @@ fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
     "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]",
 ] ; "6")]
 #[test_case(quote! {
-    #[derive(o2o::o2o)]
-    #[map(EntityDto as {})]
+    #[try_map(EntityDto as {}, String)]
     struct Entity (
         #[parent(0)]
         Child
@@ -2238,7 +2265,6 @@ fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
     "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
 ] ; "7")]
 #[test_case(quote! {
-    #[derive(o2o::o2o)]
     #[map(EntityDto)]
     struct Entity (
         #[parent(0)]
@@ -2247,9 +2273,8 @@ fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
 }, vec![
 ] ; "8")]
 #[test_case(quote! {
-    #[derive(o2o::o2o)]
     #[map(EntityDto)]
-    #[map(EntityModel)]
+    #[try_map(EntityModel, String)]
     struct Entity {
         #[parent(EntityModel| 0)]
         child: Child
@@ -2257,6 +2282,42 @@ fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
 }, vec![
     "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]"
 ] ; "9")]
+#[test_case(quote! {
+    #[from(EntityDto)]
+    struct Entity {
+        #[parent([parent(inner_test)] test)]
+        child: Child
+    }
+}, vec![
+    "Field 'test' should have type here, e.g. 'test: SomeStruct'"
+] ; "10")]
+#[test_case(quote! {
+    #[try_from(EntityDto, String)]
+    struct Entity (
+        #[parent([parent(0)] 0)]
+        Child
+    );
+}, vec![
+    "Field '0' should have type here, e.g. '0: SomeStruct'"
+] ; "11")]
+#[test_case(quote! {
+    #[into(EntityDto)]
+    #[into_existing(EntityDto)]
+    struct Entity {
+        #[parent([parent(inner_test)] test)]
+        child: Child
+    }
+}, vec![
+] ; "12")]
+#[test_case(quote! {
+    #[into(EntityDto)]
+    #[into_existing(EntityDto)]
+    struct Entity (
+        #[parent([parent(0)] 0)]
+        Child
+    );
+}, vec![
+] ; "13")]
 fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&str>) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);

@@ -264,24 +264,22 @@ fn validate_parent_attrs(named_root_struct: bool, parent_attrs: &[ParentAttr], d
                 }
             })}
         }
+
+        for _ in data_type_attrs_by_kind.iter().filter(|(x, kind)|kind.is_from() && (p.container_ty.is_none() || &x.ty == p.container_ty.as_ref().unwrap())) {
+            if let Some(fields) = p.child_fields.as_ref() { fields.iter().for_each(|f| {
+                for i in f.sub_path.iter() {
+                    if i.1.is_none() {
+                        errors.insert(format!("Field '{0}' should have type here, e.g. '{0}: SomeStruct'", i.0.to_token_stream().to_string()), i.0.span());
+                    }
+                }
+            })}
+        }
     }
 }
 
 fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, data_type_attrs_by_kind: &[(&TraitAttrCore, Kind)], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
-    let into_type_paths = data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, false)
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, false))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, true))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, true))
-        .map(|x| &x.ty)
-        .collect::<HashSet<_>>();
-
-    let from_type_paths = data_type_attrs.iter_for_kind_core(&Kind::FromOwned, false)
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, false))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::FromOwned, true))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, true))
-        .filter(|x| x.update.is_none())
-        .map(|x| &x.ty)
-        .collect::<HashSet<_>>();
+    let into_type_paths = data_type_attrs_by_kind.iter().filter_map(|(x, kind)|(!kind.is_from() && !kind.is_into_existing()).then_some(&x.ty)).collect::<HashSet<_>>();
+    let from_type_paths = data_type_attrs_by_kind.iter().filter_map(|(x, kind)|(x.update.is_none() && kind.is_from()).then_some(&x.ty)).collect::<HashSet<_>>();
 
     for field in &input.fields {
         for ghost_attr in field.attrs.ghost_attrs.iter() {
