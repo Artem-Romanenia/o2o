@@ -1131,7 +1131,7 @@ fn quote_try_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
         impl #impl_gens ::core::convert::TryFrom<#r #src #those_gens> for #dst #these_gens #where_clause {
             type Error = #err_ty;
             #attr
-            fn try_from(value: #r #src #those_gens) -> Result<#dst #these_gens, #err_ty> {
+            fn try_from(value: #r #src #those_gens) -> ::core::result::Result<#dst #these_gens, #err_ty> {
                 #inner_attr
                 #pre_init
                 #init
@@ -1190,7 +1190,7 @@ fn quote_try_into_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<To
         impl #impl_gens ::core::convert::TryInto<#dst #those_gens> for #r #src #these_gens #where_clause {
             type Error = #err_ty;
             #attr
-            fn try_into(self) -> Result<#dst #those_gens, #err_ty> {
+            fn try_into(self) -> ::core::result::Result<#dst #those_gens, #err_ty> {
                 #inner_attr
                 #body
             }
@@ -1222,7 +1222,7 @@ fn quote_try_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: 
         impl #impl_gens o2o::traits::TryIntoExisting<#dst #those_gens> for #r #src #these_gens #where_clause {
             type Error = #err_ty;
             #attr
-            fn try_into_existing(self, other: &mut #dst #those_gens) -> Result<(), #err_ty> {
+            fn try_into_existing(self, other: &mut #dst #those_gens) -> ::core::result::Result<(), #err_ty> {
                 #inner_attr
                 #pre_init
                 #init
