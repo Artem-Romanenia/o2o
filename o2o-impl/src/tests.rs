@@ -1804,7 +1804,7 @@ quote!{
     impl ::core::convert::TryFrom<TestDto> for Test {
         type Error = String;
         #[attribute(param)]
-        fn try_from(value: TestDto) -> Result<Test, String> {
+        fn try_from(value: TestDto) -> ::core::result::Result<Test, String> {
             #![inner_param(param)]
             Ok(Test { x: value.x, })
         }
@@ -1813,7 +1813,7 @@ quote!{
     impl ::core::convert::TryFrom<&TestDto> for Test {
         type Error = String;
         #[attribute(param)]
-        fn try_from(value: &TestDto) -> Result<Test, String> {
+        fn try_from(value: &TestDto) -> ::core::result::Result<Test, String> {
             #![inner_param(param)]
             Ok(Test { x: value.x, })
         }
@@ -1822,7 +1822,7 @@ quote!{
     impl ::core::convert::TryInto<TestDto> for Test {
         type Error = String;
         #[attribute(param)]
-        fn try_into(self) -> Result<TestDto, String> {
+        fn try_into(self) -> ::core::result::Result<TestDto, String> {
             #![inner_param(param)]
             Ok(TestDto { x: self.x, })
         }
@@ -1831,7 +1831,7 @@ quote!{
     impl ::core::convert::TryInto<TestDto> for &Test {
         type Error = String;
         #[attribute(param)]
-        fn try_into(self) -> Result<TestDto, String> {
+        fn try_into(self) -> ::core::result::Result<TestDto, String> {
             #![inner_param(param)]
             Ok(TestDto { x: self.x, })
         }
@@ -1840,7 +1840,7 @@ quote!{
     impl o2o::traits::TryIntoExisting<TestDto> for Test {
         type Error = String;
         #[attribute(param)]
-        fn try_into_existing(self, other: &mut TestDto) -> Result<(), String> {
+        fn try_into_existing(self, other: &mut TestDto) -> ::core::result::Result<(), String> {
             #![inner_param(param)]
             other.x = self.x;
             Ok(())
@@ -1850,7 +1850,7 @@ quote!{
     impl o2o::traits::TryIntoExisting<TestDto> for &Test {
         type Error = String;
         #[attribute(param)]
-        fn try_into_existing(self, other: &mut TestDto) -> Result<(), String> {
+        fn try_into_existing(self, other: &mut TestDto) -> ::core::result::Result<(), String> {
             #![inner_param(param)]
             other.x = self.x;
             Ok(())
@@ -2061,7 +2061,7 @@ quote!{
     where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
     {
         type Error = String;
-        fn try_from(value: Entity<'c, 'd>) -> Result<EntityDto<'a, 'b>, String> {
+        fn try_from(value: Entity<'c, 'd>) -> ::core::result::Result<EntityDto<'a, 'b>, String> {
             Ok(EntityDto {
                 some_int: value.some_int,
                 some_str: value.some_str,
@@ -2073,7 +2073,7 @@ quote!{
     where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
     {
         type Error = String;
-        fn try_from(value: &'o2o Entity<'c, 'd>) -> Result<EntityDto<'a, 'b>, String> {
+        fn try_from(value: &'o2o Entity<'c, 'd>) -> ::core::result::Result<EntityDto<'a, 'b>, String> {
             Ok(EntityDto {
                 some_int: value.some_int,
                 some_str: value.some_str,
@@ -2085,7 +2085,7 @@ quote!{
     where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
     {
         type Error = String;
-        fn try_into(self) -> Result<Entity<'c, 'd>, String> {
+        fn try_into(self) -> ::core::result::Result<Entity<'c, 'd>, String> {
             Ok(Entity {
                 some_int: self.some_int,
                 some_str: self.some_str,
@@ -2097,7 +2097,7 @@ quote!{
     where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
     {
         type Error = String;
-        fn try_into(self) -> Result<Entity<'c, 'd>, String> {
+        fn try_into(self) -> ::core::result::Result<Entity<'c, 'd>, String> {
             Ok(Entity {
                 some_int: self.some_int,
                 some_str: self.some_str,
@@ -2109,7 +2109,7 @@ quote!{
     where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
     {
         type Error = String;
-        fn try_into_existing(self, other: &mut Entity<'c, 'd>) -> Result<(), String> {
+        fn try_into_existing(self, other: &mut Entity<'c, 'd>) -> ::core::result::Result<(), String> {
             other.some_int = self.some_int;
             other.some_str = self.some_str;
             other.another_str = "123".into();
@@ -2120,7 +2120,7 @@ quote!{
     where 'c: 'a, 'd: 'b, 'a: 'c, 'b: 'd
     {
         type Error = String;
-        fn try_into_existing(self, other: &mut Entity<'c, 'd>) -> Result<(), String> {
+        fn try_into_existing(self, other: &mut Entity<'c, 'd>) -> ::core::result::Result<(), String> {
             other.some_int = self.some_int;
             other.some_str = self.some_str;
             other.another_str = "321".into();
