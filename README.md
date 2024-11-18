@@ -144,6 +144,8 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Item attributes (attributes for `#[] impl`, `#[] fn`, `fn() { #![] }`)](#item-attributes-attributes-for--impl--fn-fn---)
   - [Slightly complex example](#slightly-complex-example)
   - [Flatened children](#flatened-children)
+    - [Child instructions](#child-instructions)
+    - [Parent instructions](#parent-instructions)
   - [Tuple structs](#tuple-structs)
   - [Tuples](#tuples)
   - [Type hints](#type-hints)
@@ -1129,7 +1131,9 @@ impl EmployeeDto {
 
 ### Flatened children
 
-When the instructions are put on the side that contains flatened properties, conversion `From<T>` and `IntoExisting<T>` only requires usage of a member level `#[child(...)]` instruction, which accepts a path to the unflatened field (*without* the field name itself).
+#### Child instructions
+
+When the instructions are put on the side that contains flatened properties, conversions `From<T>` and `IntoExisting<T>` only require usage of a member level `#[child(...)]` instruction, which accepts a path to the unflatened field (*without* the field name itself).
 ``` rust
 use o2o::o2o;
 
@@ -1243,14 +1247,16 @@ struct CarDto {
   ```
 </details>
 
-The reverse case:
+#### Parent instructions
+
+When the instructions are put on the side that contains parent property that is being flatened, conversions `Into<T>` and `IntoExisting<T>` can be done by using #[parent(...)] instruction and listing inner properties:
 
 ``` rust
 #[derive(o2o::o2o)]
 #[owned_into(CarDto)]
 struct Car {
     number_of_doors: i8,
-    #[parent(number_of_seats, [parent(brand, year)] machine)]
+    #[parent(number_of_seats, [parent(brand, year)] machine)] // [parent] instruction is recursive
     vehicle: Vehicle
 }
 
@@ -1289,7 +1295,7 @@ struct CarDto {
   ```
 </details>
 
-When you need an `From<T>` conversion, **o2o** also expects you to provide types for flatened properties:
+When you need an `From<T>` conversion, **o2o** also expects you to provide types for nested parent properties:
 
 ``` rust
 #[derive(o2o::o2o)]
