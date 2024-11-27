@@ -43,7 +43,7 @@ pub(crate) enum DataTypeInstruction {
     Map(TraitAttr),
     Ghosts(GhostsAttr),
     Where(WhereAttr),
-    Children(ChildrenAttr),
+    ChildParents(ChildParentsAttr),
     AllowUnknown,
 
     Misplaced { instr: &'static str, span: Span, own: bool },
@@ -191,7 +191,7 @@ pub(crate) struct DataTypeAttrs {
     pub attrs: Vec<TraitAttr>,
     pub ghosts_attrs: Vec<GhostsAttr>,
     pub where_attrs: Vec<WhereAttr>,
-    pub children_attrs: Vec<ChildrenAttr>,
+    pub child_parents_attrs: Vec<ChildParentsAttr>,
 
     pub error_instrs: Vec<DataTypeInstruction>,
 }
@@ -217,10 +217,10 @@ impl<'a> DataTypeAttrs {
             .or_else(|| self.where_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn children_attr(&'a self, container_ty: &TypePath) -> Option<&ChildrenAttr>{
-        self.children_attrs.iter()
+    pub(crate) fn child_parents_attr(&'a self, container_ty: &TypePath) -> Option<&ChildParentsAttr>{
+        self.child_parents_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
-            .or_else(|| self.children_attrs.iter().find(|x| x.container_ty.is_none()))
+            .or_else(|| self.child_parents_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 }
 
@@ -760,40 +760,40 @@ impl Parse for WhereAttr {
     }
 }
 
-pub(crate) struct ChildrenAttr {
+pub(crate) struct ChildParentsAttr {
     pub container_ty: Option<TypePath>,
-    pub children: Punctuated<ChildData, Token![,]>,
+    pub child_parents: Punctuated<ChildParentData, Token![,]>,
 }
 
-impl Parse for ChildrenAttr {
+impl Parse for ChildParentsAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(ChildrenAttr {
+        Ok(ChildParentsAttr {
             container_ty: try_parse_container_ident(input, false),
-            children: try_parse_children(input)?,
+            child_parents: try_parse_child_parents(input)?,
         })
     }
 }
 
-pub(crate) struct ChildData {
+pub(crate) struct ChildParentData {
     pub ty: syn::Path,
     pub type_hint: TypeHint,
     pub field_path: Punctuated<Member, Token![.]>,
     field_path_str: String,
 }
 
-impl ChildData {
+impl ChildParentData {
     pub(crate) fn check_match(&self, path: &str) -> bool {
         self.field_path_str == path
     }
 }
 
-impl PartialEq for ChildData {
+impl PartialEq for ChildParentData {
     fn eq(&self, other: &Self) -> bool {
         self.field_path_str == other.field_path_str
     }
 }
-impl Eq for ChildData {}
-impl Hash for ChildData {
+impl Eq for ChildParentData {}
+impl Hash for ChildParentData {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.field_path_str.hash(state)
     }
@@ -1112,7 +1112,7 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
             },
             DataTypeInstruction::Ghosts(attr) => attrs.ghosts_attrs.push(attr),
             DataTypeInstruction::Where(attr) => attrs.where_attrs.push(attr),
-            DataTypeInstruction::Children(attr) => attrs.children_attrs.push(attr),
+            DataTypeInstruction::ChildParents(attr) => attrs.child_parents_attrs.push(attr),
             DataTypeInstruction::AllowUnknown | DataTypeInstruction::Unrecognized => (),
             _ => attrs.error_instrs.push(instr),
         };
@@ -1208,12 +1208,13 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
                 appl_ghosts_ref(instr_str),
             ],
         })),
-        "children" => Ok(DataTypeInstruction::Children(syn::parse2(input)?)),
+        "child_parents" => Ok(DataTypeInstruction::ChildParents(syn::parse2(input)?)),
         "where_clause" => Ok(DataTypeInstruction::Where(syn::parse2(input)?)),
+        "children" => Ok(DataTypeInstruction::Misnamed { instr: "children", span: instr.span(), guess_name: "child_parents", own: own_instr }),
         "ghost" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost", span: instr.span(), guess_name: "ghosts", own: own_instr }),
         "ghost_ref" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost_ref", span: instr.span(), guess_name: "ghosts_ref", own: own_instr }),
         "ghost_owned" if bark => Ok(DataTypeInstruction::Misnamed { instr: "ghost_owned", span: instr.span(), guess_name: "ghosts_owned", own: own_instr }),
-        "child" if bark => Ok(DataTypeInstruction::Misnamed { instr: "child", span: instr.span(), guess_name: "children", own: own_instr }),
+        "child" if bark => Ok(DataTypeInstruction::Misnamed { instr: "child", span: instr.span(), guess_name: "child_parents", own: own_instr }),
         "parent" if bark => Ok(DataTypeInstruction::Misplaced { instr: "parent", span: instr.span(), own: own_instr }),
         "as_type" if bark => Ok(DataTypeInstruction::Misplaced { instr: "as_type", span: instr.span(), own: own_instr }),
         "literal" if bark => Ok(DataTypeInstruction::Misplaced { instr: "literal", span: instr.span(), own: own_instr }),
@@ -1288,6 +1289,7 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
         "stop_repeat" => Ok(MemberInstruction::StopRepeat),
         "type_hint" => Ok(MemberInstruction::VariantTypeHint(syn::parse2(input)?)),
         "children" if bark => Ok(MemberInstruction::Misnamed { instr: "children", span: instr.span(), guess_name: "child", own: own_instr }),
+        "child_parents" if bark => Ok(MemberInstruction::Misnamed { instr: "child_parents", span: instr.span(), guess_name: "child", own: own_instr }),
         "where_clause" if bark => Ok(MemberInstruction::Misplaced { instr: "where_clause", span: instr.span(), own: own_instr }),
         "allow_unknown" if bark => Ok(MemberInstruction::Misplaced { instr: "allow_unknown", span: instr.span(), own: own_instr }),
         _ if own_instr => Ok(MemberInstruction::UnrecognizedWithError { instr: instr_str.clone(), span: instr.span() }),
@@ -1369,12 +1371,12 @@ fn peek_ghost_field_name(input: ParseStream) -> bool {
     peek_member(input) && (input.peek2(Token![:]) || input.peek2(Brace) || input.peek2(Paren))
 }
 
-fn try_parse_children(input: ParseStream) -> Result<Punctuated<ChildData, Token![,]>> {
+fn try_parse_child_parents(input: ParseStream) -> Result<Punctuated<ChildParentData, Token![,]>> {
     input.parse_terminated(|x| {
         let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(x)?;
         x.parse::<Token![:]>()?;
         let ty = x.parse::<syn::Path>()?;
-        Ok(ChildData {
+        Ok(ChildParentData {
             ty,
             type_hint: try_parse_type_hint(x)?,
             field_path: child_path.clone(),

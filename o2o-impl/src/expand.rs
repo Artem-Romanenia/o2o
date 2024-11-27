@@ -2,7 +2,7 @@ use std::{collections::HashMap, iter::Peekable, slice::Iter};
 
 use crate::{
     ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
-    attr::{ApplicableAttr, ChildData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
+    attr::{ApplicableAttr, ChildParentData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
     validate::validate,
 };
 use proc_macro2::{Span, TokenStream};
@@ -59,8 +59,8 @@ struct ChildRenderContext<'a> {
     pub type_hint: TypeHint
 }
 
-impl<'a> From<&'a ChildData> for ChildRenderContext<'a> {
-    fn from(value: &'a ChildData) -> Self {
+impl<'a> From<&'a ChildParentData> for ChildRenderContext<'a> {
+    fn from(value: &'a ChildParentData) -> Self {
         ChildRenderContext { ty: &value.ty, type_hint: value.type_hint }
     }
 }
@@ -512,8 +512,8 @@ fn render_child_fragment<F: Fn() -> TokenStream>(
         let new_depth = depth.map_or(0, |x|x+1);
         match ctx.kind {
             Kind::OwnedInto | Kind::RefInto => {
-                let mut children = ctx.input.get_attrs().children_attr(&ctx.struct_attr.ty).unwrap().children.iter();
-                let child_data = children.find(|child_data| child_data.check_match(child_path.get_child_path_str(Some(new_depth)))).unwrap();
+                let mut child_parents = ctx.input.get_attrs().child_parents_attr(&ctx.struct_attr.ty).unwrap().child_parents.iter();
+                let child_data = child_parents.find(|child_data| child_data.check_match(child_path.get_child_path_str(Some(new_depth)))).unwrap();
                 
                 render_child(&child_data.into(), fields, ctx.input.named_fields(), ctx, (child_path, new_depth), type_hint)
             },
@@ -633,8 +633,8 @@ fn render_existing_child(
 {
     let child_attr = field_ctx.0;
     let path = child_attr.get_child_path_str(Some(field_ctx.1));
-    let children_attr = ctx.input.get_attrs().children_attr(&ctx.struct_attr.ty);
-    let child_data = children_attr.and_then(|x| x.children.iter().find(|child_data| child_data.check_match(path)));
+    let child_parents_attr = ctx.input.get_attrs().child_parents_attr(&ctx.struct_attr.ty);
+    let child_data = child_parents_attr.and_then(|x| x.child_parents.iter().find(|child_data| child_data.check_match(path)));
     struct_init_block_inner(fields, named_fields, ctx, Some((field_ctx.0, child_data.map(|x|x.into()).as_ref(), field_ctx.1)))
 }
 

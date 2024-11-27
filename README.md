@@ -18,7 +18,7 @@ impl From<Person> for PersonDto {
 }
 ```
 
-Writing code like above is not the most exciting or emotionally rewarding part of working with Rust. If you're Ok with letting procedural macro write it for you, welcome to the rest of this page.
+Writing code like above is not the most exciting or rewarding part of working with Rust. If you're Ok with letting procedural macro write it for you, welcome to the rest of this page.
 
 ## Basic Example<!-- omit from toc --> 
 
@@ -94,7 +94,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   }
   impl ::core::convert::TryInto<Person> for PersonDto {
       type Error = std::io::Error;
-      fn try_into(self) -> Result<Person, std::io::Error> {
+      fn try_into(self) -> ::core::result::Result<Person, std::io::Error> {
           Ok(Person {
               id: self.id,
               name: self.name,
@@ -118,6 +118,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 ## Some milestones<!-- omit from toc --> 
 
+* **v0.5.0** Refactoring and improved support for 'flattened' child fields: `#[child()]`, `#[child_parents()]` and `#[parent()]` instructions
 * **v0.4.9** Support for `#![no_std]`
 * **v0.4.4** Fallible conversions
 * **v0.4.3** Enum-to-primitive type conversions with `#[literal(...)]` and `#[pattern(...)]`
@@ -501,7 +502,7 @@ struct EntityDto {
   }
   impl ::core::convert::TryInto<Entity> for EntityDto {
       type Error = std::num::ParseIntError;
-      fn try_into(self) -> Result<Entity, std::num::ParseIntError> {
+      fn try_into(self) -> ::core::result::Result<Entity, std::num::ParseIntError> {
           Ok(Entity {
               some_int: self.some_int,
               str: self.str,
@@ -511,7 +512,7 @@ struct EntityDto {
   }
   impl ::core::convert::TryInto<Entity> for &EntityDto {
       type Error = std::num::ParseIntError;
-      fn try_into(self) -> Result<Entity, std::num::ParseIntError> {
+      fn try_into(self) -> ::core::result::Result<Entity, std::num::ParseIntError> {
           Ok(Entity {
               some_int: self.some_int,
               str: self.str.clone(),
@@ -851,7 +852,7 @@ struct Wrapper(#[from(@.parse::<i32>()?)]i32);
   ``` rust ignore
   impl ::core::convert::TryFrom<String> for Wrapper {
       type Error = std::num::ParseIntError;
-      fn try_from(value: String) -> Result<Wrapper, std::num::ParseIntError> {
+      fn try_from(value: String) -> ::core::result::Result<Wrapper, std::num::ParseIntError> {
           Ok(Wrapper(value.parse::<i32>()?))
       }
   }
@@ -1133,7 +1134,7 @@ impl EmployeeDto {
 
 #### Child instructions
 
-When the instructions are put on the side that contains flatened properties, conversions `From<T>` and `IntoExisting<T>` only require usage of a member level `#[child(...)]` instruction, which accepts a path to the unflatened field (*without* the field name itself).
+When the instructions are put on the side that contains flatened (child) properties, conversions `From<T>` and `IntoExisting<T>` only require usage of a member level `#[child(...)]` instruction, which accepts a dot separated path to the parent field (*without* the field name itself).
 ``` rust
 use o2o::o2o;
 
@@ -1192,7 +1193,7 @@ struct CarDto {
   ```
 </details>
 
-When you need an `Into<T>` conversion, **o2o** also expects you to provide types for flatened properties via struct level `#[children(...)]` instruction:
+When you need an `Into<T>` conversion, **o2o** also expects you to provide types for parent properties via struct level `#[child_parents(...)]` instruction:
 
 ``` rust
 use o2o::o2o;
@@ -1212,7 +1213,7 @@ struct Machine {
 
 #[derive(o2o)]
 #[owned_into(Car)]
-#[children(vehicle: Vehicle, vehicle.machine: Machine)]
+#[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
 struct CarDto {
     number_of_doors: i8,
 
@@ -1249,14 +1250,14 @@ struct CarDto {
 
 #### Parent instructions
 
-When the instructions are put on the side that contains parent property that is being flatened, conversions `Into<T>` and `IntoExisting<T>` can be done by using #[parent(...)] instruction and listing inner properties:
+When the instructions are put on the side that contains parent property that is being flatened, conversions `Into<T>` and `IntoExisting<T>` can be done by using #[parent(...)] instruction and listing child properties:
 
 ``` rust
 #[derive(o2o::o2o)]
 #[owned_into(CarDto)]
 struct Car {
     number_of_doors: i8,
-    #[parent(number_of_seats, [parent(brand, year)] machine)] // [parent] instruction is recursive
+    #[parent(number_of_seats, [parent(brand, year)] machine)] // [parent] instruction can be recursive
     vehicle: Vehicle
 }
 
@@ -1833,7 +1834,7 @@ struct Machine {
 
 #[derive(o2o)]
 #[map_ref(Car)]
-#[children(vehicle: Vehicle, vehicle.machine: Machine)]
+#[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
 #[ghosts(vehicle.machine@id: {321})]
 struct CarDto {
     number_of_doors: i8,
@@ -2083,7 +2084,7 @@ enum EnumWithDataDto {
   }
   impl ::core::convert::TryInto<EnumWithData> for EnumWithDataDto {
       type Error = std::num::ParseIntError;
-      fn try_into(self) -> Result<EnumWithData, std::num::ParseIntError> {
+      fn try_into(self) -> ::core::result::Result<EnumWithData, std::num::ParseIntError> {
           Ok(match self {
               EnumWithDataDto::Item1(f0, f1) => EnumWithData::Item1(f0.parse::<i32>()?, f1),
               EnumWithDataDto::Item2 { str, i_str } => EnumWithData::Item2 {
@@ -2275,7 +2276,7 @@ enum EnumDto {
   }
   impl ::core::convert::TryInto<Enum> for EnumDto {
       type Error = String;
-      fn try_into(self) -> Result<Enum, String> {
+      fn try_into(self) -> ::core::result::Result<Enum, String> {
           Ok(match self {
               EnumDto::Var1 => Enum::Var1,
               EnumDto::Var2(f0, f1) => Enum::Var2(f0, f1),
@@ -2311,7 +2312,7 @@ enum EnumDto {
   ``` rust ignore
   impl ::core::convert::TryFrom<EnumDto> for Enum {
       type Error = String;
-      fn try_from(value: EnumDto) -> Result<Enum, String> {
+      fn try_from(value: EnumDto) -> ::core::result::Result<Enum, String> {
           Ok(match value {
               EnumDto::Var1 => Enum::Var1,
               EnumDto::Var2(f0, f1) => Enum::Var2(f0, f1),
@@ -2684,7 +2685,7 @@ enum HttpStatusFamily {
   ``` rust ignore
   impl ::core::convert::TryFrom<i32> for HttpStatus {
       type Error = StaticStr;
-      fn try_from(value: i32) -> Result<HttpStatus, StaticStr> {
+      fn try_from(value: i32) -> ::core::result::Result<HttpStatus, StaticStr> {
           Ok(match value {
               200 => HttpStatus::Ok,
               201 => HttpStatus::Created,
@@ -2698,7 +2699,7 @@ enum HttpStatusFamily {
   }
   impl ::core::convert::TryInto<i32> for HttpStatus {
       type Error = StaticStr;
-      fn try_into(self) -> Result<i32, StaticStr> {
+      fn try_into(self) -> ::core::result::Result<i32, StaticStr> {
           Ok(match self {
               HttpStatus::Ok => 200,
               HttpStatus::Created => 201,
@@ -2712,7 +2713,7 @@ enum HttpStatusFamily {
 
   impl ::core::convert::TryFrom<i32> for HttpStatusFamily {
     type Error = StaticStr;
-    fn try_from(value: i32) -> Result<HttpStatusFamily, StaticStr> {
+    fn try_from(value: i32) -> ::core::result::Result<HttpStatusFamily, StaticStr> {
         Ok(match value {
             100..=199 => HttpStatusFamily::Information,
             200..=299 => HttpStatusFamily::Success,

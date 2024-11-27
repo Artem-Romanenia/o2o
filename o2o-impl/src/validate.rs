@@ -1,6 +1,6 @@
 use crate::{
     ast::{DataType, DataTypeMember, Struct, Variant},
-    attr::{ChildAttr, ChildrenAttr, DataTypeAttrs, DataTypeInstruction, FallibleKind, GhostsAttr, Kind, MemberAttrs, MemberInstruction, ParentAttr, TraitAttr, TraitAttrCore, TypeHint, TypePath, WhereAttr},
+    attr::{ChildAttr, ChildParentsAttr, DataTypeAttrs, DataTypeInstruction, FallibleKind, GhostsAttr, Kind, MemberAttrs, MemberInstruction, ParentAttr, TraitAttr, TraitAttrCore, TypeHint, TypePath, WhereAttr},
 };
 use proc_macro2::Span;
 use quote::ToTokens;
@@ -40,7 +40,7 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     validate_ghost_attrs(&Kind::OwnedIntoExisting, &attrs.ghosts_attrs, &type_paths, &mut errors);
     validate_ghost_attrs(&Kind::RefIntoExisting, &attrs.ghosts_attrs, &type_paths, &mut errors);
 
-    validate_children_attrs(&attrs.children_attrs, &type_paths, &mut errors);
+    validate_child_parents_attrs(&attrs.child_parents_attrs, &type_paths, &mut errors);
     validate_where_attrs(&attrs.where_attrs, &type_paths, &mut errors);
 
     let data_type_attrs_by_kind: Vec<(&TraitAttrCore, Kind)> = attrs.iter_for_kind_core(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
@@ -179,9 +179,9 @@ fn validate_ghost_attrs(kind: &Kind, ghost_attrs: &[GhostsAttr], type_paths: &Ha
     }
 }
 
-fn validate_children_attrs(children_attrs: &[ChildrenAttr], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
+fn validate_child_parents_attrs(children_attrs: &[ChildParentsAttr], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     if children_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
-        errors.insert("There can be at most one default #[children(...)] instruction.".into(), Span::call_site());
+        errors.insert("There can be at most one default #[child_parents(...)] instruction.".into(), Span::call_site());
     }
 
     let mut unique_dedicated_attr_type_path = HashSet::new();
@@ -192,13 +192,13 @@ fn validate_children_attrs(children_attrs: &[ChildrenAttr], type_paths: &HashSet
                 errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
             }
             if !unique_dedicated_attr_type_path.insert(tp) {
-                errors.insert(format!("Dedicated #[children(...)] instruction for type {} is already defined.", tp.path_str), tp.span);
+                errors.insert(format!("Dedicated #[child_parents(...)] instruction for type {} is already defined.", tp.path_str), tp.span);
             }
         }
 
         let mut unique_field = HashSet::new();
 
-        for child_data in &children_attr.children {
+        for child_data in &children_attr.child_parents {
             if !unique_field.insert(child_data) {
                 errors.insert("Ident here must be unique.".into(), child_data.field_path.span());
             }
@@ -390,17 +390,17 @@ fn validate_variant_fields(input: &Variant, data_type_attrs: &DataTypeAttrs, _ty
 }
 
 fn check_child_errors(child_attr: &ChildAttr, struct_attrs: &DataTypeAttrs, tp: &TypePath, errors: &mut HashMap<String, Span>) {
-    let children_attr = struct_attrs.children_attr(tp);
+    let children_attr = struct_attrs.child_parents_attr(tp);
     for (idx, _level) in child_attr.child_path.child_path.iter().enumerate() {
         let path = child_attr.get_child_path_str(Some(idx));
         match children_attr {
             Some(children_attr) => {
-                if !children_attr.children.iter().any(|x| x.check_match(path)) {
+                if !children_attr.child_parents.iter().any(|x| x.check_match(path)) {
                     errors.insert(format!("Missing '{}: [Type Path]' instruction for type {}", path, tp.path_str), tp.span);
                 }
             },
             None => {
-                errors.insert(format!("Missing #[children(...)] instruction for {}", tp.path_str), tp.span);
+                errors.insert(format!("Missing #[child_parents(...)] instruction for {}", tp.path_str), tp.span);
             },
         }
     }

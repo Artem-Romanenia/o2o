@@ -21,7 +21,7 @@ struct Machine {
 #[derive(o2o)]
 #[try_map(Car, String)]
 #[try_into_existing(Car, String)]
-#[children(vehicle: Vehicle, vehicle.machine: Machine)]
+#[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
 #[ghosts(vehicle.machine@id: { 321 })]
 struct CarDto {
     number_of_doors: i8,
@@ -66,7 +66,7 @@ pub struct Team {
 #[o2o(
     try_map(Team, String),
     try_into_existing(Team, String),
-    children(base: Base, division: Division, division.base: Base, division.league: League, division.league.base: Base),
+    child_parents(base: Base, division: Division, division.base: Base, division.league: League, division.league.base: Base),
     ghosts_owned(
         division_id: { @.division.id },
         division.base@id: { @.division.id },

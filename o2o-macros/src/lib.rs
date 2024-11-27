@@ -103,6 +103,7 @@ use syn::{parse_macro_input, DeriveInput};
         try_into_existing,
         child,
         children,
+        child_parents,
         parent,
         ghost,
         ghosts,

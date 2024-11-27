@@ -58,7 +58,7 @@ fn extra_float_2(e: &UnnamedEntityDto) -> f32 {
 #[derive(o2o)]
 #[map(Entity)]
 #[into_existing(Entity)]
-#[children(child: Child)]
+#[child_parents(child: Child)]
 #[ghosts(extra_float: { extra_float(&@) })]
 struct EntityDto {
     some_int: i32,
@@ -93,7 +93,7 @@ struct EntityDto {
 #[derive(o2o)]
 #[map(Entity as {})]
 #[into_existing(Entity as {})]
-#[children(child: Child as {})]
+#[child_parents(child: Child as {})]
 #[ghosts(extra_float: { extra_float_2(&@) })]
 struct UnnamedEntityDto(
     #[map(Entity| some_int)] i32,
