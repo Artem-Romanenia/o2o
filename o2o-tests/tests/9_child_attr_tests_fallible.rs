@@ -43,7 +43,7 @@ struct TupleChild(i32, i16);
 #[o2o(
     try_map(Entity, String),
     try_into_existing(Entity, String),
-    children(Entity| base: BaseEntity, base.base: Base, child: Child),
+    child_parents(Entity| base: BaseEntity, base.base: Base, child: Child),
 )]
 struct EntityDto {
     parent_int: i32,
@@ -66,7 +66,7 @@ struct EntityDto {
 #[derive(o2o)]
 #[try_map(TupleEntity, String)]
 #[try_into_existing(TupleEntity, String)]
-#[children(1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
+#[child_parents(1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
 struct TupleEntityDto(i32, #[o2o(child(1 .0), map(0))] i32, #[o2o(child(1 .0), map(1))] i16, #[o2o(child(1), map(1))] i32, #[o2o(child(2), map(0))] i32, #[o2o(child(2), map(1))] i16);
 
 #[test]

@@ -1,6 +1,6 @@
 use crate::{
     ast::{DataType, DataTypeMember, Struct, Variant},
-    attr::{ChildAttr, ChildrenAttr, DataTypeAttrs, DataTypeInstruction, FallibleKind, GhostsAttr, Kind, MemberAttrs, MemberInstruction, TraitAttr, TraitAttrCore, TypeHint, TypePath, WhereAttr},
+    attr::{ChildAttr, ChildParentsAttr, DataTypeAttrs, DataTypeInstruction, FallibleKind, GhostsAttr, Kind, MemberAttrs, MemberInstruction, ParentAttr, TraitAttr, TraitAttrCore, TypeHint, TypePath, WhereAttr},
 };
 use proc_macro2::Span;
 use quote::ToTokens;
@@ -40,8 +40,22 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     validate_ghost_attrs(&Kind::OwnedIntoExisting, &attrs.ghosts_attrs, &type_paths, &mut errors);
     validate_ghost_attrs(&Kind::RefIntoExisting, &attrs.ghosts_attrs, &type_paths, &mut errors);
 
-    validate_children_attrs(&attrs.children_attrs, &type_paths, &mut errors);
+    validate_child_parents_attrs(&attrs.child_parents_attrs, &type_paths, &mut errors);
     validate_where_attrs(&attrs.where_attrs, &type_paths, &mut errors);
+
+    let data_type_attrs_by_kind: Vec<(&TraitAttrCore, Kind)> = attrs.iter_for_kind_core(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
+        .chain(attrs.iter_for_kind_core(&Kind::RefInto, false).map(|x| (x, Kind::RefInto)))
+        .chain(attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, false).map(|x| (x, Kind::OwnedIntoExisting)))
+        .chain(attrs.iter_for_kind_core(&Kind::RefIntoExisting, false).map(|x| (x, Kind::RefIntoExisting)))
+        .chain(attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|x| (x, Kind::FromOwned)))
+        .chain(attrs.iter_for_kind_core(&Kind::FromRef, false).map(|x| (x, Kind::FromRef)))
+        .chain(attrs.iter_for_kind_core(&Kind::OwnedInto, true).map(|x| (x, Kind::OwnedInto)))
+        .chain(attrs.iter_for_kind_core(&Kind::RefInto, true).map(|x| (x, Kind::RefInto)))
+        .chain(attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, true).map(|x| (x, Kind::OwnedIntoExisting)))
+        .chain(attrs.iter_for_kind_core(&Kind::RefIntoExisting, true).map(|x| (x, Kind::RefIntoExisting)))
+        .chain(attrs.iter_for_kind_core(&Kind::FromOwned, true).map(|x| (x, Kind::FromOwned)))
+        .chain(attrs.iter_for_kind_core(&Kind::FromRef, true).map(|x| (x, Kind::FromRef)))
+       .collect();
 
     for member in input.get_members() {
         let member_span = member.get_span();
@@ -60,6 +74,8 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
                 bark_at_member_attr(&member_attrs.ghosts_attrs.iter().filter(|x| !x.applicable_to[&Kind::OwnedInto] && x.applicable_to[&Kind::RefInto]).collect(), "ghosts_ref", |_| f.member.span(), &mut errors);
 
                 validate_dedicated_member_attrs(&member_attrs.parent_attrs, |x| x.container_ty.as_ref(), Some("parent"), member_span, &type_paths, &mut errors);
+
+                validate_parent_attrs(input.named_fields(), &member_attrs.parent_attrs, &data_type_attrs_by_kind, &mut errors);
             },
             DataTypeMember::Variant(v) => {
                 bark_at_member_attr(&member_attrs.parent_attrs, "parent", |_| v.ident.span(), &mut errors);
@@ -75,7 +91,7 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
 
     match input {
         DataType::Struct(s) => {
-            validate_fields(s, attrs, &type_paths, &mut errors);
+            validate_fields(s, attrs, &data_type_attrs_by_kind, &type_paths, &mut errors);
         },
         DataType::Enum(e) => {
             for v in &e.variants {
@@ -163,9 +179,9 @@ fn validate_ghost_attrs(kind: &Kind, ghost_attrs: &[GhostsAttr], type_paths: &Ha
     }
 }
 
-fn validate_children_attrs(children_attrs: &[ChildrenAttr], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
+fn validate_child_parents_attrs(children_attrs: &[ChildParentsAttr], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     if children_attrs.iter().filter(|x| x.container_ty.is_none()).count() > 1 {
-        errors.insert("There can be at most one default #[children(...)] instruction.".into(), Span::call_site());
+        errors.insert("There can be at most one default #[child_parents(...)] instruction.".into(), Span::call_site());
     }
 
     let mut unique_dedicated_attr_type_path = HashSet::new();
@@ -176,13 +192,13 @@ fn validate_children_attrs(children_attrs: &[ChildrenAttr], type_paths: &HashSet
                 errors.insert(format!("Type '{}' doesn't match any type specified in trait instructions.", tp.path_str), tp.span);
             }
             if !unique_dedicated_attr_type_path.insert(tp) {
-                errors.insert(format!("Dedicated #[children(...)] instruction for type {} is already defined.", tp.path_str), tp.span);
+                errors.insert(format!("Dedicated #[child_parents(...)] instruction for type {} is already defined.", tp.path_str), tp.span);
             }
         }
 
         let mut unique_field = HashSet::new();
 
-        for child_data in &children_attr.children {
+        for child_data in &children_attr.child_parents {
             if !unique_field.insert(child_data) {
                 errors.insert("Ident here must be unique.".into(), child_data.field_path.span());
             }
@@ -238,21 +254,32 @@ fn validate_dedicated_member_attrs<T, U: Fn(&T) -> Option<&TypePath>>(attrs: &Ve
     }
 }
 
-fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
-    let into_type_paths = data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, false)
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, false))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, true))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, true))
-        .map(|x| &x.ty)
-        .collect::<HashSet<_>>();
+fn validate_parent_attrs(named_root_struct: bool, parent_attrs: &[ParentAttr], data_type_attrs_by_kind: &[(&TraitAttrCore, Kind)], errors: &mut HashMap<String, Span>) {
+    for p in parent_attrs {
+        for (attr, _) in data_type_attrs_by_kind.iter().filter(|(x, kind)| !kind.is_from() && (p.container_ty.is_none() || &x.ty == p.container_ty.as_ref().unwrap())) {
+            if let Some(fields) = p.child_fields.as_ref() { fields.iter().for_each(|f| {
+                if (attr.type_hint == TypeHint::Struct || named_root_struct) && !f.named_fields() && f.attrs.is_empty() {
+                    let s = f.this_member.to_token_stream().to_string(); 
+                    errors.insert(format!("Member {0} should have an instruction that specifies corresponding field name of type {2}, e.g. #[parent({1}[map(field_name)] {0}, ...)]", s, if s == "0" { "" } else { "..., " }, attr.ty.path_str), f.this_member.span());
+                }
+            })}
+        }
 
-    let from_type_paths = data_type_attrs.iter_for_kind_core(&Kind::FromOwned, false)
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, false))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::FromOwned, true))
-        .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, true))
-        .filter(|x| x.update.is_none())
-        .map(|x| &x.ty)
-        .collect::<HashSet<_>>();
+        for _ in data_type_attrs_by_kind.iter().filter(|(x, kind)|kind.is_from() && (p.container_ty.is_none() || &x.ty == p.container_ty.as_ref().unwrap())) {
+            if let Some(fields) = p.child_fields.as_ref() { fields.iter().for_each(|f| {
+                for i in f.sub_path.iter() {
+                    if i.1.is_none() {
+                        errors.insert(format!("Field '{0}' should have type here, e.g. '{0}: SomeStruct'", i.0.to_token_stream().to_string()), i.0.span());
+                    }
+                }
+            })}
+        }
+    }
+}
+
+fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, data_type_attrs_by_kind: &[(&TraitAttrCore, Kind)], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
+    let into_type_paths = data_type_attrs_by_kind.iter().filter_map(|(x, kind)|(!kind.is_from() && !kind.is_into_existing()).then_some(&x.ty)).collect::<HashSet<_>>();
+    let from_type_paths = data_type_attrs_by_kind.iter().filter_map(|(x, kind)|(x.update.is_none() && kind.is_from()).then_some(&x.ty)).collect::<HashSet<_>>();
 
     for field in &input.fields {
         for ghost_attr in field.attrs.ghost_attrs.iter() {
@@ -298,29 +325,15 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: 
     }
 
     if !input.named_fields {
-        let data_type_attrs: Vec<(&TraitAttrCore, Kind)> = data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, false).map(|x| (x, Kind::RefInto)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, false).map(|x| (x, Kind::OwnedIntoExisting)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::RefIntoExisting, false).map(|x| (x, Kind::RefIntoExisting)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|x| (x, Kind::FromOwned)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, false).map(|x| (x, Kind::FromRef)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::OwnedInto, true).map(|x| (x, Kind::OwnedInto)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::RefInto, true).map(|x| (x, Kind::RefInto)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, true).map(|x| (x, Kind::OwnedIntoExisting)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::RefIntoExisting, true).map(|x| (x, Kind::RefIntoExisting)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::FromOwned, true).map(|x| (x, Kind::FromOwned)))
-            .chain(data_type_attrs.iter_for_kind_core(&Kind::FromRef, true).map(|x| (x, Kind::FromRef)))
-            .collect();
-
-        for (data_type_attr, kind) in data_type_attrs {
+        for (data_type_attr, kind) in data_type_attrs_by_kind {
             if data_type_attr.quick_return.is_none() && data_type_attr.type_hint == TypeHint::Struct {
                 for field in &input.fields {
-                    if field.attrs.ghost(&data_type_attr.ty, &kind).is_some() || field.attrs.has_parent_attr(&data_type_attr.ty) {
+                    if field.attrs.ghost(&data_type_attr.ty, kind).is_some() || field.attrs.has_parent_attr(&data_type_attr.ty) {
                         continue;
                     }
 
-                    if let Some(field_attr) = field.attrs.applicable_field_attr(&kind, false, &data_type_attr.ty) {
-                        if kind == Kind::FromOwned || kind == Kind::FromRef {
+                    if let Some(field_attr) = field.attrs.applicable_field_attr(kind, false, &data_type_attr.ty) {
+                        if kind.is_from() {
                             if field_attr.attr.member.is_none() && field_attr.attr.action.is_none() {
                                 errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {} or an action", field_attr.original_instr, field.member.to_token_stream(), data_type_attr.ty.path), field.member.span());
                             }
@@ -328,7 +341,7 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, type_paths: 
                             errors.insert(format!("Member trait instruction #[{}(...)] for member {} should specify corresponding field name of the {}", field_attr.original_instr, field.member.to_token_stream(), data_type_attr.ty.path_str), field.member.span());
                         }
                     } else {
-                        errors.insert(format!("Member {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", field.member.to_token_stream(), if kind == Kind::FromOwned || kind == Kind::FromRef { " or an action" } else { "" }, FallibleKind(kind, false), data_type_attr.ty.path_str), field.member.span());
+                        errors.insert(format!("Member {} should have member trait instruction with field name{}, that corresponds to #[{}({}...)] trait instruction", field.member.to_token_stream(), if kind.is_from() { " or an action" } else { "" }, FallibleKind(*kind, false), data_type_attr.ty.path_str), field.member.span());
                     }
                 }
             }
@@ -377,17 +390,17 @@ fn validate_variant_fields(input: &Variant, data_type_attrs: &DataTypeAttrs, _ty
 }
 
 fn check_child_errors(child_attr: &ChildAttr, struct_attrs: &DataTypeAttrs, tp: &TypePath, errors: &mut HashMap<String, Span>) {
-    let children_attr = struct_attrs.children_attr(tp);
+    let children_attr = struct_attrs.child_parents_attr(tp);
     for (idx, _level) in child_attr.child_path.child_path.iter().enumerate() {
         let path = child_attr.get_child_path_str(Some(idx));
         match children_attr {
             Some(children_attr) => {
-                if !children_attr.children.iter().any(|x| x.check_match(path)) {
+                if !children_attr.child_parents.iter().any(|x| x.check_match(path)) {
                     errors.insert(format!("Missing '{}: [Type Path]' instruction for type {}", path, tp.path_str), tp.span);
                 }
             },
             None => {
-                errors.insert(format!("Missing #[children(...)] instruction for {}", tp.path_str), tp.span);
+                errors.insert(format!("Missing #[child_parents(...)] instruction for {}", tp.path_str), tp.span);
             },
         }
     }

@@ -43,7 +43,7 @@ struct TupleChild(i32, i16);
 #[o2o(
     map(Entity),
     into_existing(Entity),
-    children(Entity| base: BaseEntity, base.base: Base, child: Child),
+    child_parents(Entity| base: BaseEntity, base.base: Base, child: Child),
 )]
 struct EntityDto {
     parent_int: i32,
@@ -52,21 +52,21 @@ struct EntityDto {
     base_int: i32,
     #[child(base.base)]
     another_base_int: i32,
-    #[child(base.base)]
-    #[map_ref(~.clone())]
-    some_string: String,
     #[child(base)]
     base_entity_int: i32,
     #[child(child)]
     child_int: i32,
     #[child(child)]
     another_child_int: i32,
+    #[child(base.base)]
+    #[map_ref(~.clone())]
+    some_string: String,
 }
 
 #[derive(o2o)]
 #[map(TupleEntity)]
 #[into_existing(TupleEntity)]
-#[children(1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
+#[child_parents(1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
 struct TupleEntityDto(i32, #[o2o(child(1 .0), map(0))] i32, #[o2o(child(1 .0), map(1))] i16, #[o2o(child(1), map(1))] i32, #[o2o(child(2), map(0))] i32, #[o2o(child(2), map(1))] i16);
 
 #[test]

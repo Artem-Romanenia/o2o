@@ -83,7 +83,12 @@ fn missing_map_instructions(code_fragment: TokenStream) {
     #[map(EntityDto)]
     #[child(EntityDto)]
     struct Entity {}
-}, vec![ "Perhaps you meant 'children'? To turn this message off, use #[o2o(allow_unknown)]" ]; "struct_misnamed_child_instr")]
+}, vec![ "Perhaps you meant 'child_parents'? To turn this message off, use #[o2o(allow_unknown)]" ]; "struct_misnamed_child_instr")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    #[children(EntityDto)]
+    struct Entity {}
+}, vec![ "Perhaps you meant 'child_parents'? To turn this message off, use #[o2o(allow_unknown)]" ]; "struct_misnamed_children_instr")]
 #[test_case(quote! {
     #[map(EntityDto)]
     #[child(EntityDto)]
@@ -191,7 +196,12 @@ fn missing_map_instructions(code_fragment: TokenStream) {
     #[o2o(map(EntityDto))]
     #[o2o(child(EntityDto))]
     struct Entity {}
-}, vec![ "Perhaps you meant 'children'?" ]; "own_struct_misnamed_child_instr")]
+}, vec![ "Perhaps you meant 'child_parents'?" ]; "own_struct_misnamed_child_instr")]
+#[test_case(quote! {
+    #[o2o(map(EntityDto))]
+    #[o2o(children(EntityDto))]
+    struct Entity {}
+}, vec![ "Perhaps you meant 'child_parents'?" ]; "own_struct_misnamed_children_instr")]
 #[test_case(quote! {
     #[o2o(map(EntityDto))]
     #[o2o(child(EntityDto))]
@@ -293,6 +303,13 @@ fn unrecognized_struct_instructions(code_fragment: TokenStream, errs: Vec<&str>)
 #[test_case(quote! {
     #[map(EntityDto)]
     struct Entity {
+        #[child_parents()]
+        child: i32,
+    }
+}, "Perhaps you meant 'child'? To turn this message off, use #[o2o(allow_unknown)]"; "struct_misplaced_child_parents_instr")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
         #[where_clause()]
         child: i32,
     }
@@ -325,6 +342,13 @@ fn unrecognized_struct_instructions(code_fragment: TokenStream, errs: Vec<&str>)
         child: i32,
     }
 }, "Perhaps you meant 'child'?"; "own_struct_misplaced_children_instr")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
+        #[o2o(child_parents())]
+        child: i32,
+    }
+}, "Perhaps you meant 'child'?"; "own_struct_misplaced_child_parents_instr")]
 #[test_case(quote! {
     #[map(EntityDto)]
     struct Entity {
@@ -483,10 +507,10 @@ fn unrecognized_member_instructions_no_bark(code_fragment: TokenStream) {
 
 #[test_case(quote! {
     #[map(EntityDto)]
-    #[children(test: Test)]
-    #[children(test: Test)]
+    #[child_parents(test: Test)]
+    #[child_parents(test: Test)]
     struct Entity {}
-}, "children"; "struct_children_instr")]
+}, "child_parents"; "struct_child_parents_instr")]
 #[test_case(quote! {
     #[map(EntityDto)]
     #[where_clause(T: Clone)]
@@ -563,10 +587,10 @@ fn more_than_one_default_member_instruction(code_fragment: TokenStream, err: &st
 
 #[test_case(quote! {
     #[map(EntityDto)]
-    #[children(EntityDto| test: Test)]
-    #[children(EntityDto| test: Test)]
+    #[child_parents(EntityDto| test: Test)]
+    #[child_parents(EntityDto| test: Test)]
     struct Entity {}
-}, "children", "EntityDto"; "struct_children_instr")]
+}, "child_parents", "EntityDto"; "struct_child_parents_instr")]
 #[test_case(quote! {
     #[map(EntityDto)]
     #[where_clause(EntityDto| T: Clone)]
@@ -713,19 +737,19 @@ fn dedicated_member_instruction_defined_twice(code_fragment: TokenStream, err_in
 }, vec!["EntityDto123"]; "into_child_instr")]
 #[test_case(quote! {
     #[into(EntityDto)]
-    #[children(test: Test)]
+    #[child_parents(test: Test)]
     struct Entity {
         #[child(EntityDto| test)]
         test: i32
     }
-}, vec![]; "into_children_child_instr")]
+}, vec![]; "into_child_parents_child_instr")]
 #[test_case(quote! {
     #[into(EntityDto)]
-    #[children(EntityDto123| test: Test)]
+    #[child_parents(EntityDto123| test: Test)]
     struct Entity123 {
         test: i32
     }
-}, vec!["EntityDto123"]; "into_children_instr")]
+}, vec!["EntityDto123"]; "into_child_parents_instr")]
 #[test_case(quote! {
     #[into(EntityDto)]
     #[where_clause(EntityDto123| T: Clone)]
@@ -882,7 +906,7 @@ fn trait_instruction_defined_twice(code_fragment: TokenStream, err: &str) {
 
 // endregion: trait_instruction_defined_twice
 
-// region: missing_children_instruction
+// region: missing_child_parents_instruction
 
 #[test_case(quote! {
     #[map(EntityDto)]
@@ -900,7 +924,7 @@ fn trait_instruction_defined_twice(code_fragment: TokenStream, err: &str) {
 #[test_case(quote! {
     #[try_map(EntityDto, SomeError)]
     #[try_map(EntityModel, SomeError)]
-    #[children()]
+    #[child_parents()]
     struct Entity {
         #[child(base.base)]
         base_base_int: i32,
@@ -914,7 +938,7 @@ fn trait_instruction_defined_twice(code_fragment: TokenStream, err: &str) {
 #[test_case(quote! {
     #[map(EntityDto)]
     #[try_map(EntityModel, SomeError)]
-    #[children(EntityDto| base: Base)]
+    #[child_parents(EntityDto| base: Base)]
     struct Entity {
         #[child(base.base)]
         base_base_int: i32,
@@ -925,20 +949,20 @@ fn trait_instruction_defined_twice(code_fragment: TokenStream, err: &str) {
     ("EntityDto", false),
     ("EntityModel", true) 
 ]; "3")]
-fn missing_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, bool)>) {
+fn missing_child_parents_instruction(code_fragment: TokenStream, errs: Vec<(&str, bool)>) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
     let errors: Vec<Error> = get_error_iter(output).collect();
 
     for (ty, should_contain) in errs {
         match should_contain {
-            true => assert!(errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty))),
-            false => assert!(!errors.iter().any(|x| x.to_string() == format!("Missing #[children(...)] instruction for {}", ty)))
+            true => assert!(errors.iter().any(|x| x.to_string() == format!("Missing #[child_parents(...)] instruction for {}", ty))),
+            false => assert!(!errors.iter().any(|x| x.to_string() == format!("Missing #[child_parents(...)] instruction for {}", ty)))
         }
     }
 }
 
-// endregion: missing_children_instruction
+// endregion: missing_child_parents_instruction
 
 // region: member_instr_on_wrong_member
 
@@ -1021,12 +1045,12 @@ fn member_instr_on_wrong_member(code_fragment: TokenStream, errs: Vec<&str>) {
 
 // endregion: member_instr_on_wrong_member
 
-// region: incomplete_children_instruction
+// region: incomplete_child_parents_instruction
 
 #[test_case(quote! {
     #[map(EntityDto)]
     #[try_map(EntityModel, SomeError)]
-    #[children()]
+    #[child_parents()]
     struct Entity {
         #[child(base.base)]
         base_base_int: i32,
@@ -1044,7 +1068,7 @@ fn member_instr_on_wrong_member(code_fragment: TokenStream, errs: Vec<&str>) {
 #[test_case(quote! {
     #[map(EntityDto)]
     #[try_map(EntityModel, SomeError)]
-    #[children(base: Base)]
+    #[child_parents(base: Base)]
     struct Entity {
         #[child(base.base)]
         base_base_int: i32,
@@ -1062,8 +1086,8 @@ fn member_instr_on_wrong_member(code_fragment: TokenStream, errs: Vec<&str>) {
 #[test_case(quote! {
     #[map(EntityDto)]
     #[map(EntityModel)]
-    #[children(EntityDto| base: Base)]
-    #[children(EntityModel| child: Child)]
+    #[child_parents(EntityDto| base: Base)]
+    #[child_parents(EntityModel| child: Child)]
     struct Entity {
         #[child(base.base)]
         base_base_int: i32,
@@ -1078,7 +1102,7 @@ fn member_instr_on_wrong_member(code_fragment: TokenStream, errs: Vec<&str>) {
     ("child", "EntityDto", true),
     ("child", "EntityModel", false),
 ]; "3")]
-fn incomplete_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, &str, bool)>) {
+fn incomplete_child_parents_instruction(code_fragment: TokenStream, errs: Vec<(&str, &str, bool)>) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
     let errors: Vec<Error> = get_error_iter(output).collect();
@@ -1091,7 +1115,7 @@ fn incomplete_children_instruction(code_fragment: TokenStream, errs: Vec<(&str, 
     }
 }
 
-// endregion: incomplete_children_instruction
+// endregion: incomplete_child_parents_instruction
 
 // region: incomplete_ghost_instruction
 
@@ -2138,6 +2162,205 @@ fn lifetimes(code_fragment: TokenStream, expected_output: TokenStream) {
 
 // endregion: lifetimes
 
+// region: parent_attr_member_instr
+
+#[test_case(quote! {
+    #[map(Entity as {})]
+    struct EntityDto {
+        #[parent(field_1, field_2)]
+        child: Child
+    }
+}, None; "1")]
+#[test_case(quote! {
+    #[map(Entity as {})]
+    struct EntityDto {
+        #[parent(field_1, [test()] field_2)]
+        child: Child
+    }
+}, Some("Instruction 'test' is not recognized in this context"); "2")]
+#[test_case(quote! {
+    #[map(Entity as {})]
+    struct EntityDto {
+        #[parent(field_1, [parent(test)] [parent(test)] field_2)]
+        child: Child
+    }
+}, Some("Cannot have more than one [parent(...)] instruction here"); "3")]
+#[test_case(quote! {
+    #[try_map(Entity as {}, String)]
+    struct EntityDto {
+        #[parent(field_1, field_2)]
+        child: Child
+    }
+}, None; "4")]
+#[test_case(quote! {
+    #[try_map(Entity as {}, String)]
+    struct EntityDto {
+        #[parent(field_1, [test()] field_2)]
+        child: Child
+    }
+}, Some("Instruction 'test' is not recognized in this context"); "5")]
+#[test_case(quote! {
+    #[try_map(Entity as {}, String)]
+    struct EntityDto {
+        #[parent(field_1, [parent(test)] [parent(test)] field_2)]
+        child: Child
+    }
+}, Some("Cannot have more than one [parent(...)] instruction here"); "6")]
+fn parent_attr_member_instr(code_fragment: TokenStream, err: Option<&str>) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    if err.is_some() {
+        let error = get_error(output, false);
+        assert_eq!(error, err.unwrap());
+    } else {
+        assert!(output.is_ok())
+    }
+}
+
+// endregion: parent_attr_member_instr
+
+// region: incomplete_parent_attr_member_instr
+
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "1")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
+        #[parent(EntityDto| 0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "2")]
+#[test_case(quote! {
+    #[try_map(EntityDto, String)]
+    #[try_map(EntityModel, String)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]",
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]",
+] ; "3")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity {
+        #[parent(0, 1)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]",
+    "Member 1 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent(..., [map(field_name)] 1, ...)]",
+] ; "4")]
+#[test_case(quote! {
+    #[from(EntityDto)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+] ; "5")]
+#[test_case(quote! {
+    #[from(EntityDto)]
+    #[into(EntityModel)]
+    struct Entity {
+        #[parent(0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]",
+] ; "6")]
+#[test_case(quote! {
+    #[try_map(EntityDto as {}, String)]
+    struct Entity (
+        #[parent(0)]
+        Child
+    );
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityDto, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "7")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    struct Entity (
+        #[parent(0)]
+        Child
+    );
+}, vec![
+] ; "8")]
+#[test_case(quote! {
+    #[map(EntityDto)]
+    #[try_map(EntityModel, String)]
+    struct Entity {
+        #[parent(EntityModel| 0)]
+        child: Child
+    }
+}, vec![
+    "Member 0 should have an instruction that specifies corresponding field name of type EntityModel, e.g. #[parent([map(field_name)] 0, ...)]"
+] ; "9")]
+#[test_case(quote! {
+    #[from(EntityDto)]
+    struct Entity {
+        #[parent([parent(inner_test)] test)]
+        child: Child
+    }
+}, vec![
+    "Field 'test' should have type here, e.g. 'test: SomeStruct'"
+] ; "10")]
+#[test_case(quote! {
+    #[try_from(EntityDto, String)]
+    struct Entity (
+        #[parent([parent(0)] 0)]
+        Child
+    );
+}, vec![
+    "Field '0' should have type here, e.g. '0: SomeStruct'"
+] ; "11")]
+#[test_case(quote! {
+    #[into(EntityDto)]
+    #[into_existing(EntityDto)]
+    struct Entity {
+        #[parent([parent(inner_test)] test)]
+        child: Child
+    }
+}, vec![
+] ; "12")]
+#[test_case(quote! {
+    #[into(EntityDto)]
+    #[into_existing(EntityDto)]
+    struct Entity (
+        #[parent([parent(0)] 0)]
+        Child
+    );
+}, vec![
+] ; "13")]
+fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&str>) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    if errs.len() > 0 {
+        let errors: Vec<Error> = get_error_iter(output).collect();
+
+        assert_eq!(errs.len(), errors.len());
+
+        for err in errs {
+            assert!(errors.iter().any(|x| x.to_string() == err))
+        }
+    } else {
+        assert!(output.is_ok())
+    }
+}
+
+// endregion: incomplete_parent_attr_member_instr
+
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
     let mut err_iter = output.unwrap_err().into_iter();
@@ -2159,7 +2382,7 @@ fn get_error_iter(output: Result<TokenStream, Error>) -> impl Iterator<Item = Er
     let mut err_iter = output.unwrap_err().into_iter();
 
     let error = err_iter.next();
-    assert!(error.expect("Root error expected").to_string() == "Cannot expand o2o macro");
+    assert_eq!(error.expect("Root error expected").to_string(), "Cannot expand o2o macro");
 
     err_iter
 }

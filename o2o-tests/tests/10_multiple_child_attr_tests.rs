@@ -43,8 +43,8 @@ struct TupleChild(i32, i32);
     map(TupleEntity as ()),
     into_existing(Entity),
     into_existing(TupleEntity as ()),
-    children(Entity| base: BaseEntity, base.base: Base, child: Child),
-    children(TupleEntity| 1: TupleBaseEntity as (), 1 .0: TupleBase as (), 2: TupleChild as ()),
+    child_parents(Entity| base: BaseEntity, base.base: Base, child: Child),
+    child_parents(TupleEntity| 1: TupleBaseEntity as (), 1 .0: TupleBase as (), 2: TupleChild as ()),
 )]
 struct EntityDto {
     #[map(TupleEntity| 0)]
@@ -79,8 +79,8 @@ struct EntityDto {
 #[map(TupleEntity)]
 #[into_existing(Entity as {})]
 #[into_existing(TupleEntity)]
-#[children(Entity| base: BaseEntity as {}, base.base: Base as {}, child: Child as {})]
-#[children(TupleEntity| 1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
+#[child_parents(Entity| base: BaseEntity as {}, base.base: Base as {}, child: Child as {})]
+#[child_parents(TupleEntity| 1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
 struct TupleEntityDto(
     #[map(Entity| parent_int)] i32,
     #[o2o(child(Entity| base.base))]

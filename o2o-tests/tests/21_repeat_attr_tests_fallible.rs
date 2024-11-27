@@ -29,7 +29,7 @@ struct Machine {
 #[derive(o2o)]
 #[try_map(Car, String)]
 #[try_into_existing(Car, String)]
-#[children(vehicle: Vehicle, vehicle.machine: Machine)]
+#[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
 #[ghosts(vehicle.machine@id: { 321 })]
 struct CarDto {
     number_of_doors: i8,

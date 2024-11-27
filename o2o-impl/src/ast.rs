@@ -1,10 +1,11 @@
 use crate::attr::{self};
 use crate::attr::{DataTypeAttrs, MemberAttrs};
 use proc_macro2::Span;
+use quote::ToTokens;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Result};
+use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident, Index, Member, Path, Result};
 
 #[derive(Default)]
 struct Context {
@@ -41,6 +42,8 @@ pub(crate) struct Field {
     pub attrs: MemberAttrs,
     pub idx: usize,
     pub member: Member,
+    pub member_str: String,
+    pub ty: Option<Path>
 }
 
 impl<'a> Field {
@@ -70,16 +73,24 @@ impl<'a> Field {
             .collect()
     }
 
-    fn from_syn(i: usize, node: &'a syn::Field, bark: bool) -> Result<Self> {
+    fn from_syn(idx: usize, node: &'a syn::Field, bark: bool) -> Result<Self> {
+        let member = node.ident.clone().map(Member::Named).unwrap_or_else(|| {
+            Member::Unnamed(Index {
+                index: idx as u32,
+                span: node.ty.span(),
+            })
+        });
+        let member_str = member.to_token_stream().to_string();
+
         Ok(Field {
             attrs: attr::get_member_attrs(SynDataTypeMember::Field(node), bark)?,
-            idx: i,
-            member: node.ident.clone().map(Member::Named).unwrap_or_else(|| {
-                Member::Unnamed(Index {
-                    index: i as u32,
-                    span: node.ty.span(),
-                })
-            }),
+            idx,
+            member,
+            member_str,
+            ty: match &node.ty {
+                syn::Type::Path(p) => Some(p.path.clone()),
+                _ => None
+            }
         })
     }
 }
@@ -168,6 +179,13 @@ impl<'a> DataType<'a> {
         match self {
             DataType::Struct(s) => s.ident,
             DataType::Enum(e) => e.ident,
+        }
+    }
+
+    pub fn named_fields(&'a self) -> bool {
+        match self {
+            DataType::Struct(s) => s.named_fields,
+            DataType::Enum(_) => panic!("Method 'named_fields' is not supposed to be called in the enum context."),
         }
     }
 
