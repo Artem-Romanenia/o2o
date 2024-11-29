@@ -5,6 +5,10 @@ use crate::{
 use proc_macro2::Span;
 use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
+
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 use syn::{spanned::Spanned, Result};
 
 pub(crate) fn validate(input: &DataType) -> Result<()> {

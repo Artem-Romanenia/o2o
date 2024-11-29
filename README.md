@@ -129,6 +129,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 - [Traits and `o2o` *trait instructions*](#traits-and-o2o-trait-instructions)
 - [Installation](#installation)
+  - [`syn >=2.*`](#syn-2)
   - [no\_std](#no_std)
 - [The (not so big) Problem](#the-not-so-big-problem)
 - [Inline expressions](#inline-expressions)
@@ -264,11 +265,20 @@ struct EntityDto { }
 
 ## Installation
 
-In a typical project just add this to `Cargo.toml`:
+For most projects, just add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o = "0.4.9"
+o2o = "0.5.1"
+```
+
+### `syn >=2.*`
+
+Currently o2o uses `syn >=1.0.3, <2` by default. If you want `syn >=2.*` to be used, here's the way:
+
+``` toml
+[dependencies]
+o2o = { version = "0.5.1", default-features = false, features = "syn2" }
 ```
 
 ### no_std
@@ -277,9 +287,18 @@ In `#![no_std]` project, add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o-macros = "0.4.9"
+o2o-macros = "0.5.1"
 # Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
-o2o = { version = "0.4.9", default-features = false }
+o2o = { version = "0.5.1", default-features = false }
+```
+
+Or, if you want `no_std` *and* `syn2`:
+
+``` toml
+[dependencies]
+o2o-macros = { version = "0.5.1", default-features = false, features = "syn2" }
+# Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
+o2o = { version = "0.5.1", default-features = false }
 ```
 
 ## The (not so big) Problem

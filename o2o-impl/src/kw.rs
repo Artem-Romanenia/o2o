@@ -1,3 +1,6 @@
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 syn::custom_keyword!(vars);
 syn::custom_keyword!(repeat);
 syn::custom_keyword!(permeate);

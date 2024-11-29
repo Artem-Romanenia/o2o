@@ -1,6 +1,10 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use o2o_impl::expand::derive;
 use quote::quote;
+
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 use syn::DeriveInput;
 
 fn derive_simple_benchmark(c: &mut Criterion) {

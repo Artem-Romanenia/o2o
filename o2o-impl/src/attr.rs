@@ -3,6 +3,9 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{Index, Not};
 
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseBuffer, ParseStream};
@@ -1060,9 +1063,15 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
 
     let mut instrs: Vec<DataTypeInstruction> = vec![];
     for x in input.iter() {
-        if x.path.is_ident("doc") {
+        #[cfg(feature = "syn")]
+        let path = &x.path;
+
+        #[cfg(feature = "syn2")]
+        let path = x.meta.path();
+
+        if path.is_ident("doc") {
             continue;
-        } else if x.path.is_ident("o2o") {
+        } else if path.is_ident("o2o") {
             x.parse_args_with(|input: ParseStream| {
                 let new_instrs: Punctuated<DataTypeInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
@@ -1077,9 +1086,18 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
             })?;
-        } else if let Some(instr) = x.path.get_ident() {
-            let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_data_type_instruction(instr, p.content(), false, bark)?);
+        } else if let Some(instr) = path.get_ident() {
+            #[cfg(feature = "syn")]
+            let tokens = syn::parse2(x.tokens.clone()).map(|x: OptionalParenthesizedTokenStream|x.content())?;
+
+            #[cfg(feature = "syn2")]
+            let tokens = match &x.meta {
+                syn2::Meta::Path(_) => TokenStream::new(),
+                syn2::Meta::List(l) => l.tokens.clone(),
+                syn2::Meta::NameValue(_) => Err(syn::Error::new(x.span(), "#[name = \"Value\"] syntax is not supported."))?,
+            };
+
+            instrs.push(parse_data_type_instruction(instr, tokens, false, bark)?);
         }
     }
 
@@ -1123,9 +1141,15 @@ pub(crate) fn get_data_type_attrs(input: &[Attribute]) -> Result<(DataTypeAttrs,
 pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<MemberAttrs> {
     let mut instrs: Vec<MemberInstruction> = vec![];
     for x in input.get_attrs().iter() {
-        if x.path.is_ident("doc") {
+        #[cfg(feature = "syn")]
+        let path = &x.path;
+
+        #[cfg(feature = "syn2")]
+        let path = x.meta.path();
+
+        if path.is_ident("doc") {
             continue;
-        } else if x.path.is_ident("o2o") {
+        } else if path.is_ident("o2o") {
             x.parse_args_with(|input: ParseStream| {
                 let new_instrs: Punctuated<MemberInstruction, Token![,]> = Punctuated::parse_terminated_with(input, |input| {
                     let instr = input.parse::<Ident>()?;
@@ -1135,9 +1159,18 @@ pub(crate) fn get_member_attrs(input: SynDataTypeMember, bark: bool) -> Result<M
                 instrs.extend(new_instrs.into_iter());
                 Ok(())
             })?;
-        } else if let Some(instr) = x.path.get_ident() {
-            let p: OptionalParenthesizedTokenStream = syn::parse2(x.tokens.clone())?;
-            instrs.push(parse_member_instruction(instr, p.content(), false, bark)?);
+        } else if let Some(instr) = path.get_ident() {
+            #[cfg(feature = "syn")]
+            let tokens = syn::parse2(x.tokens.clone()).map(|x: OptionalParenthesizedTokenStream|x.content())?;
+            
+            #[cfg(feature = "syn2")]
+            let tokens = match &x.meta {
+                syn2::Meta::Path(_) => TokenStream::new(),
+                syn2::Meta::List(l) => l.tokens.clone(),
+                syn2::Meta::NameValue(_) => Err(syn::Error::new(x.span(), "#[name = \"Value\"] syntax is not supported."))?,
+            };
+
+            instrs.push(parse_member_instruction(instr, tokens, false, bark)?);
         }
     }
 
@@ -1371,6 +1404,7 @@ fn peek_ghost_field_name(input: ParseStream) -> bool {
     peek_member(input) && (input.peek2(Token![:]) || input.peek2(Brace) || input.peek2(Paren))
 }
 
+#[cfg(feature = "syn")]
 fn try_parse_child_parents(input: ParseStream) -> Result<Punctuated<ChildParentData, Token![,]>> {
     input.parse_terminated(|x| {
         let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(x)?;
@@ -1383,6 +1417,21 @@ fn try_parse_child_parents(input: ParseStream) -> Result<Punctuated<ChildParentD
             field_path_str: child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect(),
         })
     })
+}
+
+#[cfg(feature = "syn2")]
+fn try_parse_child_parents(input: ParseStream) -> Result<Punctuated<ChildParentData, Token![,]>> {
+    input.parse_terminated(|x| {
+        let child_path: Punctuated<Member, Token![.]> = Punctuated::parse_separated_nonempty(x)?;
+        x.parse::<Token![:]>()?;
+        let ty = x.parse::<syn::Path>()?;
+        Ok(ChildParentData {
+            ty,
+            type_hint: try_parse_type_hint(x)?,
+            field_path: child_path.clone(),
+            field_path_str: child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect(),
+        })
+    }, Token![,])
 }
 
 fn try_parse_action(input: ParseStream, allow_braceless: bool) -> Result<Option<TokenStream>> {

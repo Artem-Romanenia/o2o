@@ -3,6 +3,10 @@
 use crate::expand::derive;
 use proc_macro2::TokenStream;
 use quote::quote;
+
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 use syn::{DeriveInput, Error};
 use test_case::test_case;
 

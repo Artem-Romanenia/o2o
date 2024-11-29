@@ -2,6 +2,10 @@ extern crate o2o_impl;
 
 use o2o_impl::expand::derive;
 use proc_macro::TokenStream;
+
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 use syn::{parse_macro_input, DeriveInput};
 
 /// ### Object to Object mapper for Rust

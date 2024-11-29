@@ -2,6 +2,10 @@ use crate::attr::{self};
 use crate::attr::{DataTypeAttrs, MemberAttrs};
 use proc_macro2::Span;
 use quote::ToTokens;
+
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;

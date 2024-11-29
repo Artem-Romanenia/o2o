@@ -18,9 +18,17 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
-    - name: Run Doc Tests
-      run: cargo test --package o2o
-    - name: Run Integration Tests
-      run: cargo test --package o2o-tests
-    - name: Run Impl Tests
-      run: cargo test --package o2o-impl
+    - name: Run Doc Tests default
+      run: cargo test -q --package o2o
+    - name: Run Doc Tests syn1
+      run: cargo test -q --package o2o --no-default-features --features syn1
+    - name: Run Doc Tests syn2
+      run: cargo test -q --package o2o --no-default-features --features syn2
+    - name: Run Integration Tests syn1
+      run: cargo test -q --package o2o-tests --no-default-features --features syn1
+    - name: Run Integration Tests syn2
+      run: cargo test -q --package o2o-tests --no-default-features --features syn2
+    - name: Run Impl Tests syn1
+      run: cargo test -q --package o2o-impl --no-default-features --features syn
+    - name: Run Impl Tests syn2
+      run: cargo test -q --package o2o-impl --no-default-features --features syn2

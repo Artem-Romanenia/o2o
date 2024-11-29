@@ -1,6 +1,6 @@
 [package]
 name = "o2o"
-version = "0.5.0"
+version = "0.5.1-beta1"
 edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 categories = ["rust-patterns", "no-std", "development-tools"]
@@ -10,12 +10,13 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Artem-Romanenia/o2o"
 
 [dependencies]
-o2o-impl = { version = "0.5.0", path = "o2o-impl", optional = true }
-o2o-macros = { version = "0.5.0", path = "o2o-macros", optional = true }
+o2o-impl = { version = "0.5.1-beta1", path = "o2o-impl", optional = true }
+o2o-macros = { version = "0.5.1-beta1", path = "o2o-macros", default-features = false, optional = true }
 
 [features]
-default = ["macro"]
-macro = ["dep:o2o-impl", "dep:o2o-macros"]
+default = ["syn1"]
+syn1 = ["o2o-impl/syn", "o2o-macros/syn1"]
+syn2 = ["o2o-impl/syn2", "o2o-macros/syn2"]
 
 [workspace]
 members = ["o2o-impl", "o2o-macros", "o2o-tests"]

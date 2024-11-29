@@ -7,6 +7,10 @@ use crate::{
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
+
+#[cfg(feature = "syn2")]
+use syn2 as syn;
+
 use syn::{
     parse_quote, Data, DeriveInput, Error, GenericArgument, GenericParam, Index, Lifetime,
     Member::{self, Named, Unnamed}, Result
