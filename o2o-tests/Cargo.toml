@@ -15,5 +15,6 @@ anyhow = "1.0.86"
 test-case = "3"
 
 [features]
+default = ["syn1"]
 syn1 = ["o2o/syn1"]
 syn2 = ["o2o/syn2"]

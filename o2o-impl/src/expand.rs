@@ -406,10 +406,10 @@ fn enum_init_block(input: &Enum, ctx: &ImplContext) -> TokenStream {
         .flat_map(|x| &x.attr.ghost_data)
         .map(VariantData::GhostData));
 
-    enum_init_block_inner(&mut fields.iter().peekable(), input, ctx)
+    enum_init_block_inner(&mut fields.iter().peekable(), ctx)
 }
 
-fn enum_init_block_inner(members: &mut Peekable<Iter<VariantData>>, input: &Enum, ctx: &ImplContext) -> TokenStream {
+fn enum_init_block_inner(members: &mut Peekable<Iter<VariantData>>, ctx: &ImplContext) -> TokenStream {
     let mut fragments: Vec<TokenStream> = vec![];
 
     while let Some(member_data) = members.peek() {
@@ -443,12 +443,8 @@ fn enum_init_block_inner(members: &mut Peekable<Iter<VariantData>>, input: &Enum
     }
 
     if let Some(default_case) = &ctx.struct_attr.default_case {
-        if ctx.kind.is_from() && (input.variants.iter().any(|v| v.attrs.lit(&ctx.struct_attr.ty).is_some() || v.attrs.pat(&ctx.struct_attr.ty).is_some()) || input.attrs.ghosts_attr(&ctx.struct_attr.ty, &ctx.kind).is_some())
-            || !ctx.kind.is_from() && input.variants.iter().any(|v| v.attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_some())
-        {
-            let g = quote_action(default_case, None, ctx);
-            fragments.push(quote!(_ #g))
-        }
+        let g = quote_action(default_case, None, ctx);
+        fragments.push(quote!(_ #g))
     }
 
     quote!({#(#fragments)*})
