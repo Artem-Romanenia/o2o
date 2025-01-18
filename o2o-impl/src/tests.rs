@@ -12,28 +12,35 @@ use test_case::test_case;
 
 // region: Debuger
 
-// use std::io::Write;
-// #[test]
-// fn debuger() {
-//     let code_fragment = quote!{
-//     };
+use std::io::Write;
+#[test]
+fn debuger() {
+    let code_fragment = quote!{
+#[o2o(owned_into(i32| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}),
+    return hrs * 3600 + mns * 60 + scs))]
+struct Time {
+    hours: i8,
+    minutes: i8,
+    seconds: i8,
+}
+    };
 
-//     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
-//     let output = derive(&input);
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
 
-//     match output {
-//         Ok(output) => {
-//             let text = output.to_string();
-//             _ = std::io::stdout().write_all(format!("\nOutput:\n\n{}\n\n", text).as_ref());
-//         },
-//         Err(err) => {
-//             let mut err_iter = err.into_iter();
-//             let error = err_iter.next();
-//             let message = error.expect("One error expected").to_string();
-//             _ = std::io::stdout().write_all(format!("\nError:\n\n{}\n\n", message).as_ref());
-//         }
-//     }
-// }
+    match output {
+        Ok(output) => {
+            let text = output.to_string();
+            _ = std::io::stdout().write_all(format!("\nOutput:\n\n{}\n\n", text).as_ref());
+        },
+        Err(err) => {
+            let mut err_iter = err.into_iter();
+            let error = err_iter.next();
+            let message = error.expect("One error expected").to_string();
+            _ = std::io::stdout().write_all(format!("\nError:\n\n{}\n\n", message).as_ref());
+        }
+    }
+}
 
 // endregion: Debuger
 

@@ -10,9 +10,9 @@ enum EnumDto {
     Var1,
     #[map(Var22)]
     Var2,
-    #[ghost({Err("impl var3")?})]
+    #[ghost(Err("impl var3")?)]
     Var3,
-    #[ghost({Err("impl var4")?})]
+    #[ghost(Err("impl var4")?)]
     Var4 {
         _str: String,
         _i: i32,
@@ -23,7 +23,7 @@ enum EnumDto {
 
 #[derive(Clone, PartialEq, o2o::o2o)]
 #[try_map(EnumDto2, String)]
-#[ghosts(Var3: {Err("impl var3")?}, Var4 { .. }: {Err("impl var4")?}, Var5(..): {Err("impl var5")?})]
+#[ghosts(Var3: Err("impl var3")?, Var4 { .. }: {Err("impl var4")?}, Var5(..): Err("impl var5")?)]
 enum Enum2 {
     Var1,
     #[map(Var2)]

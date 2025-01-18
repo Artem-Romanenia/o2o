@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Artem-Romanenia/o2o"
 
 [dependencies]
-o2o-impl = { version = "0.5.2", path = "o2o-impl", optional = true }
+o2o-impl = { version = "0.5.2", path = "o2o-impl", default-features = false, optional = true }
 o2o-macros = { version = "0.5.2", path = "o2o-macros", default-features = false, optional = true }
 
 [features]

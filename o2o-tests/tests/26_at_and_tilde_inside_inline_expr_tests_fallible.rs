@@ -94,7 +94,7 @@ struct EntityDto {
 #[try_map(Entity as {}, String)]
 #[try_into_existing(Entity as {}, String)]
 #[child_parents(child: Child as {})]
-#[ghosts(extra_float: { extra_float_2(&@) })]
+#[ghosts(extra_float: extra_float_2(&@))]
 struct UnnamedEntityDto(
     #[map(Entity| some_int)] i32,
     #[o2o(
@@ -114,7 +114,7 @@ struct UnnamedEntityDto(
     String,
     #[ghost({ extra_string(&@) })] String,
     #[child(child)]
-    #[from(child_float, { float_to_string(~) })]
+    #[from(child_float, float_to_string(~))]
     #[into(child_float, { string_to_float(~.clone()) })]
     String,
 );

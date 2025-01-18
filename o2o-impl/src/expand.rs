@@ -247,10 +247,12 @@ fn enum_main_code_block(input: &Enum, ctx: &ImplContext) -> TokenStream {
 
     match ctx.kind {
         Kind::FromOwned | Kind::FromRef => {
-            quote!(match value #enum_init_block)
+            let match_expr = if let Some(h) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(h, Some(&quote!(value)), None) } else { quote!(value) };
+            quote!(match #match_expr #enum_init_block)
         },
         Kind::OwnedInto | Kind::RefInto => {
-            quote!(match self #enum_init_block)
+            let match_expr = if let Some(h) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(h, Some(&quote!(self)), None) } else { quote!(self) };
+            quote!(match #match_expr #enum_init_block)
         },
         Kind::OwnedIntoExisting | Kind::RefIntoExisting => enum_init_block,
     }
