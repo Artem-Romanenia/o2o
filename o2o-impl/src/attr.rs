@@ -59,6 +59,18 @@ impl Parse for CommaDelimitedTokenStream {
     }
 }
 
+#[derive(Clone)]
+pub struct TokenStreamWithSpan {
+    pub token_stream: TokenStream,
+    pub span: Span
+}
+
+impl TokenStreamWithSpan {
+    fn new (token_stream: TokenStream, span: Span) -> TokenStreamWithSpan {
+        TokenStreamWithSpan { token_stream, span }
+    }
+}
+
 pub(crate) enum DataTypeInstruction {
     Map(TraitAttr),
     Ghosts(GhostsAttr),
@@ -448,7 +460,7 @@ impl TypeHint {
     }
 }
 
-type TraitRepeatFor = [bool; 4];
+type TraitRepeatFor = [bool; 5];
 struct TraitRepeatForWrap(TraitRepeatFor);
 
 enum TraitAttrType {
@@ -456,6 +468,7 @@ enum TraitAttrType {
     Update,
     QuickReturn,
     DefaultCase,
+    MatchExpr
 }
 
 impl Index<&TraitAttrType> for TraitRepeatFor {
@@ -467,20 +480,21 @@ impl Index<&TraitAttrType> for TraitRepeatFor {
             TraitAttrType::Update => &self[1],
             TraitAttrType::QuickReturn => &self[2],
             TraitAttrType::DefaultCase => &self[3],
+            TraitAttrType::MatchExpr => &self[4]
         }
     }
 }
 
-const TRAIT_REPEAT_TYPES: [&str; 4] = ["vars", "update", "quick_return", "default_case"];
+const TRAIT_REPEAT_TYPES: [&str; 5] = ["vars", "update", "quick_return", "default_case", "match_expr"];
 
 impl Parse for TraitRepeatForWrap {
     fn parse(input: ParseStream) -> Result<Self> {
         let types: Punctuated<Ident, Token![,]> = Punctuated::parse_terminated(input)?;
         if types.is_empty() {
-            return Ok(TraitRepeatForWrap([true, true, true, true]));
+            return Ok(TraitRepeatForWrap([true, true, true, true, true]));
         }
 
-        let mut repeat: TraitRepeatFor = [false, false, false, false];
+        let mut repeat: TraitRepeatFor = [false, false, false, false, false];
 
         for ty in types {
             let str = ty.to_token_stream().to_string();
@@ -508,10 +522,10 @@ pub(crate) struct TraitAttrCore {
     pub err_ty: Option<TypePath>,
     pub type_hint: TypeHint,
     pub init_data: Option<Punctuated<InitData, Token![,]>>,
-    pub update: Option<TokenStream>,
-    pub quick_return: Option<TokenStream>,
-    pub default_case: Option<TokenStream>,
-    pub match_expr: Option<TokenStream>,
+    pub update: Option<TokenStreamWithSpan>,
+    pub quick_return: Option<TokenStreamWithSpan>,
+    pub default_case: Option<TokenStreamWithSpan>,
+    pub match_expr: Option<TokenStreamWithSpan>,
     pub repeat: Option<TraitRepeatFor>,
     pub skip_repeat: bool,
     pub stop_repeat: bool,
@@ -534,22 +548,28 @@ impl TraitAttrCore {
                 self.init_data = other.init_data
             }
             if attr_to_repeat[&TraitAttrType::Update] {
-                if self.update.is_some() {
-                    Err(syn::Error::new(self.update.span(), "Update statement will be overriden. Did you forget to use 'skip_repeat'?"))?
+                if let Some(update) = &self.update {
+                    Err(syn::Error::new(update.span, "Update instruction will be overriden. Did you forget to use 'skip_repeat'?"))?
                 }
                 self.update = other.update
             }
             if attr_to_repeat[&TraitAttrType::QuickReturn] {
-                if self.quick_return.is_some() {
-                    Err(syn::Error::new(self.quick_return.span(), "Quick Return statement will be overriden. Did you forget to use 'skip_repeat'?"))?
+                if let Some(quick_return) = &self.quick_return {
+                    Err(syn::Error::new(quick_return.span, "Quick Return instruction will be overriden. Did you forget to use 'skip_repeat'?"))?
                 }
                 self.quick_return = other.quick_return
             }
             if attr_to_repeat[&TraitAttrType::DefaultCase] {
-                if self.default_case.is_some() {
-                    Err(syn::Error::new(self.default_case.span(), "Default Case statement will be overriden. Did you forget to use 'skip_repeat'?"))?
+                if let Some(default_case) = &self.default_case {
+                    Err(syn::Error::new(default_case.span, "Default Case instruction will be overriden. Did you forget to use 'skip_repeat'?"))?
                 }
                 self.default_case = other.default_case
+            }
+            if attr_to_repeat[&TraitAttrType::MatchExpr] {
+                if let Some(match_expr) = &self.match_expr {
+                    Err(syn::Error::new(match_expr.span, "Match instruction will be overriden. Did you forget to use 'skip_repeat'?"))?
+                }
+                self.match_expr = other.match_expr
             }
         }
         Ok(())
@@ -584,9 +604,9 @@ impl Parse for TraitAttrCore {
     }
 }
 
-fn parse_trait_instruction_param_inner<T: Parse, U>(input: &syn::parse::ParseBuffer, parser: impl Fn(&ParseBuffer) -> Result<U>, condition: bool, setter: impl FnOnce(U), span: impl Fn(T) -> Span, name: &str) -> Result<bool> {
+fn parse_trait_instruction_param_inner<T: Parse, U>(input: &syn::parse::ParseBuffer, parser: impl Fn(&ParseBuffer, &T) -> Result<U>, condition: bool, setter: impl FnOnce(U), span: impl Fn(T) -> Span, name: &str) -> Result<bool> {
     let a = input.parse::<T>()?;
-    let b = parser(input)?;
+    let b = parser(input, &a)?;
     if condition {
         Err(syn::Error::new(span(a), format!("Instruction parameter '{}' was already set.", name)))?
     } else {
@@ -616,21 +636,21 @@ fn parse_parenthesized_trait_instruction_param_inner<T: Parse, U>(input: &syn::p
 
 fn parse_trait_instruction_param(input: &syn::parse::ParseBuffer, attr: &mut TraitAttrCore) -> Result<bool> {
     if input.peek(kw::stop_repeat) {
-        return parse_trait_instruction_param_inner::<kw::stop_repeat, ()>(input, |_| Ok(()), attr.stop_repeat, |_| attr.stop_repeat = true, |a| a.span, "stop_repeat")
+        return parse_trait_instruction_param_inner::<kw::stop_repeat, ()>(input, |_, _| Ok(()), attr.stop_repeat, |_| attr.stop_repeat = true, |a| a.span, "stop_repeat")
     } else if input.peek(kw::skip_repeat) {
-        return parse_trait_instruction_param_inner::<kw::skip_repeat, ()>(input, |_| Ok(()), attr.skip_repeat, |_| attr.skip_repeat = true, |a| a.span, "skip_repeat")
+        return parse_trait_instruction_param_inner::<kw::skip_repeat, ()>(input, |_, _| Ok(()), attr.skip_repeat, |_| attr.skip_repeat = true, |a| a.span, "skip_repeat")
     } else if input.peek(kw::repeat) {
         return parse_parenthesized_trait_instruction_param_inner::<kw::repeat, TraitRepeatForWrap>(input, |c| c.parse(), attr.repeat.is_some(), |x| attr.repeat = Some(x.0), |a| a.span, "repeat")
     } else if input.peek(kw::vars) {
         return parse_parenthesized_trait_instruction_param_inner::<kw::vars, Punctuated<InitData, Comma>>(input, |c| Punctuated::parse_separated_nonempty(&c), attr.init_data.is_some(), |x| attr.init_data = Some(x), |a| a.span, "vars")
     } else if input.peek(Token![..]) {
-        return parse_trait_instruction_param_inner::<Token![..], Option<TokenStream>>(input, |x| try_parse_action(x), attr.update.is_some(), |x| attr.update = x, |a| a.span(), "update")
+        return parse_trait_instruction_param_inner::<Token![..], Option<TokenStreamWithSpan>>(input, |x, t| try_parse_action(x).map(|x| x.map(|x| TokenStreamWithSpan::new(x, t.span()))), attr.update.is_some(), |x| attr.update = x, |a| a.span(), "update")
     } else if input.peek(Token![return]) {
-        return parse_trait_instruction_param_inner::<Token![return], Option<TokenStream>>(input, |x| try_parse_action(x), attr.quick_return.is_some(), |x| attr.quick_return = x, |a| a.span(), "quick_return")
+        return parse_trait_instruction_param_inner::<Token![return], Option<TokenStreamWithSpan>>(input, |x, t| try_parse_action(x).map(|x| x.map(|x| TokenStreamWithSpan::new(x, t.span))), attr.quick_return.is_some(), |x| attr.quick_return = x, |a| a.span(), "quick_return")
     } else if input.peek(Token![_]) {
-        return parse_trait_instruction_param_inner::<Token![_], Option<TokenStream>>(input, |x| try_parse_action(x), attr.default_case.is_some(), |x| attr.default_case = x, |a| a.span(), "default_case")
+        return parse_trait_instruction_param_inner::<Token![_], Option<TokenStreamWithSpan>>(input, |x, t| try_parse_action(x).map(|x| x.map(|x| TokenStreamWithSpan::new(x, t.span))), attr.default_case.is_some(), |x| attr.default_case = x, |a| a.span(), "default_case")
     } else if input.peek(Token![match]) {
-        return parse_trait_instruction_param_inner::<Token![match], Option<TokenStream>>(input, |x| try_parse_action(x), attr.match_expr.is_some(), |x| attr.match_expr = x, |a| a.span(), "match_expr")
+        return parse_trait_instruction_param_inner::<Token![match], Option<TokenStreamWithSpan>>(input, |x, t| try_parse_action(x).map(|x| x.map(|x| TokenStreamWithSpan::new(x, t.span))), attr.match_expr.is_some(), |x| attr.match_expr = x, |a| a.span(), "match_expr")
     } else if input.peek(kw::attribute) {
         return parse_parenthesized_trait_instruction_param_inner::<kw::attribute, TokenStream>(input, |c| c.parse(), attr.attribute.is_some(), |x| attr.attribute = Some(quote!(#[ #x ])), |a| a.span, "attribute")
     } else if input.peek(kw::impl_attribute) {

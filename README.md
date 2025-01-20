@@ -676,7 +676,7 @@ struct PersonDto {
     id: i32,
     full_name: String,
     age: i8,
-    // {None} below provides default value when creating PersonDto from Person
+    // 'None' below provides default value when creating PersonDto from Person
     // It could have been omited if we only needed to create Person from PersonDto
     #[ghost({None})]
     zodiac_sign: Option<ZodiacSign>
@@ -715,7 +715,7 @@ use o2o::o2o;
 
 #[derive(o2o)]
 #[map_owned(PersonDto)]
-#[ghosts(zodiac_sign: {None})]
+#[ghosts(zodiac_sign: None)]
 struct Person {
     id: i32,
     full_name: String,
@@ -817,11 +817,11 @@ struct Person {
 
 #[derive(o2o)]
 #[from_owned(Person| vars(first_name: {@.first_name}, last_name: {@.last_name}))]
-#[owned_into(Person| vars(first: {"John"}, last: {"Doe"}))]
-#[ghosts(first_name: {first.into()}, last_name: {last.into()})]
+#[owned_into(Person| vars(first: "John", last: "Doe"))]
+#[ghosts(first_name: first.into(), last_name: last.into())]
 struct PersonDto {
     age: i8,
-    #[ghost({format!("{} {}", first_name, last_name)})]
+    #[ghost(format!("{} {}", first_name, last_name))]
     full_name: String
 }
 ```
@@ -889,7 +889,7 @@ Quick returns work well with helper variables:
 use o2o::o2o;
 
 #[derive(o2o)]
-#[owned_into(i32| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}), 
+#[owned_into(i32| vars(hrs: @.hours as i32, mns: @.minutes as i32, scs: @.seconds as i32), 
     return hrs * 3600 + mns * 60 + scs)]
 struct Time {
     hours: i8,
@@ -1075,8 +1075,8 @@ impl Employee {
 #[derive(o2o)]
 #[map(Employee)]
 #[ghosts(
-    first_name: {@.get_first_name()},
-    last_name: {@.get_last_name()}
+    first_name: @.get_first_name(),
+    last_name: @.get_last_name()
 )]
 struct EmployeeDto {
     #[map(id)]
@@ -1854,7 +1854,7 @@ struct Machine {
 #[derive(o2o)]
 #[map_ref(Car)]
 #[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghosts(vehicle.machine@id: {321})]
+#[ghosts(vehicle.machine@id: 321)]
 struct CarDto {
     number_of_doors: i8,
 
@@ -1880,7 +1880,7 @@ struct CarDto {
     height: f32,
     #[o2o(stop_repeat)]
 
-    #[o2o(repeat)] #[ghost({123})]
+    #[o2o(repeat)] #[ghost(123)]
     useless_param: i32,
     useless_param_2: i32,
     useless_param_3: i32,
@@ -2276,7 +2276,7 @@ enum Enum {
 enum EnumDto {
     Var1,
     Var2(i32, String),
-    #[ghost({Err(format!("unknown: {}", _str_field))?})]
+    #[ghost(Err(format!("unknown: {}", _str_field))?)]
     Var3 { _field: i32, _str_field: String }
 }
 ```
@@ -2312,7 +2312,7 @@ Reverse case:
 #[derive(o2o::o2o)]
 #[try_from_owned(EnumDto, String)]
 #[owned_into(EnumDto)]
-#[ghosts(Var3 { _str_field, .. }: {Err(format!("Unknown: {}", _str_field))?})]
+#[ghosts(Var3 { _str_field, .. }: Err(format!("Unknown: {}", _str_field))?)]
 enum Enum {
     Var1,
     Var2(i32, String),
@@ -2413,11 +2413,11 @@ Missing fields and default values:
 #[map_owned(EnumDto)]
 enum Enum {
     Var1,
-    #[ghosts(f: {123.0})]
+    #[ghosts(f: 123.0)]
     Var2 {
         field: i32,
     },
-    #[ghosts(1: {321.0})]
+    #[ghosts(1: 321.0)]
     Var3(
         i32,
     )
