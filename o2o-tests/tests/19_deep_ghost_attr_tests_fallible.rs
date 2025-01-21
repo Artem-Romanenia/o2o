@@ -22,7 +22,7 @@ struct Machine {
 #[try_map(Car, String)]
 #[try_into_existing(Car, String)]
 #[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghosts(vehicle.machine@id: { 321 })]
+#[ghosts(vehicle.machine@id: 321)]
 struct CarDto {
     number_of_doors: i8,
 
@@ -76,12 +76,12 @@ pub struct Team {
         division.league.base@name: { @.league.name }
     ),
     ghosts_ref(
-        division_id: { @.division.id },
-        division.base@id: { @.division.id },
-        division.base@name: { @.division.name.clone() },
-        division@league_id: { @.league.id },
-        division.league.base@id: { @.league.id },
-        division.league.base@name: { @.league.name.clone() }
+        division_id: @.division.id,
+        division.base@id: @.division.id,
+        division.base@name: @.division.name.clone(),
+        division@league_id: @.league.id,
+        division.league.base@id: @.league.id,
+        division.league.base@name: @.league.name.clone()
     )
 )]
 pub struct TeamDto {

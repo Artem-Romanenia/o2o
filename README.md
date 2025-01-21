@@ -118,6 +118,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 ## Some milestones<!-- omit from toc --> 
 
+* **v0.5.3** Better parsing of [inline expression](#inline-expressions). Now both 'braced' and 'braceless' flavors are supported in all contexts.
 * **v0.5.0** Refactoring and improved support for 'flattened' child fields: `#[child()]`, `#[child_parents()]` and `#[parent()]` instructions
 * **v0.4.9** Support for `#![no_std]`
 * **v0.4.4** Fallible conversions
@@ -269,7 +270,7 @@ For most projects, just add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o = "0.5.2"
+o2o = "0.5.3"
 ```
 
 ### `syn >=2.*`
@@ -278,7 +279,7 @@ Currently o2o uses `syn >=1.0.3, <2` by default. If you want `syn >=2.*` to be u
 
 ``` toml
 [dependencies]
-o2o = { version = "0.5.2", default-features = false, features = "syn2" }
+o2o = { version = "0.5.3", default-features = false, features = "syn2" }
 ```
 
 ### no_std
@@ -287,18 +288,18 @@ In `#![no_std]` project, add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o-macros = "0.5.2"
+o2o-macros = "0.5.3"
 # Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
-o2o = { version = "0.5.2", default-features = false }
+o2o = { version = "0.5.3", default-features = false }
 ```
 
 Or, if you want `no_std` *and* `syn2`:
 
 ``` toml
 [dependencies]
-o2o-macros = { version = "0.5.2", default-features = false, features = "syn2" }
+o2o-macros = { version = "0.5.3", default-features = false, features = "syn2" }
 # Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
-o2o = { version = "0.5.2", default-features = false }
+o2o = { version = "0.5.3", default-features = false }
 ```
 
 ## The (not so big) Problem
@@ -327,8 +328,11 @@ If o2o is wrong in any of its assumptions, you will have to tell it that.
 
 ## Inline expressions
 
-o2o has a concept of Inline Expressions, which can be passed as a parameter to some of the o2o instructions. You can think of inline expression as a closure, which always has two *implicit* params: `|@, ~| {` **...expression body...** `}` or `|@, ~|` **{ ...expression body... }**
+o2o has a concept of Inline Expressions, which can be passed as a parameter to some of the o2o instructions. You can think of inline expression as a closure, which always has two *implicit* params. There are two flavors:
+* `|@, ~|` **{ ...expression body... }** (aka *'braced'*)
+* `|@, ~|` **...expression body...** *(aka 'braceless')*
 
+In these expressions:
 * `@` represents the object that is being converted from.
 * `~` represents the path to a specific field of the object that is being converted from.
 
@@ -339,7 +343,7 @@ struct Entity { some_int: i32 }
 #[map_owned(Entity)] // tells o2o to implement 'From<Entity> for EntityDto' and 'Into<Entity> for EntityDto'
 struct EntityDto { 
     #[from(~ * 2)] // Let's say for whatever reason we want to multiply 'some_int' by 2 when converting from Entity
-    #[into(~ / 2)] // And divide back by 2 when converting into it
+    #[into({~ / 2})] // And divide back by 2 when converting into it
     some_int: i32
 }
 ```
@@ -372,7 +376,7 @@ struct Entity { some_int: i32 }
 #[map_owned(Entity)]
 struct EntityDto { 
     #[from(@.some_int * 2)]
-    #[into(@.some_int / 2)]
+    #[into({@.some_int / 2})]
     some_int: i32
 }
 ```
@@ -715,7 +719,7 @@ use o2o::o2o;
 
 #[derive(o2o)]
 #[map_owned(PersonDto)]
-#[ghosts(zodiac_sign: {None})]
+#[ghosts(zodiac_sign: None)]
 struct Person {
     id: i32,
     full_name: String,
@@ -817,11 +821,11 @@ struct Person {
 
 #[derive(o2o)]
 #[from_owned(Person| vars(first_name: {@.first_name}, last_name: {@.last_name}))]
-#[owned_into(Person| vars(first: {"John"}, last: {"Doe"}))]
-#[ghosts(first_name: {first.into()}, last_name: {last.into()})]
+#[owned_into(Person| vars(first: "John", last: "Doe"))]
+#[ghosts(first_name: first.into(), last_name: last.into())]
 struct PersonDto {
     age: i8,
-    #[ghost({format!("{} {}", first_name, last_name)})]
+    #[ghost(format!("{} {}", first_name, last_name))]
     full_name: String
 }
 ```
@@ -889,7 +893,7 @@ Quick returns work well with helper variables:
 use o2o::o2o;
 
 #[derive(o2o)]
-#[owned_into(i32| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}), 
+#[owned_into(i32| vars(hrs: @.hours as i32, mns: @.minutes as i32, scs: @.seconds as i32), 
     return hrs * 3600 + mns * 60 + scs)]
 struct Time {
     hours: i8,
@@ -1075,8 +1079,8 @@ impl Employee {
 #[derive(o2o)]
 #[map(Employee)]
 #[ghosts(
-    first_name: {@.get_first_name()},
-    last_name: {@.get_last_name()}
+    first_name: @.get_first_name(),
+    last_name: @.get_last_name()
 )]
 struct EmployeeDto {
     #[map(id)]
@@ -1854,7 +1858,7 @@ struct Machine {
 #[derive(o2o)]
 #[map_ref(Car)]
 #[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghosts(vehicle.machine@id: {321})]
+#[ghosts(vehicle.machine@id: 321)]
 struct CarDto {
     number_of_doors: i8,
 
@@ -1880,7 +1884,7 @@ struct CarDto {
     height: f32,
     #[o2o(stop_repeat)]
 
-    #[o2o(repeat)] #[ghost({123})]
+    #[o2o(repeat)] #[ghost(123)]
     useless_param: i32,
     useless_param_2: i32,
     useless_param_3: i32,
@@ -2276,7 +2280,7 @@ enum Enum {
 enum EnumDto {
     Var1,
     Var2(i32, String),
-    #[ghost({Err(format!("unknown: {}", _str_field))?})]
+    #[ghost(Err(format!("unknown: {}", _str_field))?)]
     Var3 { _field: i32, _str_field: String }
 }
 ```
@@ -2312,7 +2316,7 @@ Reverse case:
 #[derive(o2o::o2o)]
 #[try_from_owned(EnumDto, String)]
 #[owned_into(EnumDto)]
-#[ghosts(Var3 { _str_field, .. }: {Err(format!("Unknown: {}", _str_field))?})]
+#[ghosts(Var3 { _str_field, .. }: Err(format!("Unknown: {}", _str_field))?)]
 enum Enum {
     Var1,
     Var2(i32, String),
@@ -2413,11 +2417,11 @@ Missing fields and default values:
 #[map_owned(EnumDto)]
 enum Enum {
     Var1,
-    #[ghosts(f: {123.0})]
+    #[ghosts(f: 123.0)]
     Var2 {
         field: i32,
     },
-    #[ghosts(1: {321.0})]
+    #[ghosts(1: 321.0)]
     Var3(
         i32,
     )

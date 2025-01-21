@@ -1694,7 +1694,7 @@ fn infallible_map_instruction_error_type(instr: TokenStream, postfix: Option<Tok
     #[from_owned(i64| repeat(), return Self(@.to_string()))]
     #[from_owned(i32| return Self(@.to_string()))]
     struct Wrapper(String);
-}, "Quick Return statement will be overriden. Did you forget to use 'skip_repeat'?"; "2")]
+}, "Quick Return instruction will be overriden. Did you forget to use 'skip_repeat'?"; "2")]
 #[test_case(quote! {
     #[from_owned(i64| repeat(), vars(msg: {"test".into()}), return Self(msg))]
     #[from_owned(i32| vars(msg: {"123".into()}))]
@@ -1709,12 +1709,22 @@ fn infallible_map_instruction_error_type(instr: TokenStream, postfix: Option<Tok
     #[from_owned(i64| repeat(quick_return), vars(msg: {"test".into()}), return Self(msg))]
     #[from_owned(i32| vars(msg: {"123".into()}), return Self(msg))]
     struct Wrapper(String);
-}, "Quick Return statement will be overriden. Did you forget to use 'skip_repeat'?"; "5")]
+}, "Quick Return instruction will be overriden. Did you forget to use 'skip_repeat'?"; "5")]
+#[test_case(quote! {
+    #[from_owned(i64| repeat(), match @.test())]
+    #[from_owned(i32| match @.test())]
+    enum Wrapper{}
+}, "Match instruction will be overriden. Did you forget to use 'skip_repeat'?"; "6")]
+#[test_case(quote! {
+    #[from_owned(i64| repeat(match_expr), match @.test())]
+    #[from_owned(i32| match @.test())]
+    enum Wrapper{}
+}, "Match instruction will be overriden. Did you forget to use 'skip_repeat'?"; "7")]
 #[test_case(quote! {
     #[from_owned(i64| repeat(test), vars(msg: {"test".into()}), return Self(msg))]
     #[from_owned(i32)]
     struct Wrapper(String);
-}, "#[repeat] of instruction type 'test' is not supported. Supported types are: vars, update, quick_return, default_case"; "6")]
+}, "#[repeat] of instruction type 'test' is not supported. Supported types are: vars, update, quick_return, default_case, match_expr"; "8")]
 fn trait_attr_repeat(code_fragment: TokenStream, err: &str) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
@@ -1724,6 +1734,30 @@ fn trait_attr_repeat(code_fragment: TokenStream, err: &str) {
 }
 
 // endregion: trait_attr_repeat
+
+// region: misplaced_trait_attr_instr
+
+#[test_case(quote! {
+    #[from_owned(EnumDto| .. => Default::default())]
+    enum Enum {}
+}, "Update instructions are only applicable to structs."; "1")]
+#[test_case(quote! {
+    #[from_owned(StructDto| match @.test())]
+    struct Struct();
+}, "Match instructions are only applicable to enums."; "2")]
+#[test_case(quote! {
+    #[from_owned(StructDto| _ => todo!())]
+    struct Struct();
+}, "Default case instructions are only applicable to enums."; "3")]
+fn misplaced_trait_attr_instr(code_fragment: TokenStream, err: &str) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+    let message = get_error(output, true);
+
+    assert_eq!(message, err);
+}
+
+// endregion: misplaced_trait_attr_instr
 
 // region: permeating_repeat
 

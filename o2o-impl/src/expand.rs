@@ -188,10 +188,10 @@ fn main_code_block(ctx: &ImplContext) -> TokenStream {
     if let Some(quick_return) = &ctx.struct_attr.quick_return {
         //TODO: Consider removing quick returns for into_existing because they are confusing
         if ctx.kind.is_into_existing() {
-            let action = quote_action(quick_return, None, ctx);
+            let action = quote_action(&quick_return.token_stream, None, ctx);
             return quote!(*other = #action;);
         }
-        return quote_action(quick_return, None, ctx);
+        return quote_action(&quick_return.token_stream, None, ctx);
     }
 
     match ctx.input {
@@ -204,10 +204,10 @@ fn main_code_block_ok(ctx: &ImplContext) -> TokenStream {
     if let Some(quick_return) = &ctx.struct_attr.quick_return {
         //TODO: Consider removing quick returns for into_existing because they are confusing
         if ctx.kind.is_into_existing() {
-            let action = quote_action(quick_return, None, ctx);
+            let action = quote_action(&quick_return.token_stream, None, ctx);
             return quote!(*other = #action;);
         }
-        return quote_action(quick_return, None, ctx);
+        return quote_action(&quick_return.token_stream, None, ctx);
     }
 
     let inner = match ctx.input {
@@ -247,10 +247,12 @@ fn enum_main_code_block(input: &Enum, ctx: &ImplContext) -> TokenStream {
 
     match ctx.kind {
         Kind::FromOwned | Kind::FromRef => {
-            quote!(match value #enum_init_block)
+            let match_expr = if let Some(ts) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(&ts.token_stream, Some(&quote!(value)), None) } else { quote!(value) };
+            quote!(match #match_expr #enum_init_block)
         },
         Kind::OwnedInto | Kind::RefInto => {
-            quote!(match self #enum_init_block)
+            let match_expr = if let Some(ts) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(&ts.token_stream, Some(&quote!(self)), None) } else { quote!(self) };
+            quote!(match #match_expr #enum_init_block)
         },
         Kind::OwnedIntoExisting | Kind::RefIntoExisting => enum_init_block,
     }
@@ -377,7 +379,7 @@ fn struct_init_block_inner(
     }
 
     if let Some(update) = &ctx.struct_attr.update {
-        let a = quote_action(update, None, ctx);
+        let a = quote_action(&update.token_stream, None, ctx);
         fragments.push(quote!(..#a))
     }
 
@@ -443,7 +445,7 @@ fn enum_init_block_inner(members: &mut Peekable<Iter<VariantData>>, ctx: &ImplCo
     }
 
     if let Some(default_case) = &ctx.struct_attr.default_case {
-        let g = quote_action(default_case, None, ctx);
+        let g = quote_action(&default_case.token_stream, None, ctx);
         fragments.push(quote!(_ #g))
     }
 

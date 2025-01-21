@@ -22,7 +22,7 @@ struct Machine {
 #[map(Car)]
 #[into_existing(Car)]
 #[child_parents(vehicle: Vehicle, vehicle.machine: Machine)]
-#[ghosts(vehicle.machine@id: { 321 })]
+#[ghosts(vehicle.machine@id: 321)]
 struct CarDto {
     number_of_doors: i8,
 
@@ -68,12 +68,12 @@ pub struct Team {
     into_existing(Team),
     child_parents(base: Base, division: Division, division.base: Base, division.league: League, division.league.base: Base),
     ghosts_owned(
-        division_id: { @.division.id },
-        division.base@id: { @.division.id },
-        division.base@name: { @.division.name },
-        division@league_id: { @.league.id },
-        division.league.base@id: { @.league.id },
-        division.league.base@name: { @.league.name }
+        division_id: @.division.id,
+        division.base@id: @.division.id,
+        division.base@name: @.division.name,
+        division@league_id:@.league.id,
+        division.league.base@id: @.league.id,
+        division.league.base@name: @.league.name
     ),
     ghosts_ref(
         division_id: { @.division.id },

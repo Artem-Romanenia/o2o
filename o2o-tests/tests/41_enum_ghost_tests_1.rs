@@ -10,9 +10,9 @@ enum EnumDto {
     Var1,
     #[map(Var22)]
     Var2,
-    #[ghost({panic!("impl var3")})]
+    #[ghost(panic!("impl var3"))]
     Var3,
-    #[ghost({panic!("impl var4")})]
+    #[ghost(panic!("impl var4"))]
     Var4 {
         _str: String,
         _i: i32,
@@ -23,7 +23,7 @@ enum EnumDto {
 
 #[derive(Clone, PartialEq, o2o::o2o)]
 #[map(EnumDto2)]
-#[ghosts(Var3: {panic!("impl var3")}, Var4 { .. }: {panic!("impl var4")}, Var5(..): {panic!("impl var5")})]
+#[ghosts(Var3: panic!("impl var3"), Var4 { .. }: panic!("impl var4"), Var5(..): { panic!("impl var5") })]
 enum Enum2 {
     Var1,
     #[map(Var2)]

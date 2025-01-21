@@ -21,7 +21,7 @@ enum EnumDto {
 
 #[derive(Clone, PartialEq, o2o::o2o)]
 #[map(EnumDto2)]
-#[ghosts(Var3 { _str, .. }: {Enum2::Error(_str.clone())})]
+#[ghosts(Var3 { _str, .. }: Enum2::Error(_str.clone()))]
 enum Enum2 {
     Var1,
     #[map(Var2)]

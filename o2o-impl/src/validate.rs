@@ -96,10 +96,19 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     match input {
         DataType::Struct(s) => {
             validate_fields(s, attrs, &data_type_attrs_by_kind, &type_paths, &mut errors);
+
+            for attr in &attrs.attrs {
+                check_misplaced_instrs_struct(&attr.core, &mut errors);
+            }
+
         },
         DataType::Enum(e) => {
             for v in &e.variants {
                 validate_variant_fields(v, attrs, &type_paths, &mut errors);
+            }
+
+            for attr in &attrs.attrs {
+                check_misplaced_instrs_enum(&attr.core, &mut errors);
             }
         },
     }
@@ -407,5 +416,20 @@ fn check_child_errors(child_attr: &ChildAttr, struct_attrs: &DataTypeAttrs, tp: 
                 errors.insert(format!("Missing #[child_parents(...)] instruction for {}", tp.path_str), tp.span);
             },
         }
+    }
+}
+
+fn check_misplaced_instrs_struct(attr: &TraitAttrCore, errors: &mut HashMap<String, Span>) {
+    if let Some(default_case) = &attr.default_case {
+        errors.insert(format!("Default case instructions are only applicable to enums."), default_case.span);
+    }
+    if let Some(match_expr) = &attr.match_expr {
+        errors.insert(format!("Match instructions are only applicable to enums."), match_expr.span);
+    }
+}
+
+fn check_misplaced_instrs_enum(attr: &TraitAttrCore, errors: &mut HashMap<String, Span>) {
+    if let Some(update) = &attr.update {
+        errors.insert(format!("Update instructions are only applicable to structs."), update.span);
     }
 }
