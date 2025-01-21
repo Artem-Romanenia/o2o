@@ -160,8 +160,6 @@ fn validate_member_error_instrs(input: &DataType, attrs: &MemberAttrs, errors: &
 fn validate_struct_attrs<'a, I: Iterator<Item = &'a TraitAttrCore>>(attrs: I, fallible: bool, errors: &mut HashMap<String, Span>) {
     let mut unique_ident = HashSet::new();
     for attr in attrs {
-        
-
         if !unique_ident.insert(&attr.ty) {
             errors.insert("Ident here must be unique.".into(), attr.ty.span);
         }

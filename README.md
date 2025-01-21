@@ -118,6 +118,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 ## Some milestones<!-- omit from toc --> 
 
+* **v0.5.3** Better parsing of [inline expression](#inline-expressions). Now both 'braced' and 'braceless' flavors are supported in all contexts.
 * **v0.5.0** Refactoring and improved support for 'flattened' child fields: `#[child()]`, `#[child_parents()]` and `#[parent()]` instructions
 * **v0.4.9** Support for `#![no_std]`
 * **v0.4.4** Fallible conversions
@@ -269,7 +270,7 @@ For most projects, just add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o = "0.5.2"
+o2o = "0.5.3"
 ```
 
 ### `syn >=2.*`
@@ -278,7 +279,7 @@ Currently o2o uses `syn >=1.0.3, <2` by default. If you want `syn >=2.*` to be u
 
 ``` toml
 [dependencies]
-o2o = { version = "0.5.2", default-features = false, features = "syn2" }
+o2o = { version = "0.5.3", default-features = false, features = "syn2" }
 ```
 
 ### no_std
@@ -287,18 +288,18 @@ In `#![no_std]` project, add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o-macros = "0.5.2"
+o2o-macros = "0.5.3"
 # Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
-o2o = { version = "0.5.2", default-features = false }
+o2o = { version = "0.5.3", default-features = false }
 ```
 
 Or, if you want `no_std` *and* `syn2`:
 
 ``` toml
 [dependencies]
-o2o-macros = { version = "0.5.2", default-features = false, features = "syn2" }
+o2o-macros = { version = "0.5.3", default-features = false, features = "syn2" }
 # Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
-o2o = { version = "0.5.2", default-features = false }
+o2o = { version = "0.5.3", default-features = false }
 ```
 
 ## The (not so big) Problem
@@ -327,8 +328,11 @@ If o2o is wrong in any of its assumptions, you will have to tell it that.
 
 ## Inline expressions
 
-o2o has a concept of Inline Expressions, which can be passed as a parameter to some of the o2o instructions. You can think of inline expression as a closure, which always has two *implicit* params: `|@, ~| {` **...expression body...** `}` or `|@, ~|` **{ ...expression body... }**
+o2o has a concept of Inline Expressions, which can be passed as a parameter to some of the o2o instructions. You can think of inline expression as a closure, which always has two *implicit* params. There are two flavors:
+* `|@, ~|` **{ ...expression body... }** (aka *'braced'*)
+* `|@, ~|` **...expression body...** *(aka 'braceless')*
 
+In these expressions:
 * `@` represents the object that is being converted from.
 * `~` represents the path to a specific field of the object that is being converted from.
 
@@ -339,7 +343,7 @@ struct Entity { some_int: i32 }
 #[map_owned(Entity)] // tells o2o to implement 'From<Entity> for EntityDto' and 'Into<Entity> for EntityDto'
 struct EntityDto { 
     #[from(~ * 2)] // Let's say for whatever reason we want to multiply 'some_int' by 2 when converting from Entity
-    #[into(~ / 2)] // And divide back by 2 when converting into it
+    #[into({~ / 2})] // And divide back by 2 when converting into it
     some_int: i32
 }
 ```
@@ -372,7 +376,7 @@ struct Entity { some_int: i32 }
 #[map_owned(Entity)]
 struct EntityDto { 
     #[from(@.some_int * 2)]
-    #[into(@.some_int / 2)]
+    #[into({@.some_int / 2})]
     some_int: i32
 }
 ```
@@ -676,7 +680,7 @@ struct PersonDto {
     id: i32,
     full_name: String,
     age: i8,
-    // 'None' below provides default value when creating PersonDto from Person
+    // {None} below provides default value when creating PersonDto from Person
     // It could have been omited if we only needed to create Person from PersonDto
     #[ghost({None})]
     zodiac_sign: Option<ZodiacSign>
