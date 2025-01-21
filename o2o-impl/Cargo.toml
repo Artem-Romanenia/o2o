@@ -1,6 +1,6 @@
 [package]
 name = "o2o-impl"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 description = "Implementation of 'o2o' crate"
