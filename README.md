@@ -118,7 +118,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 ## Some milestones<!-- omit from toc --> 
 
-* **v0.5.3** Better parsing of [inline expression](#inline-expressions). Now both 'braced' and 'braceless' flavors are supported in all contexts.
+* **v0.5.4** Better parsing of [inline expression](#inline-expressions). Now both 'braced' and 'braceless' flavors are supported in all contexts.
 * **v0.5.0** Refactoring and improved support for 'flattened' child fields: `#[child()]`, `#[child_parents()]` and `#[parent()]` instructions
 * **v0.4.9** Support for `#![no_std]`
 * **v0.4.4** Fallible conversions
@@ -270,7 +270,7 @@ For most projects, just add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o = "0.5.3"
+o2o = "0.5.4"
 ```
 
 ### `syn >=2.*`
@@ -279,7 +279,7 @@ Currently o2o uses `syn >=1.0.3, <2` by default. If you want `syn >=2.*` to be u
 
 ``` toml
 [dependencies]
-o2o = { version = "0.5.3", default-features = false, features = "syn2" }
+o2o = { version = "0.5.4", default-features = false, features = "syn2" }
 ```
 
 ### no_std
@@ -288,18 +288,18 @@ In `#![no_std]` project, add this to `Cargo.toml`:
 
 ``` toml
 [dependencies]
-o2o-macros = "0.5.3"
+o2o-macros = "0.5.4"
 # Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
-o2o = { version = "0.5.3", default-features = false }
+o2o = { version = "0.5.4", default-features = false }
 ```
 
 Or, if you want `no_std` *and* `syn2`:
 
 ``` toml
 [dependencies]
-o2o-macros = { version = "0.5.3", default-features = false, features = "syn2" }
+o2o-macros = { version = "0.5.4", default-features = false, features = "syn2" }
 # Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
-o2o = { version = "0.5.3", default-features = false }
+o2o = { version = "0.5.4", default-features = false }
 ```
 
 ## The (not so big) Problem

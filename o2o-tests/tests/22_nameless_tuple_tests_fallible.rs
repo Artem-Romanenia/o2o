@@ -2,8 +2,8 @@ use o2o::o2o;
 use o2o::traits::TryIntoExisting;
 
 #[derive(o2o)]
-#[try_map((i32, String), String)]
-#[try_into_existing((i32, String), String)]
+#[try_map((i32, String), ())]
+#[try_into_existing((i32, String), (i8, String))]
 pub struct Entity {
     #[map(0)]
     int: i32,
