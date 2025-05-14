@@ -118,7 +118,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
 
 ## Some milestones<!-- omit from toc --> 
 
-* **v0.5.4** Better parsing of [inline expression](#inline-expressions). Now both 'braced' and 'braceless' flavors are supported in all contexts.
+* **v0.5.3** Better parsing of [inline expression](#inline-expressions). Now both 'braced' and 'braceless' flavors are supported in all contexts.
 * **v0.5.0** Refactoring and improved support for 'flattened' child fields: `#[child()]`, `#[child_parents()]` and `#[parent()]` instructions
 * **v0.4.9** Support for `#![no_std]`
 * **v0.4.4** Fallible conversions
