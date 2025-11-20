@@ -208,13 +208,13 @@ impl ::core::convert::TryFrom<&A> for B { ... }
 // #[owned_into(A)]
 impl ::core::convert::Into<A> for B { ... }
 
-// #[try_owned_into(A)]
+// #[owned_try_into(A)]
 impl ::core::convert::TryInto<A> for B { ... }
 
 // #[ref_into(A)]
 impl ::core::convert::Into<A> for &B { ... }
 
-// #[try_ref_into(A)]
+// #[ref_try_into(A)]
 impl ::core::convert::TryInto<A> for &B { ... }
 
 // #[owned_into_existing(A)]
