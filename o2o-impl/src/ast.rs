@@ -92,11 +92,21 @@ impl<'a> Field {
             member,
             member_str,
             ty: match &node.ty {
-                syn::Type::Path(p) => Some(p.path.clone()),
+                syn::Type::Path(p) => Some(ensure_colons(p.path.clone())),
                 _ => None
             }
         })
     }
+}
+
+fn ensure_colons(mut path: Path) -> Path {
+    if let Some(segment) = path.segments.last_mut() {
+        // if final segment is AngleBracketed, include `::` for ::<T> instead of <T>
+        if let syn::PathArguments::AngleBracketed(ref mut args) = segment.arguments {
+            args.colon2_token = Some(Default::default());
+        }
+    }
+    path
 }
 
 pub(crate) struct Enum<'a> {
