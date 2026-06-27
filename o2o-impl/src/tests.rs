@@ -2190,6 +2190,76 @@ quote!{
         }
     }
 }; "4")]
+#[test_case(quote!{
+    #[owned_into(Entity<T>)]
+    #[map_ref(Entity<T>)]
+    #[into_existing(Entity<T>)]
+    #[where_clause(T : Copy)]
+    pub struct EntityDto<'a, 'b, T> {
+        some_int: T,
+        #[into(~.to_string())]
+        #[from(~.as_str())]
+        pub some_str: &'a str,
+        #[into(another_str, ~.to_string())]
+        #[from(another_str, ~.as_str())]
+        #[owned_into_existing(another_str, "123".into())]
+        #[ref_into_existing(another_str, "321".into())]
+        pub different_str: &'b str,
+    }
+},
+quote! {
+    impl<'a, 'b, 'o2o: 'a + 'b, T> ::core::convert::From<&'o2o Entity<T>> for EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn from(value: &'o2o Entity<T>) -> EntityDto<'a, 'b, T> {
+            EntityDto {
+                some_int: value.some_int,
+                some_str: value.some_str.as_str(),
+                different_str: value.another_str.as_str(),
+            }
+        }
+    }
+    impl<'a, 'b, T> ::core::convert::Into<Entity<T>> for EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into(self) -> Entity<T> {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str.to_string(),
+                another_str: self.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b, T> ::core::convert::Into<Entity<T>> for &EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into(self) -> Entity<T> {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str.to_string(),
+                another_str: self.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b, T> o2o::traits::IntoExisting<Entity<T>> for EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into_existing(self, other: &mut Entity<T>) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str.to_string();
+            other.another_str = "123".into();
+        }
+    }
+    impl<'a, 'b, T> o2o::traits::IntoExisting<Entity<T>> for &EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into_existing(self, other: &mut Entity<T>) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str.to_string();
+            other.another_str = "321".into();
+        }
+    }
+}; "5")]
 fn lifetimes(code_fragment: TokenStream, expected_output: TokenStream) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);

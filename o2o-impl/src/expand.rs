@@ -1028,7 +1028,9 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
     }
 
     if !ref_lts.is_empty() {
-        impl_gens.params.push(parse_quote!('o2o: #( #ref_lts )+*));
+        let ind = impl_gens.params.iter()
+            .take_while(|p| matches!(p, GenericParam::Lifetime(_))).count();
+        impl_gens.params.insert(ind, parse_quote!('o2o: #( #ref_lts )+*));
     }
 
     QuoteTraitParams { 
