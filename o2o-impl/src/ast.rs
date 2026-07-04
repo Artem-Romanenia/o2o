@@ -189,7 +189,7 @@ pub(crate) enum DataType<'a> {
 }
 
 impl<'a> DataType<'a> {
-    pub fn get_ident(&'a self) -> &Ident {
+    pub fn get_ident(&'a self) -> &'a Ident {
         match self {
             DataType::Struct(s) => s.ident,
             DataType::Enum(e) => e.ident,
@@ -210,7 +210,7 @@ impl<'a> DataType<'a> {
         }
     }
 
-    pub fn get_members(&'a self) -> Vec<DataTypeMember> {
+    pub fn get_members(&'a self) -> Vec<DataTypeMember<'a>> {
         match self {
             DataType::Struct(s) => s.fields.iter().map(DataTypeMember::Field).collect(),
             DataType::Enum(e) => e.variants.iter().map(DataTypeMember::Variant).collect(),

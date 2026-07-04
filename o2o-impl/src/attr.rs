@@ -229,27 +229,27 @@ pub(crate) struct DataTypeAttrs {
 }
 
 impl<'a> DataTypeAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &TraitAttr> {
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &'a TraitAttr> {
         self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind])
     }
 
-    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &TraitAttrCore> {
+    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &'a TraitAttrCore> {
         self.iter_for_kind(kind, fallible).map(|x| &x.core)
     }
 
-    pub(crate) fn ghosts_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&StructGhostAttrCore> {
+    pub(crate) fn ghosts_attr(&'a self, container_ty: &'a TypePath, kind: &'a Kind) -> Option<&'a StructGhostAttrCore> {
         self.ghosts_attrs.iter()
             .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.ghosts_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
-    pub(crate) fn where_attr(&'a self, container_ty: &TypePath) -> Option<&WhereAttr>{
+    pub(crate) fn where_attr(&'a self, container_ty: &TypePath) -> Option<&'a WhereAttr>{
         self.where_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.where_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn child_parents_attr(&'a self, container_ty: &TypePath) -> Option<&ChildParentsAttr>{
+    pub(crate) fn child_parents_attr(&'a self, container_ty: &TypePath) -> Option<&'a ChildParentsAttr>{
         self.child_parents_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.child_parents_attrs.iter().find(|x| x.container_ty.is_none()))
@@ -339,15 +339,15 @@ pub(crate) struct MemberAttrs {
 }
 
 impl<'a> MemberAttrs {
-    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &MemberAttr> {
+    pub(crate) fn iter_for_kind(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &'a MemberAttr> {
         self.attrs.iter().filter(move |x| x.fallible == fallible && x.applicable_to[kind])
     }
 
-    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &MemberAttrCore> {
+    pub(crate) fn iter_for_kind_core(&'a self, kind: &'a Kind, fallible: bool) -> impl Iterator<Item = &'a MemberAttrCore> {
         self.iter_for_kind(kind, fallible).map(|x| &x.attr)
     }
 
-    pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<ApplicableAttr> {
+    pub(crate) fn applicable_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<ApplicableAttr<'a>> {
         self.ghost(container_ty, kind)
             .map(ApplicableAttr::Ghost)
             .or_else(|| self.field_attr_core(kind, fallible, container_ty)
@@ -365,31 +365,31 @@ impl<'a> MemberAttrs {
             .or_else(|| if kind == &Kind::RefIntoExisting { self.field_attr(&Kind::RefInto, fallible, container_ty) } else { None })
     }
 
-    pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&ChildAttr>{
+    pub(crate) fn child(&'a self, container_ty: &TypePath) -> Option<&'a ChildAttr>{
         self.child_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.child_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn ghost(&'a self, container_ty: &TypePath, kind: &'a Kind) -> Option<&FieldGhostAttrCore>{
+    pub(crate) fn ghost(&'a self, container_ty: &TypePath, kind: &'a Kind) -> Option<&'a FieldGhostAttrCore>{
         self.ghost_attrs.iter()
             .find(|x| x.applicable_to[kind] && x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.ghost_attrs.iter().find(|x| x.applicable_to[kind] && x.attr.container_ty.is_none())).map(|x| &x.attr)
     }
 
-    pub(crate) fn lit(&'a self, container_ty: &TypePath) -> Option<&LitAttr>{
+    pub(crate) fn lit(&'a self, container_ty: &TypePath) -> Option<&'a LitAttr>{
         self.lit_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.lit_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn pat(&'a self, container_ty: &TypePath) -> Option<&PatAttr>{
+    pub(crate) fn pat(&'a self, container_ty: &TypePath) -> Option<&'a PatAttr>{
         self.pat_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.pat_attrs.iter().find(|x| x.container_ty.is_none()))
     }
 
-    pub(crate) fn type_hint(&'a self, container_ty: &TypePath) -> Option<&VariantTypeHintAttr>{
+    pub(crate) fn type_hint(&'a self, container_ty: &TypePath) -> Option<&'a VariantTypeHintAttr>{
         self.type_hint_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.type_hint_attrs.iter().find(|x| x.container_ty.is_none()))
@@ -403,19 +403,19 @@ impl<'a> MemberAttrs {
         self.parent_attrs.iter().any(|x| x.child_fields.is_none() && (x.container_ty.is_none() || x.container_ty.as_ref().unwrap() == container_ty))
     }
 
-    pub(crate) fn parameterized_parent_attr(&'a self, container_ty: &TypePath) -> Option<&ParentAttr> {
+    pub(crate) fn parameterized_parent_attr(&'a self, container_ty: &TypePath) -> Option<&'a ParentAttr> {
         self.parent_attrs.iter()
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty && x.child_fields.is_some())
             .or_else(|| self.parent_attrs.iter().find(|x| x.container_ty.is_none() && x.child_fields.is_some()))
     }
 
-    pub(crate) fn field_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&MemberAttr> {
+    pub(crate) fn field_attr(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&'a MemberAttr> {
         self.iter_for_kind(kind, fallible)
             .find(|x| x.attr.container_ty.is_some() && x.attr.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.iter_for_kind(kind, fallible).find(|x| x.attr.container_ty.is_none()))
     }
 
-    pub(crate) fn field_attr_core(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&MemberAttrCore> {
+    pub(crate) fn field_attr_core(&'a self, kind: &'a Kind, fallible: bool, container_ty: &TypePath) -> Option<&'a MemberAttrCore> {
         self.iter_for_kind_core(kind, fallible)
             .find(|x| x.container_ty.is_some() && x.container_ty.as_ref().unwrap() == container_ty)
             .or_else(|| self.iter_for_kind_core(kind, fallible).find(|x| x.container_ty.is_none()))
@@ -974,7 +974,7 @@ impl<'a> ParentChildField {
         }
     }
 
-    pub(crate) fn get_for_kind(&'a self, kind: &'a Kind) -> Option<&ParentChildFieldAttr> {
+    pub(crate) fn get_for_kind(&'a self, kind: &'a Kind) -> Option<&'a ParentChildFieldAttr> {
         self.attrs.iter()
             .find(|x| x.applicable_to[kind])
             .or_else(|| if kind == &Kind::OwnedIntoExisting { self.get_for_kind(&Kind::OwnedInto) } else { None })
