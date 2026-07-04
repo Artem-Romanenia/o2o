@@ -2190,6 +2190,133 @@ quote!{
         }
     }
 }; "4")]
+#[test_case(quote!{
+    #[owned_into(Entity<T>)]
+    #[map_ref(Entity<T>)]
+    #[into_existing(Entity<T>)]
+    #[where_clause(T : Copy)]
+    pub struct EntityDto<'a, 'b, T> {
+        some_int: T,
+        #[into(~.to_string())]
+        #[from(~.as_str())]
+        pub some_str: &'a str,
+        #[into(another_str, ~.to_string())]
+        #[from(another_str, ~.as_str())]
+        #[owned_into_existing(another_str, "123".into())]
+        #[ref_into_existing(another_str, "321".into())]
+        pub different_str: &'b str,
+    }
+},
+quote! {
+    impl<'a, 'b, 'o2o: 'a + 'b, T> ::core::convert::From<&'o2o Entity<T>> for EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn from(value: &'o2o Entity<T>) -> EntityDto<'a, 'b, T> {
+            EntityDto {
+                some_int: value.some_int,
+                some_str: value.some_str.as_str(),
+                different_str: value.another_str.as_str(),
+            }
+        }
+    }
+    impl<'a, 'b, T> ::core::convert::Into<Entity<T>> for EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into(self) -> Entity<T> {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str.to_string(),
+                another_str: self.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b, T> ::core::convert::Into<Entity<T>> for &EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into(self) -> Entity<T> {
+            Entity {
+                some_int: self.some_int,
+                some_str: self.some_str.to_string(),
+                another_str: self.different_str.to_string(),
+            }
+        }
+    }
+    impl<'a, 'b, T> o2o::traits::IntoExisting<Entity<T>> for EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into_existing(self, other: &mut Entity<T>) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str.to_string();
+            other.another_str = "123".into();
+        }
+    }
+    impl<'a, 'b, T> o2o::traits::IntoExisting<Entity<T>> for &EntityDto<'a, 'b, T>
+    where T : Copy
+    {
+        fn into_existing(self, other: &mut Entity<T>) {
+            other.some_int = self.some_int;
+            other.some_str = self.some_str.to_string();
+            other.another_str = "321".into();
+        }
+    }
+}; "5")]
+#[test_case(quote! {
+    #[map(EntityDto<'a, 'b>)]
+    #[into_existing(EntityDto<'a, 'b>)]
+    struct Entity<'a : 'static, 'b> {
+        str1: &'a str,
+        str2: &'b str
+    }
+}, quote! {
+    impl<'a: 'static, 'b> ::core::convert::From<EntityDto<'a, 'b>> for Entity<'a, 'b> {
+        fn from(value: EntityDto<'a, 'b>) -> Entity<'a, 'b> {
+            Entity {
+                str1: value.str1,
+                str2: value.str2,
+            }
+        }
+    }
+    impl<'a: 'static, 'b, 'o2o: 'a + 'b> ::core::convert::From<&'o2o EntityDto<'a, 'b>>
+    for Entity<'a, 'b> {
+        fn from(value: &'o2o EntityDto<'a, 'b>) -> Entity<'a, 'b> {
+            Entity {
+                str1: value.str1,
+                str2: value.str2,
+            }
+        }
+    }
+    impl<'a: 'static, 'b> ::core::convert::Into<EntityDto<'a, 'b>> for Entity<'a, 'b> {
+        fn into(self) -> EntityDto<'a, 'b> {
+            EntityDto {
+                str1: self.str1,
+                str2: self.str2,
+            }
+        }
+    }
+    impl<'a: 'static, 'b, 'o2o: 'a + 'b> ::core::convert::Into<EntityDto<'a, 'b>>
+    for &'o2o Entity<'a, 'b> {
+        fn into(self) -> EntityDto<'a, 'b> {
+            EntityDto {
+                str1: self.str1,
+                str2: self.str2,
+            }
+        }
+    }
+    impl<'a: 'static, 'b> o2o::traits::IntoExisting<EntityDto<'a, 'b>>
+    for Entity<'a, 'b> {
+        fn into_existing(self, other: &mut EntityDto<'a, 'b>) {
+            other.str1 = self.str1;
+            other.str2 = self.str2;
+        }
+    }
+    impl<'a: 'static, 'b, 'o2o: 'a + 'b> o2o::traits::IntoExisting<EntityDto<'a, 'b>>
+    for &'o2o Entity<'a, 'b> {
+        fn into_existing(self, other: &mut EntityDto<'a, 'b>) {
+            other.str1 = self.str1;
+            other.str2 = self.str2;
+        }
+    }
+}; "6")]
 fn lifetimes(code_fragment: TokenStream, expected_output: TokenStream) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
@@ -2199,6 +2326,278 @@ fn lifetimes(code_fragment: TokenStream, expected_output: TokenStream) {
 }
 
 // endregion: lifetimes
+
+// region: generics
+
+#[test_case(quote!{
+    #[map(EntityDto<T, U>)]
+    #[into_existing(EntityDto<T, U>)]
+    #[where_clause(U: Clone)]
+    struct Entity<T: Copy + Clone, U>
+    where U : Clone{
+        parent_int: T,
+        #[map(~.clone())]
+        some_val: U
+    }
+}, quote!{
+    impl<T: Copy + Clone, U> ::core::convert::From<EntityDto<T, U>> for Entity<T, U>
+    where U: Clone
+    {
+        fn from(value: EntityDto<T, U>) -> Entity<T, U> {
+            Entity {
+                parent_int: value.parent_int,
+                some_val: value.some_val.clone(),
+            }
+        }
+    }
+    impl<T: Copy + Clone, U> ::core::convert::From<&EntityDto<T, U>> for Entity<T, U>
+    where U: Clone
+    {
+        fn from(value: &EntityDto<T, U>) -> Entity<T, U> {
+            Entity {
+                parent_int: value.parent_int,
+                some_val: value.some_val.clone(),
+            }
+        }
+    }
+    impl<T: Copy + Clone, U> ::core::convert::Into<EntityDto<T, U>> for Entity<T, U>
+    where U: Clone
+    {
+        fn into(self) -> EntityDto<T, U> {
+            EntityDto {
+                parent_int: self.parent_int,
+                some_val: self.some_val.clone(),
+            }
+        }
+    }
+    impl<T: Copy + Clone, U> ::core::convert::Into<EntityDto<T, U>> for &Entity<T, U>
+    where U: Clone
+    {
+        fn into(self) -> EntityDto<T, U> {
+            EntityDto {
+                parent_int: self.parent_int,
+                some_val: self.some_val.clone(),
+            }
+        }
+    }
+    impl<T: Copy + Clone, U> o2o::traits::IntoExisting<EntityDto<T, U>> for Entity<T, U>
+    where U: Clone
+    {
+        fn into_existing(self, other: &mut EntityDto<T, U>) {
+            other.parent_int = self.parent_int;
+            other.some_val = self.some_val.clone();
+        }
+    }
+    impl<T: Copy + Clone, U> o2o::traits::IntoExisting<EntityDto<T, U>> for &Entity<T, U>
+    where U: Clone
+    {
+        fn into_existing(self, other: &mut EntityDto<T, U>) {
+            other.parent_int = self.parent_int;
+            other.some_val = self.some_val.clone();
+        }
+    }
+}; "generic with bounds")]
+#[test_case(quote!{
+    #[map_owned(EntityDto<T>)]
+    struct Entity<T = i32> {
+        parent_int: T,
+        some_int: T
+    }
+}, quote!{
+    impl<T> ::core::convert::From<EntityDto<T>> for Entity<T> {
+        fn from(value: EntityDto<T>) -> Entity<T> {
+            Entity {
+                parent_int: value.parent_int,
+                some_int: value.some_int,
+            }
+        }
+    }
+    impl<T> ::core::convert::Into<EntityDto<T>> for Entity<T> {
+        fn into(self) -> EntityDto<T> {
+            EntityDto {
+                parent_int: self.parent_int,
+                some_int: self.some_int,
+            }
+        }
+    }
+}; "generic with default")]
+#[test_case(quote! {
+    #[derive(o2o::o2o)]
+    #[map(EntityDto<T>)]
+    #[into_existing(EntityDto<T>)]
+    struct Entity<const T: usize> {
+        ints: [i32; T],
+        some_val: i32
+    }
+}, quote! {
+    impl<const T: usize> ::core::convert::From<EntityDto<T>> for Entity<T> {
+        fn from(value: EntityDto<T>) -> Entity<T> {
+            Entity {
+                ints: value.ints,
+                some_val: value.some_val,
+            }
+        }
+    }
+    impl<const T: usize> ::core::convert::From<&EntityDto<T>> for Entity<T> {
+        fn from(value: &EntityDto<T>) -> Entity<T> {
+            Entity {
+                ints: value.ints,
+                some_val: value.some_val,
+            }
+        }
+    }
+    impl<const T: usize> ::core::convert::Into<EntityDto<T>> for Entity<T> {
+        fn into(self) -> EntityDto<T> {
+            EntityDto {
+                ints: self.ints,
+                some_val: self.some_val,
+            }
+        }
+    }
+    impl<const T: usize> ::core::convert::Into<EntityDto<T>> for &Entity<T> {
+        fn into(self) -> EntityDto<T> {
+            EntityDto {
+                ints: self.ints,
+                some_val: self.some_val,
+            }
+        }
+    }
+    impl<const T: usize> o2o::traits::IntoExisting<EntityDto<T>> for Entity<T> {
+        fn into_existing(self, other: &mut EntityDto<T>) {
+            other.ints = self.ints;
+            other.some_val = self.some_val;
+        }
+    }
+    impl<const T: usize> o2o::traits::IntoExisting<EntityDto<T>> for &Entity<T> {
+        fn into_existing(self, other: &mut EntityDto<T>) {
+            other.ints = self.ints;
+            other.some_val = self.some_val;
+        }
+    }
+}; "const generic")]
+#[test_case(quote! {
+    #[derive(o2o::o2o)]
+    #[map(EntityDto<T>)]
+    #[into_existing(EntityDto<T>)]
+    struct Entity<const T: usize = 10> {
+        ints: [i32; T],
+        some_val: i32
+    }
+}, quote! {
+    impl<const T: usize> ::core::convert::From<EntityDto<T>> for Entity<T> {
+        fn from(value: EntityDto<T>) -> Entity<T> {
+            Entity {
+                ints: value.ints,
+                some_val: value.some_val,
+            }
+        }
+    }
+    impl<const T: usize> ::core::convert::From<&EntityDto<T>> for Entity<T> {
+        fn from(value: &EntityDto<T>) -> Entity<T> {
+            Entity {
+                ints: value.ints,
+                some_val: value.some_val,
+            }
+        }
+    }
+    impl<const T: usize> ::core::convert::Into<EntityDto<T>> for Entity<T> {
+        fn into(self) -> EntityDto<T> {
+            EntityDto {
+                ints: self.ints,
+                some_val: self.some_val,
+            }
+        }
+    }
+    impl<const T: usize> ::core::convert::Into<EntityDto<T>> for &Entity<T> {
+        fn into(self) -> EntityDto<T> {
+            EntityDto {
+                ints: self.ints,
+                some_val: self.some_val,
+            }
+        }
+    }
+    impl<const T: usize> o2o::traits::IntoExisting<EntityDto<T>> for Entity<T> {
+        fn into_existing(self, other: &mut EntityDto<T>) {
+            other.ints = self.ints;
+            other.some_val = self.some_val;
+        }
+    }
+    impl<const T: usize> o2o::traits::IntoExisting<EntityDto<T>> for &Entity<T> {
+        fn into_existing(self, other: &mut EntityDto<T>) {
+            other.ints = self.ints;
+            other.some_val = self.some_val;
+        }
+    }
+}; "const generic with default")]
+#[test_case(quote! {
+    #[derive(o2o::o2o)]
+    #[map_owned(StructA<T>)]
+    struct StructB<T = i32> {
+        id: T,
+        #[parent(content1, content2)]
+        inner: InnerB<T>
+    }
+}, quote! {
+    impl<T> ::core::convert::From<StructA<T>> for StructB<T> {
+        fn from(value: StructA<T>) -> StructB<T> {
+            StructB {
+                id: value.id,
+                inner: InnerB::<T> {
+                    content1: value.content1,
+                    content2: value.content2,
+                },
+            }
+        }
+    }
+    impl<T> ::core::convert::Into<StructA<T>> for StructB<T> {
+        fn into(self) -> StructA<T> {
+            StructA {
+                id: self.id,
+                content1: self.inner.content1,
+                content2: self.inner.content2,
+            }
+        }
+    }
+}; "generic child")]
+#[test_case(quote! {
+    #[derive(o2o::o2o)]
+    #[map_owned(StructA<T>)]
+    struct StructB<T = i32> {
+        id: T,
+        #[parent(content1, content2)]
+        inner: InnerB::<T>
+    }
+}, quote! {
+    impl<T> ::core::convert::From<StructA<T>> for StructB<T> {
+        fn from(value: StructA<T>) -> StructB<T> {
+            StructB {
+                id: value.id,
+                inner: InnerB::<T> {
+                    content1: value.content1,
+                    content2: value.content2,
+                },
+            }
+        }
+    }
+    impl<T> ::core::convert::Into<StructA<T>> for StructB<T> {
+        fn into(self) -> StructA<T> {
+            StructA {
+                id: self.id,
+                content1: self.inner.content1,
+                content2: self.inner.content2,
+            }
+        }
+    }
+}; "generic child with colons")]
+fn generics(code_fragment: TokenStream, expected_output: TokenStream) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    assert!(output.is_ok());
+    assert_eq!(output.unwrap().to_string().trim().replace(" ", ""), expected_output.to_string().trim().replace(" ", ""));
+}
+
+// endregion: generics
 
 // region: parent_attr_member_instr
 

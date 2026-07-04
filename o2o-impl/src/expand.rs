@@ -936,6 +936,41 @@ fn render_enum_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStr
     }
 }
 
+fn render_generics_with_bounds(generics: &syn::Generics) -> TokenStream {
+    if !generics.params.is_empty() {
+        let filtered = generics.params.iter().map(|param| match param {
+            GenericParam::Type(syn::TypeParam { ident, colon_token, bounds, .. }) =>
+                quote!(#ident #colon_token #bounds),
+            GenericParam::Lifetime(l) =>
+                quote!(#l),
+            GenericParam::Const(syn::ConstParam { ident, colon_token, ty, .. }) =>
+                quote!(const #ident #colon_token #ty)
+        });
+
+        quote!(<#(#filtered),*>)
+    } else {
+        quote!()
+    }
+}
+
+fn render_generics_ident_only(generics: &syn::Generics) -> TokenStream {
+    if !generics.params.is_empty() {
+        let filtered = generics.params.iter().map(|param| match param {
+            GenericParam::Type(syn::TypeParam { ident, .. }) =>
+                quote!(#ident),
+            GenericParam::Lifetime(l) => {
+                let lifetime = &l.lifetime;
+                quote!(#lifetime)
+            }
+            GenericParam::Const(syn::ConstParam { ident, .. }) =>
+                quote!(#ident)
+        });
+        quote!(<#(#filtered),*>)
+    } else {
+        quote!()
+    }
+}
+
 fn replace_tilde_or_at_in_expr(input: &TokenStream, at_tokens: Option<&TokenStream>, tilde_tokens: Option<&TokenStream>) -> TokenStream {
     let mut tokens = Vec::new();
 
@@ -1028,7 +1063,9 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
     }
 
     if !ref_lts.is_empty() {
-        impl_gens.params.push(parse_quote!('o2o: #( #ref_lts )+*));
+        let ind = impl_gens.params.iter()
+            .take_while(|p| matches!(p, GenericParam::Lifetime(_))).count();
+        impl_gens.params.insert(ind, parse_quote!('o2o: #( #ref_lts )+*));
     }
 
     QuoteTraitParams { 
@@ -1037,9 +1074,9 @@ fn get_quote_trait_params<'a>(input: &DataType, ctx: &'a ImplContext) -> QuoteTr
         inner_attr: ctx.struct_attr.inner_attribute.as_ref(), 
         dst: ctx.dst_ty, 
         src: ctx.src_ty, 
-        these_gens: input.get_generics().to_token_stream(),
+        these_gens: render_generics_ident_only(input.get_generics()),
         those_gens: ctx.struct_attr.ty.generics.to_token_stream(),
-        impl_gens: impl_gens.to_token_stream(), 
+        impl_gens: render_generics_with_bounds(&impl_gens),
         where_clause: input.get_attrs().where_attr(&ctx.struct_attr.ty).map(|x| {
             let where_clause = &x.where_clause;
             quote!(where #where_clause)
