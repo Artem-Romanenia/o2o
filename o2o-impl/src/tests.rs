@@ -2798,6 +2798,8 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
 
 // endregion: incomplete_parent_attr_member_instr
 
+// region: incorrect_attribute
+
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[map_owned(B | invalid_instruction())]
@@ -2814,10 +2816,6 @@ fn incorrect_map_instruction(code_fragment: TokenStream, err: &str) {
         let error = get_error(output, false);
         assert_eq!(error, err);
 }
-
-// region: incorrect_attribute
-
-
 
 // endregion: incorrect_attribute
 
