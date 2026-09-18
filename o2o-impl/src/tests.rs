@@ -2798,11 +2798,38 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
 
 // endregion: incomplete_parent_attr_member_instr
 
-// region: incorrect_attribute
+// region: incorrect_map_instruction
 
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[map_owned(B | invalid_instruction())]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Unrecognized instruction: invalid_instruction"
+)]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[map(B | invalid_instruction())]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Unrecognized instruction: invalid_instruction"
+)]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[try_map(B | invalid_instruction())]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Unrecognized instruction: invalid_instruction"
+)]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[try_map_owned(B | invalid_instruction())]
     struct A {
         #[map(id)]
         id: u32,
@@ -2817,7 +2844,7 @@ fn incorrect_map_instruction(code_fragment: TokenStream, err: &str) {
         assert_eq!(error, err);
 }
 
-// endregion: incorrect_attribute
+// endregion: incorrect_map_instruction
 
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
