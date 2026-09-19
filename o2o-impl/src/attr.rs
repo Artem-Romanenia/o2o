@@ -665,7 +665,7 @@ fn parse_trait_instruction_param(input: &syn::parse::ParseBuffer, attr: &mut Tra
     }
 
     let token: TokenTree = input.parse()?;
-    Err(syn::Error::new(token.span(), format!("Unrecognized instruction: {token}")))
+    Err(syn::Error::new(token.span(), format!("Instruction '{}' is unrecognized", token)))
 }
 
 #[derive(Clone)]

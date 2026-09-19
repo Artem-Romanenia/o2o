@@ -2802,46 +2802,50 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
 
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
-    #[map_owned(B | invalid_instruction())]
-    struct A {
-        #[map(id)]
-        id: u32,
-    }
-}, "Unrecognized instruction: invalid_instruction"
-)]
-#[test_case(quote! {
-    #[derive(o2o::o2o, Debug)]
     #[map(B | invalid_instruction())]
     struct A {
         #[map(id)]
         id: u32,
     }
-}, "Unrecognized instruction: invalid_instruction"
+}, "Instruction 'invalid_instruction' is unrecognized"
+; "1"
 )]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
-    #[try_map(B | invalid_instruction())]
+    #[map_owned(B | ())]
     struct A {
         #[map(id)]
         id: u32,
     }
-}, "Unrecognized instruction: invalid_instruction"
+}, "Instruction '()' is unrecognized"
+; "2"
 )]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
-    #[try_map_owned(B | invalid_instruction())]
+    #[try_map(B | +)]
     struct A {
         #[map(id)]
         id: u32,
     }
-}, "Unrecognized instruction: invalid_instruction"
+}, "Instruction '+' is unrecognized"
+; "3"
+)]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[try_map_owned(B | 77)]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Instruction '77' is unrecognized"
+; "4"
 )]
 fn incorrect_map_instruction(code_fragment: TokenStream, err: &str) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
 
-        let error = get_error(output, false);
-        assert_eq!(error, err);
+    let error = get_error(output, false);
+    assert_eq!(error, err);
 }
 
 // endregion: incorrect_map_instruction
