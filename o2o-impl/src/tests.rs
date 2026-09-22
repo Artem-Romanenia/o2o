@@ -2807,8 +2807,7 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
         #[map(id)]
         id: u32,
     }
-}, "Instruction 'invalid_instruction' is unrecognized"; "1"
-)]
+}, "Instruction 'invalid_instruction' is unrecognized"; "1")]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[try_map(B| +, anyhow::Error)]
@@ -2816,8 +2815,7 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
         #[map(id)]
         id: u32,
     }
-}, "Instruction '+' is unrecognized"; "2"
-)]
+}, "Instruction '+' is unrecognized"; "2")]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[map_owned(B | ())]
@@ -2825,8 +2823,7 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
         #[map(id)]
         id: u32,
     }
-}, "Instruction '()' is unrecognized"; "3"
-)]
+}, "Instruction '()' is unrecognized"; "3")]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[try_map_owned(B | 77, anyhow::Error)]
@@ -2834,24 +2831,21 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
         #[map(id)]
         id: u32,
     }
-}, "Instruction '77' is unrecognized"; "4"
-)]
+}, "Instruction '77' is unrecognized"; "4")]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[map_ref(B| ~)]
     struct A {
         id: u32,
     }
-}, "Instruction '~' is unrecognized"; "5"
-)]
+}, "Instruction '~' is unrecognized"; "5")]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[try_map_ref(B| @, anyhow::Error)]
     struct A {
         id: u32,
     }
-}, "Instruction '@' is unrecognized"; "6"
-)]
+}, "Instruction '@' is unrecognized"; "6")]
 
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
@@ -2860,8 +2854,7 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
         #[map(id)]
         id: u32,
     }
-}, "Instruction 'not' is unrecognized"; "7"
-)]
+}, "Instruction 'not' is unrecognized"; "7")]
 #[test_case(quote! {
     #[derive(o2o::o2o, Debug)]
     #[ref_into_existing(B| ^#!)]
@@ -2869,8 +2862,7 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
         #[map(id)]
         id: u32,
     }
-}, "Instruction '^' is unrecognized"; "8"
-)]
+}, "Instruction '^' is unrecognized"; "8")]
 fn invalid_map_instruction(code_fragment: TokenStream, err: &str) {
     let input: DeriveInput = syn::parse2(code_fragment).unwrap();
     let output = derive(&input);
