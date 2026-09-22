@@ -1,6 +1,6 @@
 [package]
 name = "o2o-tests"
-version = "0.5.5"
+version = "0.6.0"
 edition = "2021"
 authors = ["Artem Romanenia <artem.romanenia@gmail.com>"]
 description = "Tests for 'o2o' crate"
@@ -8,13 +8,13 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Artem-Romanenia/o2o"
 
 [dependencies]
-o2o = { version = "0.5.5", default-features = false, path = "../" }
+o2o = { version = "0.6.0", default-features = false, path = "../" }
 anyhow = "1.0.86"
 
 [dev-dependencies]
 test-case = "3"
 
 [features]
-default = ["syn1"]
+default = ["syn2"]
 syn1 = ["o2o/syn1"]
 syn2 = ["o2o/syn2"]
