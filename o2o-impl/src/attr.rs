@@ -664,7 +664,8 @@ fn parse_trait_instruction_param(input: &syn::parse::ParseBuffer, attr: &mut Tra
         return parse_parenthesized_trait_instruction_param_inner::<kw::inner_attribute, TokenStream>(input, |c| c.parse(), attr.inner_attribute.is_some(), |x| attr.inner_attribute = Some(quote!(#![ #x ])), |a| a.span, "inner_attribute")
     }
 
-    Ok(true)
+    let token: TokenTree = input.parse()?;
+    Err(syn::Error::new(token.span(), format!("Instruction '{}' is unrecognized", token)))
 }
 
 #[derive(Clone)]

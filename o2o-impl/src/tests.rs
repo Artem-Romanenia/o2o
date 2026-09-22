@@ -2798,6 +2798,81 @@ fn incomplete_parent_attr_member_instr(code_fragment: TokenStream, errs: Vec<&st
 
 // endregion: incomplete_parent_attr_member_instr
 
+// region: invalid_map_instruction
+
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[map(B| invalid_instruction())]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Instruction 'invalid_instruction' is unrecognized"; "1")]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[try_map(B| +, anyhow::Error)]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Instruction '+' is unrecognized"; "2")]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[map_owned(B | ())]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Instruction '()' is unrecognized"; "3")]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[try_map_owned(B | 77, anyhow::Error)]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Instruction '77' is unrecognized"; "4")]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[map_ref(B| ~)]
+    struct A {
+        id: u32,
+    }
+}, "Instruction '~' is unrecognized"; "5")]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[try_map_ref(B| @, anyhow::Error)]
+    struct A {
+        id: u32,
+    }
+}, "Instruction '@' is unrecognized"; "6")]
+
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[ref_into(B| not a thing)]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Instruction 'not' is unrecognized"; "7")]
+#[test_case(quote! {
+    #[derive(o2o::o2o, Debug)]
+    #[ref_into_existing(B| ^#!)]
+    struct A {
+        #[map(id)]
+        id: u32,
+    }
+}, "Instruction '^' is unrecognized"; "8")]
+fn invalid_map_instruction(code_fragment: TokenStream, err: &str) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+
+    let error = get_error(output, false);
+    assert_eq!(error, err);
+}
+
+// endregion: invalid_map_instruction
+
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
     let mut err_iter = output.unwrap_err().into_iter();
