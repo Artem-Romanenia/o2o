@@ -447,16 +447,12 @@ enum EntityEnumDto {
   ``` rust ignore
   impl ::core::convert::From<&Entity> for EntityDto {
       fn from(value: &Entity) -> EntityDto {
-          EntityDto {
-              some_int: value.some_int,
-              different_int: value.another_int,
-          }
+          EntityDto { some_int: value.some_int, different_int: value.another_int }
       }
   }
-  impl o2o::traits::IntoExisting<Entity> for &EntityDto {
-      fn into_existing(self, other: &mut Entity) {
-          other.some_int = self.some_int;
-          other.another_int = self.different_int;
+  impl ::core::convert::Into<Entity> for &EntityDto {
+      fn into(self) -> Entity {
+          Entity { some_int: self.some_int, another_int: self.different_int }
       }
   }
 
