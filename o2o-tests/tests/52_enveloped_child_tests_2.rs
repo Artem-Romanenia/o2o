@@ -65,7 +65,7 @@ struct EntityDto {
     child_int: i16,
 
     #[child(Entity| child.base)]
-    #[map(~.clone())]
+    #[map(Entity| ~.clone())]
     #[child(TupleEntity| 1 .1)]
     #[map(TupleEntity| 0, ~.clone())]
     some_str: String,

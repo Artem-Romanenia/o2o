@@ -148,6 +148,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Slightly complex example](#slightly-complex-example)
   - [Flatened children](#flatened-children)
     - [Child instructions](#child-instructions)
+    - [Embelished children (`Option<T>`, `Result<T,E>` etc.)](#embelished-children-optiont-resultte-etc)
     - [Parent instructions](#parent-instructions)
   - [Tuple structs](#tuple-structs)
   - [Tuples](#tuples)
@@ -1265,6 +1266,74 @@ struct CarDto {
                       year: self.year,
                   },
               },
+          }
+      }
+  }
+  ```
+</details>
+
+#### Embelished children (`Option<T>`, `Result<T,E>` etc.)
+
+If the flattened children are embelished, or require any additional logic applied to constructed child object, you need to provide additional o2o instructions:
+
+``` rust
+struct Entity {
+    some_int: i8,
+    child: Option<Child>,
+}
+#[derive(Clone)]
+struct Child {
+    child_int: i16,
+    base: Result<Base, i32>,
+}
+#[derive(Clone)]
+struct Base {
+    some_str: String,
+    base_int: i16,
+}
+
+#[derive(o2o::o2o)]
+#[map_ref(Entity)]
+#[child_parents(Entity|
+    child: Child => (into: Some(@), from: ~.clone().unwrap()),
+    child.base: Base => (into: Ok(@), from: ~.unwrap())
+)]
+struct EntityDto {
+    some_int: i8,
+
+    #[child(child)]
+    child_int: i16,
+
+    #[child(child.base)]
+    #[map(~.clone())]
+    some_str: String,
+
+    #[child(child.base)]
+    base_int: i16,
+}
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl ::core::convert::From<&Entity> for EntityDto {
+      fn from(value: &Entity) -> EntityDto {
+          EntityDto {
+              some_int: value.some_int,
+              child_int: value.child.clone().unwrap().child_int,
+              some_str: value.child.clone().unwrap().base.unwrap().some_str.clone(),
+              base_int: value.child.clone().unwrap().base.unwrap().base_int,
+          }
+      }
+  }
+  impl ::core::convert::Into<Entity> for &EntityDto {
+      fn into(self) -> Entity {
+          Entity {
+              some_int: self.some_int,
+              child: Some(Child {
+                  child_int: self.child_int,
+                  base: Ok(Base { some_str: self.some_str.clone(), base_int: self.base_int }),
+              }),
           }
       }
   }
