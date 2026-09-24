@@ -820,6 +820,7 @@ impl Parse for ChildParentsAttr {
 pub(crate) struct ChildParentData {
     pub ty: syn::Path,
     pub type_hint: TypeHint,
+    pub actions: Punctuated<ChildParentAction, Token![,]>,
     pub field_path: Punctuated<Member, Token![.]>,
     field_path_str: String,
 }
@@ -839,6 +840,31 @@ impl Eq for ChildParentData {}
 impl Hash for ChildParentData {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.field_path_str.hash(state)
+    }
+}
+
+pub(crate) struct ChildParentAction {
+    pub action: TokenStream,
+    pub applicable_to: ApplicableTo
+}
+
+impl Parse for ChildParentAction{
+    fn parse(input: ParseStream) -> Result<Self> {
+        let ident = input.parse::<Ident>()?;
+        let kind_str = ident.to_string();
+
+        input.parse::<Token![:]>()?;
+
+        Ok(ChildParentAction { 
+            action: try_parse_action(input)?.ok_or(syn::Error::new(ident.span(), "valera"))?, 
+            applicable_to: appl_to(&kind_str)
+        })
+    }
+}
+
+impl ChildParentAction {
+    pub fn is_applicable(&self, kind: &Kind) -> bool {
+        self.applicable_to[kind]
     }
 }
 
@@ -927,14 +953,7 @@ impl Parse for ParentChildFieldAsParsed {
                     attrs.push(ParentChildFieldAttr { 
                         that_member: try_parse_optional_ident(&content_inner),
                         action: try_parse_action(&content_inner)?,
-                        applicable_to: [
-                            appl_owned_into(instr_str),
-                            appl_ref_into(instr_str),
-                            appl_from_owned(instr_str),
-                            appl_from_ref(instr_str),
-                            appl_owned_into_existing(instr_str),
-                            appl_ref_into_existing(instr_str),
-                    ]});
+                        applicable_to: appl_to(instr_str)});
                 },
                 "parent" => {
                     if parent_attr.is_none() {
@@ -1249,37 +1268,16 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
         "owned_into" | "ref_into" | "into" | "from_owned" | "from_ref" | "from" | "map_owned" | "map_ref" | "map" | "owned_into_existing" | "ref_into_existing" | "into_existing" => Ok(DataTypeInstruction::Map(TraitAttr {
             core: syn::parse2(input)?,
             fallible: false,
-            applicable_to: [
-                appl_owned_into(instr_str),
-                appl_ref_into(instr_str),
-                appl_from_owned(instr_str),
-                appl_from_ref(instr_str),
-                appl_owned_into_existing(instr_str),
-                appl_ref_into_existing(instr_str),
-            ],
+            applicable_to: appl_to(instr_str),
         })),
         "owned_try_into" | "ref_try_into" | "try_into" | "try_from_owned" | "try_from_ref" | "try_from" | "try_map_owned" | "try_map_ref" | "try_map" | "owned_try_into_existing" | "ref_try_into_existing" | "try_into_existing" => Ok(DataTypeInstruction::Map(TraitAttr {
             core: syn::parse2(input)?,
             fallible: true,
-            applicable_to: [
-                appl_owned_into(instr_str),
-                appl_ref_into(instr_str),
-                appl_from_owned(instr_str),
-                appl_from_ref(instr_str),
-                appl_owned_into_existing(instr_str),
-                appl_ref_into_existing(instr_str),
-            ],
+            applicable_to: appl_to(instr_str),
         })),
         "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(DataTypeInstruction::Ghosts(GhostsAttr {
             attr: syn::parse2(input)?,
-            applicable_to: [
-                appl_ghosts_owned(instr_str),
-                appl_ghosts_ref(instr_str),
-                appl_ghosts_owned(instr_str),
-                appl_ghosts_ref(instr_str),
-                appl_ghosts_owned(instr_str),
-                appl_ghosts_ref(instr_str),
-            ],
+            applicable_to: appl_to_ghosts(instr_str),
         })),
         "child_parents" => Ok(DataTypeInstruction::ChildParents(syn::parse2(input)?)),
         "where_clause" => Ok(DataTypeInstruction::Where(syn::parse2(input)?)),
@@ -1308,49 +1306,21 @@ fn parse_member_instruction(instr: &Ident, input: TokenStream, own_instr: bool, 
             attr: syn::parse2(input)?,
             fallible: false,
             original_instr: instr_str.clone(),
-            applicable_to: [
-                appl_owned_into(instr_str),
-                appl_ref_into(instr_str),
-                appl_from_owned(instr_str),
-                appl_from_ref(instr_str),
-                appl_owned_into_existing(instr_str),
-                appl_ref_into_existing(instr_str),
-            ],
+            applicable_to: appl_to(instr_str),
         })),
         "owned_try_into" | "ref_try_into" | "try_into" | "try_from_owned" | "try_from_ref" | "try_from" | "try_map_owned" | "try_map_ref" | "try_map" => Ok(MemberInstruction::Map(MemberAttr {
             attr: syn::parse2(input)?,
             fallible: true,
             original_instr: instr_str.clone(),
-            applicable_to: [
-                appl_owned_into(instr_str),
-                appl_ref_into(instr_str),
-                appl_from_owned(instr_str),
-                appl_from_ref(instr_str),
-                appl_owned_into_existing(instr_str),
-                appl_ref_into_existing(instr_str),
-            ],
+            applicable_to: appl_to(instr_str),
         })),
         "ghost" | "ghost_ref" | "ghost_owned" => Ok(MemberInstruction::Ghost(GhostAttr {
             attr: syn::parse2(input)?,
-            applicable_to: [
-                appl_ghost_owned(instr_str),
-                appl_ghost_ref(instr_str),
-                appl_ghost_owned(instr_str),
-                appl_ghost_ref(instr_str),
-                appl_ghost_owned(instr_str),
-                appl_ghost_ref(instr_str),
-            ],
+            applicable_to: appl_to_ghost(instr_str),
         })),
         "ghosts" | "ghosts_ref" | "ghosts_owned" => Ok(MemberInstruction::Ghosts(GhostsAttr {
             attr: syn::parse2(input)?,
-            applicable_to: [
-                appl_ghosts_owned(instr_str),
-                appl_ghosts_ref(instr_str),
-                appl_ghosts_owned(instr_str),
-                appl_ghosts_ref(instr_str),
-                appl_ghosts_owned(instr_str),
-                appl_ghosts_ref(instr_str),
-            ],
+            applicable_to: appl_to_ghosts(instr_str),
         })),
         "child" => Ok(MemberInstruction::Child(syn::parse2(input)?)),
         "parent" => Ok(MemberInstruction::Parent(syn::parse2(input)?)),
@@ -1453,6 +1423,7 @@ fn try_parse_child_parents(input: ParseStream) -> Result<Punctuated<ChildParentD
         Ok(ChildParentData {
             ty,
             type_hint: try_parse_type_hint(x)?,
+            actions: try_parse_child_parent_actions(x)?,
             field_path: child_path.clone(),
             field_path_str: child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect(),
         })
@@ -1468,10 +1439,24 @@ fn try_parse_child_parents(input: ParseStream) -> Result<Punctuated<ChildParentD
         Ok(ChildParentData {
             ty,
             type_hint: try_parse_type_hint(x)?,
+            actions: try_parse_child_parent_actions(x)?,
             field_path: child_path.clone(),
             field_path_str: child_path.to_token_stream().to_string().chars().filter(|c| !c.is_whitespace()).collect(),
         })
     }, Token![,])
+}
+
+fn try_parse_child_parent_actions(input: ParseStream) -> Result<Punctuated<ChildParentAction, Token![,]>>{
+    if !input.peek(Token![=>]) {
+        return Ok(Punctuated::new());
+    }
+
+    input.parse::<Token![=>]>()?; 
+
+    let content;
+    parenthesized!(content in input);
+
+    Ok(Punctuated::parse_terminated(&content)?)
 }
 
 fn try_parse_action(input: ParseStream) -> Result<Option<TokenStream>> {
@@ -1512,41 +1497,69 @@ fn add_as_type_attrs(input: &syn::Field, attr: AsAttr, attrs: &mut Vec<MemberAtt
     });
 }
 
-fn appl_owned_into(instr: &str) -> bool {
-    matches!(instr, "owned_into" | "into" | "map_owned" | "map" | "owned_try_into" | "try_into" | "try_map_owned" | "try_map")
+fn appl_owned_into(kind_str: &str) -> bool {
+    matches!(kind_str, "owned_into" | "into" | "map_owned" | "map" | "owned_try_into" | "try_into" | "try_map_owned" | "try_map")
 }
-fn appl_ref_into(instr: &str) -> bool {
-    matches!(instr, "ref_into" | "into" | "map_ref" | "map" | "ref_try_into" | "try_into" | "try_map_ref" | "try_map")
+fn appl_ref_into(kind_str: &str) -> bool {
+    matches!(kind_str, "ref_into" | "into" | "map_ref" | "map" | "ref_try_into" | "try_into" | "try_map_ref" | "try_map")
 }
-fn appl_from_owned(instr: &str) -> bool {
-    matches!(instr, "from_owned" | "from" | "map_owned" | "map" | "try_from_owned" | "try_from" | "try_map_owned" | "try_map")
+fn appl_from_owned(kind_str: &str) -> bool {
+    matches!(kind_str, "from_owned" | "from" | "map_owned" | "map" | "try_from_owned" | "try_from" | "try_map_owned" | "try_map")
 }
-fn appl_from_ref(instr: &str) -> bool {
-    matches!(instr, "from_ref" | "from" | "map_ref" | "map" | "try_from_ref" | "try_from" | "try_map_ref" | "try_map")
+fn appl_from_ref(kind_str: &str) -> bool {
+    matches!(kind_str, "from_ref" | "from" | "map_ref" | "map" | "try_from_ref" | "try_from" | "try_map_ref" | "try_map")
 }
-
-fn appl_owned_into_existing(instr: &str) -> bool {
-    matches!(instr, "owned_into_existing" | "into_existing" | "owned_try_into_existing" | "try_into_existing")
+fn appl_owned_into_existing(kind_str: &str) -> bool {
+    matches!(kind_str, "owned_into_existing" | "into_existing" | "owned_try_into_existing" | "try_into_existing")
 }
-
-fn appl_ref_into_existing(instr: &str) -> bool {
-    matches!(instr, "ref_into_existing" | "into_existing" | "ref_try_into_existing" | "try_into_existing")
+fn appl_ref_into_existing(kind_str: &str) -> bool {
+    matches!(kind_str, "ref_into_existing" | "into_existing" | "ref_try_into_existing" | "try_into_existing")
 }
 
-fn appl_ghosts_owned(instr: &str) -> bool {
-    matches!(instr, "ghosts" | "ghosts_owned")
+fn appl_ghosts_owned(kind_str: &str) -> bool {
+    matches!(kind_str, "ghosts" | "ghosts_owned")
+}
+fn appl_ghosts_ref(kind_str: &str) -> bool {
+    matches!(kind_str, "ghosts" | "ghosts_ref")
+}
+fn appl_ghost_owned(kind_str: &str) -> bool {
+    matches!(kind_str, "ghost" | "ghost_owned")
+}
+fn appl_ghost_ref(kind_str: &str) -> bool {
+    matches!(kind_str, "ghost" | "ghost_ref")
 }
 
-fn appl_ghosts_ref(instr: &str) -> bool {
-    matches!(instr, "ghosts" | "ghosts_ref")
+fn appl_to(kind_str: &str) -> ApplicableTo {
+    [
+        appl_owned_into(kind_str),
+        appl_ref_into(kind_str),
+        appl_from_owned(kind_str),
+        appl_from_ref(kind_str),
+        appl_owned_into_existing(kind_str),
+        appl_ref_into_existing(kind_str),
+    ]
 }
 
-fn appl_ghost_owned(instr: &str) -> bool {
-    matches!(instr, "ghost" | "ghost_owned")
+fn appl_to_ghosts(kind_str: &str) -> ApplicableTo {
+    [
+        appl_ghosts_owned(kind_str),
+        appl_ghosts_ref(kind_str),
+        appl_ghosts_owned(kind_str),
+        appl_ghosts_ref(kind_str),
+        appl_ghosts_owned(kind_str),
+        appl_ghosts_ref(kind_str),
+    ]
 }
 
-fn appl_ghost_ref(instr: &str) -> bool {
-    matches!(instr, "ghost" | "ghost_ref")
+fn appl_to_ghost(kind_str: &str) -> ApplicableTo {
+    [
+        appl_ghost_owned(kind_str),
+        appl_ghost_ref(kind_str),
+        appl_ghost_owned(kind_str),
+        appl_ghost_ref(kind_str),
+        appl_ghost_owned(kind_str),
+        appl_ghost_ref(kind_str),
+    ]
 }
 
 fn build_child_path_str(child_path: &Punctuated<Member, Token![.]>) -> Vec<String> {
