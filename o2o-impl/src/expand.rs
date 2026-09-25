@@ -1,9 +1,7 @@
 use std::{collections::HashMap, iter::Peekable, slice::Iter};
 
 use crate::{
-    ast::{DataType, DataTypeMember, Enum, Field, Struct, Variant},
-    attr::{ApplicableAttr, ChildParentData, ChildParentAction, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
-    validate::validate,
+    model::*, render::*, validate::validate,
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
@@ -32,30 +30,6 @@ pub fn derive(node: &DeriveInput) -> Result<TokenStream> {
         },
         _ => Err(Error::new_spanned(node, "#[derive(o2o)] only supports structs and enums.")),
     }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum ImplType {
-    Struct,
-    Enum,
-    Variant,
-}
-
-impl ImplType {
-    fn is_variant(self) -> bool {
-        self == ImplType::Variant
-    }
-}
-
-struct ImplContext<'a> {
-    input: &'a DataType<'a>,
-    impl_type: ImplType,
-    struct_attr: &'a TraitAttrCore,
-    kind: Kind,
-    dst_ty: &'a TokenStream,
-    src_ty: &'a TokenStream,
-    has_post_init: bool,
-    fallible: bool,
 }
 
 struct ChildRenderContext<'a> {
@@ -189,10 +163,10 @@ fn main_code_block(ctx: &ImplContext) -> TokenStream {
     if let Some(quick_return) = &ctx.struct_attr.quick_return {
         //TODO: Consider removing quick returns for into_existing because they are confusing
         if ctx.kind.is_into_existing() {
-            let action = quote_action(&quick_return.token_stream, None, ctx);
+            let action = render_action(&quick_return.expr, None, ctx);
             return quote!(*other = #action;);
         }
-        return quote_action(&quick_return.token_stream, None, ctx);
+        return render_action(&quick_return.expr, None, ctx);
     }
 
     match ctx.input {
@@ -205,10 +179,10 @@ fn main_code_block_ok(ctx: &ImplContext) -> TokenStream {
     if let Some(quick_return) = &ctx.struct_attr.quick_return {
         //TODO: Consider removing quick returns for into_existing because they are confusing
         if ctx.kind.is_into_existing() {
-            let action = quote_action(&quick_return.token_stream, None, ctx);
+            let action = render_action(&quick_return.expr, None, ctx);
             return quote!(*other = #action;);
         }
-        return quote_action(&quick_return.token_stream, None, ctx);
+        return render_action(&quick_return.expr, None, ctx);
     }
 
     let inner = match ctx.input {
@@ -248,11 +222,11 @@ fn enum_main_code_block(input: &Enum, ctx: &ImplContext) -> TokenStream {
 
     match ctx.kind {
         Kind::FromOwned | Kind::FromRef => {
-            let match_expr = if let Some(ts) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(&ts.token_stream, Some(&quote!(value)), None) } else { quote!(value) };
+            let match_expr = if let Some(ts) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(&ts.expr, Some(&quote!(value)), None) } else { quote!(value) };
             quote!(match #match_expr #enum_init_block)
         },
         Kind::OwnedInto | Kind::RefInto => {
-            let match_expr = if let Some(ts) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(&ts.token_stream, Some(&quote!(self)), None) } else { quote!(self) };
+            let match_expr = if let Some(ts) = &ctx.struct_attr.match_expr { replace_tilde_or_at_in_expr(&ts.expr, Some(&quote!(self)), None) } else { quote!(self) };
             quote!(match #match_expr #enum_init_block)
         },
         Kind::OwnedIntoExisting | Kind::RefIntoExisting => enum_init_block,
@@ -380,7 +354,7 @@ fn struct_init_block_inner(
     }
 
     if let Some(update) = &ctx.struct_attr.update {
-        let a = quote_action(&update.token_stream, None, ctx);
+        let a = render_action(&update.expr, None, ctx);
         fragments.push(quote!(..#a))
     }
 
@@ -446,7 +420,7 @@ fn enum_init_block_inner(members: &mut Peekable<Iter<VariantData>>, ctx: &ImplCo
     }
 
     if let Some(default_case) = &ctx.struct_attr.default_case {
-        let g = quote_action(&default_case.token_stream, None, ctx);
+        let g = render_action(&default_case.expr, None, ctx);
         fragments.push(quote!(_ #g))
     }
 
@@ -460,7 +434,7 @@ fn variant_destruct_block(input: &Struct, ctx: &ImplContext) -> TokenStream {
         (false, Kind::FromOwned | Kind::FromRef, TypeHint::Struct) => (
             input.fields.iter().filter(|x| !ctx.kind.is_from() || x.attrs.ghost(&ctx.struct_attr.ty, &ctx.kind).is_none())
                 .map(|x| {
-                    let attr = x.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
+                    let attr = ApplicableAttr::get(&x.attrs, &ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
 
                     if !ctx.kind.is_from() || attr.is_none() {
                         let ident = &x.member;
@@ -563,7 +537,7 @@ fn struct_pre_init(ctx: &ImplContext) -> Option<TokenStream> {
     if let Some(init_data) = &ctx.struct_attr.init_data {
         let g = init_data.iter().map(|x| {
             let a = &x.ident;
-            let b = quote_action(&x.action, None, ctx);
+            let b = render_action(&x.action, None, ctx);
 
             quote!(let #a = #b;)
         });
@@ -669,7 +643,7 @@ fn render_struct_line(
     let member = parent_child.map(|p| &p.this_member)
         .unwrap_or(&f.member);
     let attr = parent_child.map(|p| ApplicableAttr::ParentChildField(p, ctx.kind))
-        .or_else(|| f.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty));
+        .or_else(|| ApplicableAttr::get(&f.attrs, &ctx.kind, ctx.fallible, &ctx.struct_attr.ty));
     let get_field_path = |x: &Member| match f.attrs.child(&ctx.struct_attr.ty) {
         Some(child_attr) => {
             let ch = child_attr.child_path.child_path.to_token_stream(); 
@@ -847,7 +821,7 @@ fn render_struct_line(
 }
 
 fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
-    let attr = v.attrs.applicable_attr(&ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
+    let attr = ApplicableAttr::get(&v.attrs, &ctx.kind, ctx.fallible, &ctx.struct_attr.ty);
     let lit = v.attrs.lit(&ctx.struct_attr.ty);
     let pat = v.attrs.pat(&ctx.struct_attr.ty);
     let var = v.attrs.type_hint(&ctx.struct_attr.ty);
@@ -937,7 +911,7 @@ fn render_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
         }
         None => TokenStream::new(),
     };
-    let right_side = quote_action(&ghost_data.action, None, ctx);
+    let right_side = render_action(&ghost_data.action, None, ctx);
     let ghost_ident = &ghost_data.ghost_ident.get_ident();
     match (ghost_ident, &ctx.kind) {
         (Named(ident), Kind::OwnedInto | Kind::RefInto) => quote!(#ident: #right_side,),
@@ -950,7 +924,7 @@ fn render_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
 
 fn render_enum_ghost_line(ghost_data: &GhostData, ctx: &ImplContext) -> TokenStream {
     let src = ctx.src_ty;
-    let right_side = quote_action(&ghost_data.action, None, ctx);
+    let right_side = render_action(&ghost_data.action, None, ctx);
 
     match &ghost_data.ghost_ident {
         GhostIdent::Member(ghost_ident) => match (ghost_ident, ctx.kind.is_from()) {
@@ -1001,54 +975,6 @@ fn render_generics_ident_only(generics: &syn::Generics) -> TokenStream {
     } else {
         quote!()
     }
-}
-
-fn replace_tilde_or_at_in_expr(input: &TokenStream, at_tokens: Option<&TokenStream>, tilde_tokens: Option<&TokenStream>) -> TokenStream {
-    let mut tokens = Vec::new();
-
-    input.clone().into_iter().for_each(|x| {
-        let f = match x {
-            proc_macro2::TokenTree::Group(group) => {
-                let inner = replace_tilde_or_at_in_expr(&group.stream(), at_tokens, tilde_tokens);
-                match group.delimiter() {
-                    proc_macro2::Delimiter::Parenthesis => quote!(( #inner )),
-                    proc_macro2::Delimiter::Brace => quote!({ #inner }),
-                    proc_macro2::Delimiter::Bracket => quote!([ #inner ]),
-                    proc_macro2::Delimiter::None => quote!(#inner),
-                }
-            }
-            proc_macro2::TokenTree::Punct(punct) => {
-                let ch = punct.as_char();
-
-                if ch == '~' {
-                    quote!(#tilde_tokens)
-                } else if ch == '@' {
-                    quote!(#at_tokens)
-                } else {
-                    quote!(#punct)
-                }
-            }
-            _ => quote!(#x),
-        };
-
-        tokens.push(f)
-    });
-
-    TokenStream::from_iter(tokens)
-}
-
-fn quote_action(action: &TokenStream, tilde_postfix: Option<&TokenStream>, ctx: &ImplContext) -> TokenStream {
-    let dst = ctx.dst_ty;
-    let ident = match ctx.kind {
-        Kind::FromOwned | Kind::FromRef => quote!(value),
-        _ => quote!(self),
-    };
-    let path = match ctx.impl_type {
-        ImplType::Struct => quote!(#tilde_postfix),
-        ImplType::Enum => quote!(#dst::#tilde_postfix),
-        ImplType::Variant => quote!(#tilde_postfix),
-    };
-    replace_tilde_or_at_in_expr(action, Some(&ident), Some(&path))
 }
 
 struct QuoteTraitParams<'a> {
@@ -1255,115 +1181,6 @@ fn quote_try_into_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: 
                 #post_init
                 Ok(())
             }
-        }
-    }
-}
-
-impl<'a> ApplicableAttr<'a> {
-    fn get_ident(&'a self) -> &'a Member {
-        match self {
-            ApplicableAttr::Field(MemberAttrCore { member, .. }) => match member {
-                Some(val) => val,
-                None => unreachable!("8"),
-            },
-            ApplicableAttr::ParentChildField(p, kind) => {
-                let attr = p.get_for_kind(kind);
-                match attr.as_ref() {
-                    Some(attr) => match attr.that_member.as_ref() {
-                        Some(val) => val,
-                        None => unreachable!("18"),
-                    },
-                    None => unreachable!("19")
-                }
-            }
-            ApplicableAttr::Ghost(_) => unreachable!("9"),
-        }
-    }
-
-    fn has_action(&self) -> bool {
-        match self {
-            ApplicableAttr::Field(f) => f.action.is_some(),
-            ApplicableAttr::Ghost(g) => g.action.is_some(),
-            ApplicableAttr::ParentChildField(p, kind) => p.get_for_kind(kind).is_some_and(|x| x.action.is_some()),
-        }
-    }
-
-    fn get_field_name_or(&'a self, field: &'a Member) -> &'a Member {
-        match self {
-            ApplicableAttr::Field(MemberAttrCore { member, .. }) => match member {
-                Some(val) => val,
-                None => field,
-            },
-            ApplicableAttr::Ghost(_) => unreachable!("10"),
-            ApplicableAttr::ParentChildField(p, kind) => {
-                let attr = p.get_for_kind(kind);
-
-                match attr.as_ref() {
-                    Some(attr) =>  match attr.that_member.as_ref() {
-                        Some(val) => val,
-                        None => &p.this_member,
-                    },
-                    None => &p.this_member
-                }
-            }
-        }
-    }
-
-    fn get_action_or<F: Fn() -> TokenStream>(&self, field_path: Option<&TokenStream>, ctx: &ImplContext, or: F) -> TokenStream {
-        match self {
-            ApplicableAttr::Field(MemberAttrCore { action, .. }) => match action {
-                Some(val) => quote_action(val, field_path, ctx),
-                None => or(),
-            },
-            ApplicableAttr::ParentChildField(p, kind) => {
-                let attr = p.get_for_kind(kind);
-
-                match attr.as_ref() {
-                    Some(attr) => match attr.action.as_ref() {
-                        Some(val) => quote_action(val, field_path, ctx),
-                        None => or()
-                    },
-                    None => or()
-                }
-            }
-            ApplicableAttr::Ghost(_) => unreachable!("11"),
-        }
-    }
-
-    fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, obj: Option<&TokenStream>, field_path: F1, ctx: &ImplContext, or: F2) -> TokenStream {
-        let get_stuff = |member: &Option<Member>, action: &Option<TokenStream>| {
-            match (member, action) {
-                (Some(ident), Some(action)) => if let Unnamed(index) = ident {
-                        if ctx.impl_type.is_variant() {
-                            let ident = Named(format_ident!("f{}", index.index));
-                            quote_action(action, Some(&field_path(&ident)), ctx)
-                        } else {
-                            quote_action(action, Some(&field_path(ident)), ctx)
-                        }
-                    } else {
-                        quote_action(action, Some(&field_path(ident)), ctx)
-                    },
-                (Some(ident), None) => {
-                    let field_path = field_path(ident);
-                    quote!(#obj #field_path)
-                }
-                (None, Some(action)) => quote_action(action, Some(&field_path(or())), ctx),
-                _ => unreachable!("12"),
-            }
-        };
-        match self {
-            ApplicableAttr::Field(MemberAttrCore { member, action, .. }) => get_stuff(member, action),
-            ApplicableAttr::ParentChildField(p, kind) => {
-                let attr = p.get_for_kind(kind);
-
-                if attr.is_some_and(|x|x.that_member.is_some()) {
-                    let attr = attr.unwrap();
-                    get_stuff(&attr.that_member, &attr.action)
-                } else {
-                    get_stuff(&Some(p.this_member.clone()), attr.map_or(&None, |x| &x.action))
-                }
-            },
-            ApplicableAttr::Ghost(ghost_attr) => quote_action(ghost_attr.action.as_ref().unwrap(), None, ctx),
         }
     }
 }

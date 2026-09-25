@@ -1,7 +1,4 @@
-use crate::{
-    ast::{DataType, DataTypeMember, Struct, Variant},
-    attr::{ChildAttr, ChildParentsAttr, DataTypeAttrs, DataTypeInstruction, FallibleKind, GhostsAttr, Kind, MemberAttrs, MemberInstruction, ParentAttr, TraitAttr, TraitAttrCore, TypeHint, TypePath, WhereAttr},
-};
+use crate::model::*;
 use proc_macro2::Span;
 use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
@@ -424,12 +421,12 @@ fn check_misplaced_instrs_struct(attr: &TraitAttrCore, errors: &mut HashMap<Stri
         errors.insert(format!("Default case instructions are only applicable to enums."), default_case.span);
     }
     if let Some(match_expr) = &attr.match_expr {
-        errors.insert(format!("Match instructions are only applicable to enums."), match_expr.span);
+        errors.insert("Match instructions are only applicable to enums.".to_string(), match_expr.span);
     }
 }
 
 fn check_misplaced_instrs_enum(attr: &TraitAttrCore, errors: &mut HashMap<String, Span>) {
     if let Some(update) = &attr.update {
-        errors.insert(format!("Update instructions are only applicable to structs."), update.span);
+        errors.insert("Update instructions are only applicable to structs.".to_string(), update.span);
     }
 }
