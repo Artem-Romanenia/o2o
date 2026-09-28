@@ -1,0 +1,16 @@
+[package]
+name = "o2o-compat-syn2"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+o2o = { path = "../.." }
+
+[dev-dependencies]
+syn = "2.0.119"
+
+anyhow = "1.0.86"
+test-case = "3"

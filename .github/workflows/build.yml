@@ -32,3 +32,5 @@ jobs:
       run: cargo test -q --package o2o-impl --no-default-features --features syn
     - name: Run Impl Tests syn2
       run: cargo test -q --package o2o-impl --no-default-features --features syn2
+    - name: Run Integration and Doc Tests with syn 2.0
+      run: cargo test -q --manifest-path compat/syn2/Cargo.toml --no-default-features
