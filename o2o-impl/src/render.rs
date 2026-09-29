@@ -1,18 +1,63 @@
 mod applicable_attr;
-mod impl_context;
+
+mod implementation;
+mod attribute;
+mod function;
+mod function_body;
+mod generics;
+mod where_clause;
+mod struct_init_block;
+mod enum_init;
+mod expression;
+
+pub(crate) use applicable_attr::*;
+
+pub(crate) use implementation::*;
+pub(crate) use attribute::*;
+pub(crate) use function::*;
+pub(crate) use function_body::*;
+pub(crate) use generics::*;
+pub(crate) use where_clause::*;
+pub(crate) use struct_init_block::*;
+pub(crate) use enum_init::*;
+pub(crate) use expression::*;
 
 #[cfg(feature = "syn2")]
 use syn2 as syn;
 
-pub(super) use syn::{Member::Named, Member::Unnamed};
-pub(super) use quote::format_ident;
-
-pub(crate) use applicable_attr::*;
-pub(crate) use impl_context::*;
+use syn::{Ident, Index, Member, Member::Named, Member::Unnamed, Generics, AngleBracketedGenericArguments, GenericParam};
+use quote::{format_ident, quote, ToTokens};
+use proc_macro2::{TokenStream, Span};
 
 use crate::model::*;
 
-pub(crate) fn render_action(expr: &InlineExpression, tilde_postfix: Option<&TokenStream>, ctx: &ImplContext) -> TokenStream {
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum ImplType {
+    Struct,
+    Enum,
+    Variant,
+}
+
+impl ImplType {
+    pub(crate) fn is_variant(self) -> bool {
+        self == ImplType::Variant
+    }
+}
+
+pub(crate) struct RenderContext<'a> {
+    pub impl_type: ImplType,
+    pub kind: Kind,
+    pub dst_ty: &'a TokenStream,
+    pub src_ty: &'a TokenStream,
+    pub has_post_init: bool,
+    pub fallible: bool,
+}
+
+pub(crate) trait Render {
+    fn render(&self, ctx: &RenderContext) -> TokenStream;
+}
+
+pub(crate) fn render_action(expr: &TokenStream, tilde_postfix: Option<&TokenStream>, ctx: &RenderContext) -> TokenStream {
     let dst = ctx.dst_ty;
     let ident = match ctx.kind {
         Kind::FromOwned | Kind::FromRef => quote!(value),
@@ -26,13 +71,13 @@ pub(crate) fn render_action(expr: &InlineExpression, tilde_postfix: Option<&Toke
     replace_tilde_or_at_in_expr(&expr, Some(&ident), Some(&path))
 }
 
-pub(crate) fn replace_tilde_or_at_in_expr(input: &InlineExpression, at_tokens: Option<&TokenStream>, tilde_tokens: Option<&TokenStream>) -> TokenStream {
+pub(crate) fn replace_tilde_or_at_in_expr(expr: &TokenStream, at_tokens: Option<&TokenStream>, tilde_tokens: Option<&TokenStream>) -> TokenStream {
     let mut tokens = Vec::new();
 
-    input.expr.clone().into_iter().for_each(|x| {
+    expr.clone().into_iter().for_each(|x| {
         let f = match x {
             proc_macro2::TokenTree::Group(group) => {
-                let inner = replace_tilde_or_at_in_expr(&InlineExpression { expr: group.stream() }, at_tokens, tilde_tokens);
+                let inner = replace_tilde_or_at_in_expr(&group.stream(), at_tokens, tilde_tokens);
                 match group.delimiter() {
                     proc_macro2::Delimiter::Parenthesis => quote!(( #inner )),
                     proc_macro2::Delimiter::Brace => quote!({ #inner }),

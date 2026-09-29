@@ -69,10 +69,10 @@ impl<'a> ApplicableAttr<'a> {
         }
     }
 
-    pub(crate) fn get_action_or<F: Fn() -> TokenStream>(&self, field_path: Option<&TokenStream>, ctx: &ImplContext, or: F) -> TokenStream {
+    pub(crate) fn get_action_or<F: Fn() -> TokenStream>(&self, field_path: Option<&TokenStream>, ctx: &RenderContext, or: F) -> TokenStream {
         match self {
             ApplicableAttr::Field(MemberAttrCore { action, .. }) => match action {
-                Some(val) => render_action(val, field_path, ctx),
+                Some(val) => render_action(&val.expr, field_path, ctx),
                 None => or(),
             },
             ApplicableAttr::ParentChildField(p, kind) => {
@@ -80,7 +80,7 @@ impl<'a> ApplicableAttr<'a> {
 
                 match attr.as_ref() {
                     Some(attr) => match attr.action.as_ref() {
-                        Some(val) => render_action(val, field_path, ctx),
+                        Some(val) => render_action(&val.expr, field_path, ctx),
                         None => or()
                     },
                     None => or()
@@ -90,24 +90,24 @@ impl<'a> ApplicableAttr<'a> {
         }
     }
 
-    pub(crate) fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, obj: Option<&TokenStream>, field_path: F1, ctx: &ImplContext, or: F2) -> TokenStream {
+    pub(crate) fn get_stuff<F1: Fn(&Member) -> TokenStream, F2: Fn() -> &'a Member>(&self, obj: Option<&TokenStream>, field_path: F1, ctx: &RenderContext, or: F2) -> TokenStream {
         let get_stuff = |member: &Option<Member>, expr: &Option<InlineExpression>| {
             match (member, expr) {
                 (Some(ident), Some(expr)) => if let Unnamed(index) = ident {
                         if ctx.impl_type.is_variant() {
                             let ident = Named(format_ident!("f{}", index.index));
-                            render_action(expr, Some(&field_path(&ident)), ctx)
+                            render_action(&expr.expr, Some(&field_path(&ident)), ctx)
                         } else {
-                            render_action(expr, Some(&field_path(ident)), ctx)
+                            render_action(&expr.expr, Some(&field_path(ident)), ctx)
                         }
                     } else {
-                        render_action(expr, Some(&field_path(ident)), ctx)
+                        render_action(&expr.expr, Some(&field_path(ident)), ctx)
                     },
                 (Some(ident), None) => {
                     let field_path = field_path(ident);
                     quote!(#obj #field_path)
                 }
-                (None, Some(action)) => render_action(action, Some(&field_path(or())), ctx),
+                (None, Some(action)) => render_action(&action.expr, Some(&field_path(or())), ctx),
                 _ => unreachable!("12"),
             }
         };
@@ -123,7 +123,7 @@ impl<'a> ApplicableAttr<'a> {
                     get_stuff(&Some(p.this_member.clone()), attr.map_or(&None, |x| &x.action))
                 }
             },
-            ApplicableAttr::Ghost(ghost_attr) => render_action(ghost_attr.action.as_ref().unwrap(), None, ctx),
+            ApplicableAttr::Ghost(ghost_attr) => render_action(&ghost_attr.action.as_ref().unwrap().expr, None, ctx),
         }
     }
 }

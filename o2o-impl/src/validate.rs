@@ -76,7 +76,7 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
 
                 validate_dedicated_member_attrs(&member_attrs.parent_attrs, |x| x.container_ty.as_ref(), Some("parent"), member_span, &type_paths, &mut errors);
 
-                validate_parent_attrs(input.named_fields(), &member_attrs.parent_attrs, &data_type_attrs_by_kind, &mut errors);
+                validate_parent_attrs(input.struct_kind().is_struct(), &member_attrs.parent_attrs, &data_type_attrs_by_kind, &mut errors);
             },
             DataTypeMember::Variant(v) => {
                 bark_at_member_attr(&member_attrs.parent_attrs, "parent", |_| v.ident.span(), &mut errors);
@@ -334,7 +334,7 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, data_type_at
         }
     }
 
-    if !input.named_fields {
+    if input.struct_kind.is_tuple() {
         for (data_type_attr, kind) in data_type_attrs_by_kind {
             if data_type_attr.quick_return.is_none() && data_type_attr.type_hint == TypeHint::Struct {
                 for field in &input.fields {
@@ -360,7 +360,7 @@ fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, data_type_at
 }
 
 fn validate_variant_fields(input: &Variant, data_type_attrs: &DataTypeAttrs, _type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
-    if !input.named_fields {
+    if input.variant_kind.is_tuple() {
         let data_type_attrs: Vec<(&TraitAttr, Kind)> = data_type_attrs.iter_for_kind(&Kind::OwnedInto, false).map(|x| (x, Kind::OwnedInto))
             .chain(data_type_attrs.iter_for_kind(&Kind::RefInto, false).map(|x| (x, Kind::RefInto)))
             .chain(data_type_attrs.iter_for_kind(&Kind::OwnedIntoExisting, false).map(|x| (x, Kind::OwnedIntoExisting)))

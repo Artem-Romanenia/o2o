@@ -137,11 +137,11 @@ fn parse_trait_instruction_param(input: &syn::parse::ParseBuffer, attr: &mut Tra
     } else if input.peek(Token![match]) {
         return parse_trait_instruction_param_inner::<Token![match], Option<InlineExpressionWithSpan>>(input, |x, t| x.is_empty().not().then(|| x.parse()).map(|x| x.map(|x| InlineExpressionWithSpan::new(x, t.span))).transpose(), attr.match_expr.is_some(), |x| attr.match_expr = x, |a| a.span(), "match_expr")
     } else if input.peek(kw::attribute) {
-        return parse_parenthesized_trait_instruction_param_inner::<kw::attribute, TokenStream>(input, |c| c.parse(), attr.attribute.is_some(), |x| attr.attribute = Some(quote!(#[ #x ])), |a| a.span, "attribute")
+        return parse_parenthesized_trait_instruction_param_inner::<kw::attribute, TokenStream>(input, |c| c.parse(), attr.attribute.is_some(), |x| attr.attribute = Some(x), |a| a.span, "attribute")
     } else if input.peek(kw::impl_attribute) {
-        return parse_parenthesized_trait_instruction_param_inner::<kw::impl_attribute, TokenStream>(input, |c| c.parse(), attr.impl_attribute.is_some(), |x| attr.impl_attribute = Some(quote!(#[ #x ])), |a| a.span, "impl_attribute")
+        return parse_parenthesized_trait_instruction_param_inner::<kw::impl_attribute, TokenStream>(input, |c| c.parse(), attr.impl_attribute.is_some(), |x| attr.impl_attribute = Some(x), |a| a.span, "impl_attribute")
     } else if input.peek(kw::inner_attribute) {
-        return parse_parenthesized_trait_instruction_param_inner::<kw::inner_attribute, TokenStream>(input, |c| c.parse(), attr.inner_attribute.is_some(), |x| attr.inner_attribute = Some(quote!(#![ #x ])), |a| a.span, "inner_attribute")
+        return parse_parenthesized_trait_instruction_param_inner::<kw::inner_attribute, TokenStream>(input, |c| c.parse(), attr.inner_attribute.is_some(), |x| attr.inner_attribute = Some(x), |a| a.span, "inner_attribute")
     }
 
     Ok(true)

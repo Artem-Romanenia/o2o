@@ -86,8 +86,7 @@ pub(crate) struct Variant {
     pub ident: Ident,
     _idx: usize,
     pub fields: Vec<Field>,
-    pub named_fields: bool,
-    pub unit: bool,
+    pub variant_kind: StructKind,
 }
 
 impl<'a> Variant {
@@ -134,8 +133,11 @@ impl<'a> Variant {
             ident: variant.ident.clone(),
             _idx: i,
             fields,
-            named_fields: matches!(&variant.fields, Fields::Named(_)),
-            unit: matches!(&variant.fields, Fields::Unit),
+            variant_kind: match variant.fields {
+                Fields::Named(_) => StructKind::Struct,
+                Fields::Unnamed(_) => StructKind::Tuple,
+                Fields::Unit => StructKind::Unit
+            }
         })
     }
 }

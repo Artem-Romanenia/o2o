@@ -15,10 +15,10 @@ impl<'a> DataType<'a> {
         }
     }
 
-    pub fn named_fields(&'a self) -> bool {
+    pub fn struct_kind(&'a self) -> StructKind {
         match self {
-            DataType::Struct(s) => s.named_fields,
-            DataType::Enum(_) => panic!("Method 'named_fields' is not supposed to be called in the enum context."),
+            DataType::Struct(s) => s.struct_kind,
+            DataType::Enum(_) => panic!("Method 'struct_kind' is not supposed to be called in the enum context."),
         }
     }
 
@@ -49,8 +49,7 @@ pub(crate) struct Struct<'a> {
     pub ident: &'a Ident,
     pub generics: &'a Generics,
     pub fields: Vec<Field>,
-    pub named_fields: bool,
-    pub unit: bool,
+    pub struct_kind: StructKind,
 }
 
 impl<'a> Struct<'a> {
@@ -62,9 +61,42 @@ impl<'a> Struct<'a> {
             ident: &node.ident,
             generics: &node.generics,
             fields,
-            named_fields: matches!(&data.fields, Fields::Named(_)),
-            unit: matches!(&data.fields, Fields::Unit),
+            struct_kind: match data.fields {
+                Fields::Named(_) => StructKind::Struct,
+                Fields::Unnamed(_) => StructKind::Tuple,
+                Fields::Unit => StructKind::Unit
+            }
         })
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum StructKind {
+    Struct,
+    Tuple,
+    Unit
+}
+
+impl StructKind {
+    pub(crate) fn is_struct(&self) -> bool {
+        match self {
+            StructKind::Struct => true,
+            _ => false
+        }
+    }
+
+    pub(crate) fn is_tuple(&self) -> bool {
+        match self {
+            StructKind::Tuple => true,
+            _ => false
+        }
+    }
+
+    pub(crate) fn is_unit(&self) -> bool {
+        match self {
+            StructKind::Unit => true,
+            _ => false
+        }
     }
 }
 

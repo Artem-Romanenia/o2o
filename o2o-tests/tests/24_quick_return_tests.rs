@@ -1,5 +1,4 @@
 use o2o::o2o;
-use o2o::traits::IntoExisting;
 
 #[derive(o2o)]
 #[o2o(owned_into(i32| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}),
@@ -14,7 +13,6 @@ struct Time {
 #[from(Time| vars(hrs: {@.hours as i32}, mns: {@.minutes as i32}, scs: {@.seconds as i32}),
     return { TotalTime {total_seconds: hrs * 3600 + mns * 60 + scs} })]
 #[into(String| return @.total_seconds.to_string())]
-#[into_existing(String| return @.total_seconds.to_string())]
 struct TotalTime {
     total_seconds: i32,
 }
@@ -63,26 +61,6 @@ fn time2string_ref() {
     let total_time = &TotalTime { total_seconds: 123 };
 
     let str: String = total_time.into();
-
-    assert_eq!("123", str);
-}
-
-#[test]
-fn existing_time2string() {
-    let total_time = TotalTime { total_seconds: 123 };
-
-    let mut str = String::new();
-    total_time.into_existing(&mut str);
-
-    assert_eq!("123", str);
-}
-
-#[test]
-fn existing_time2string_ref() {
-    let total_time = &TotalTime { total_seconds: 123 };
-
-    let mut str = String::new();
-    total_time.into_existing(&mut str);
 
     assert_eq!("123", str);
 }
