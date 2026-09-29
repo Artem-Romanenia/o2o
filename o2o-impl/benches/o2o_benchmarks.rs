@@ -27,8 +27,8 @@ fn derive_complex_benchmark(c: &mut Criterion) {
         #[map(TupleEntity)]
         #[into_existing(Entity as {})]
         #[into_existing(TupleEntity)]
-        #[children(Entity| base: BaseEntity as {}, base.base: Base as {}, child: Child as {})]
-        #[children(TupleEntity| 1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
+        #[child_parents(Entity| base: BaseEntity as {}, base.base: Base as {}, child: Child as {})]
+        #[child_parents(TupleEntity| 1: TupleBaseEntity, 1 .0: TupleBase, 2: TupleChild)]
         struct TupleEntityDto (
             #[map(Entity| parent_int)]
             i32,
