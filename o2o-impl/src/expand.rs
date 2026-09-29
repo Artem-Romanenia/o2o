@@ -487,7 +487,7 @@ fn quote_trait(input: &DataType, ctx: &mut ImplContext) -> TokenStream {
         }),
     };
 
-    Implementation {
+    let implementation = Implementation {
         impl_attr: params.impl_attr.cloned().map(|attr| Attribute { attr, inner: false }),
         err_ty,
         impl_gens: ImplGenerics { gens: params.impl_gens.clone() },
@@ -510,8 +510,11 @@ fn quote_trait(input: &DataType, ctx: &mut ImplContext) -> TokenStream {
             err_ty,
             r: params.r.as_ref(),
         },
-    }
-    .render(&ctx.to_render_ctx())
+    };
+
+    // println!("{:#?}", implementation);
+    
+    implementation.render(&ctx.to_render_ctx())
 }
 
 fn struct_init_block_fragments<'a>(input: &'a Struct, ctx: &'a ImplContext) -> Vec<StructInitBlockFragment<'a>> {

@@ -14,9 +14,10 @@ pub(crate) struct StructGhostAttrCore {
 
 impl Parse for StructGhostAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
+        let container_ty = try_parse_container_ident(input, false);
         let ghost_data: Punctuated<GhostData, Token![,]> = Punctuated::parse_terminated(input)?;
         Ok(StructGhostAttrCore {
-            container_ty: try_parse_container_ident(input, false),
+            container_ty,
             ghost_data: ghost_data.into_iter().collect(),
         })
     }

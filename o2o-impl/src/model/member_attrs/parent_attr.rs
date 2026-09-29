@@ -26,7 +26,7 @@ fn convert_parent_child_field(child_fields_as_parsed: Punctuated<ParentChildFiel
             path.push(PathFragment { mem: child_field.this_member, path: child_field.ty });
             child_fields_as_used.extend(convert_parent_child_field(parent_attr, path));
         } else {
-            let path_tokens = sub_path.iter().map(|x|x.path.to_token_stream()).fold(TokenStream::new(), |a,b| quote!(#a.#b));
+            let path_tokens = sub_path.iter().map(|x|x.mem.to_token_stream()).fold(TokenStream::new(), |a,b| quote!(#a.#b));
             child_fields_as_used.push(ParentChildField { this_member: child_field.this_member, attrs: child_field.attrs, sub_path: sub_path.clone(), sub_path_tokens: path_tokens });
         }
     }
