@@ -18,7 +18,7 @@ pub(crate) use as_attr::*;
 
 use crate::model::*;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub(crate) struct MemberAttrs {
     pub attrs: Vec<MemberAttr>,
     pub child_attrs: Vec<ChildAttr>,
@@ -131,7 +131,7 @@ impl<'a> MemberAttrs {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum MemberInstruction {
     Map(MemberAttr),
     Ghost(GhostAttr),
@@ -152,7 +152,7 @@ pub(crate) enum MemberInstruction {
     Unrecognized,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct VariantTypeHintAttr {
     pub container_ty: Option<TypePath>,
     pub type_hint: TypeHint,

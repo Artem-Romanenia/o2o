@@ -1,5 +1,6 @@
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct Function<'a> {
     pub attr: Option<Attribute>,
     pub inner_attr: Option<Attribute>,

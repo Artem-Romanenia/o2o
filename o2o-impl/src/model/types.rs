@@ -70,7 +70,7 @@ impl<'a> Struct<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum StructKind {
     Struct,
     Tuple,

@@ -1,6 +1,6 @@
 use crate::model::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct PatAttr {
     pub container_ty: Option<TypePath>,
     pub tokens: TokenStream,

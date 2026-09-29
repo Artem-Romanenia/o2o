@@ -9,7 +9,13 @@ pub(crate) struct StructInitBlockChild<'a> {
     pub parent_hint: TypeHint,
 }
 
-impl Render for StructInitBlockChild<'_> {
+impl<'a> std::fmt::Debug for StructInitBlockChild<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StructInitBlockChild").field("block", &self.block).field("name", &self.name.to_token_stream().to_string()).field("ty", &self.ty.to_token_stream().to_string()).field("action", &self.action).field("struct_kind", &self.struct_kind).field("parent_hint", &self.parent_hint).finish()
+    }
+}
+
+impl<'a> Render for StructInitBlockChild<'a> {
     fn render(&self, ctx: &RenderContext) -> TokenStream {
         let block = self.block.render(ctx);
         let child_name = &self.name;

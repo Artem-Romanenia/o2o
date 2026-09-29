@@ -1,5 +1,6 @@
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct FunctionBody<'a> {
     pub pre_init: Option<PreInit<'a>>,
     pub main_code_block: &'a dyn Render,
@@ -37,6 +38,7 @@ impl<'a> Render for FunctionBody<'a> {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct PreInit<'a> {
     pub vars: Vec<(Expression<'a>, &'a Ident)>
 }
@@ -53,7 +55,10 @@ impl<'a> Render for PreInit<'a> {
     }
 }
 
+#[derive(derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct PostInitStatement<'a> {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub member: &'a Member
 }
 

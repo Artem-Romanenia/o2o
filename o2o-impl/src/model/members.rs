@@ -23,12 +23,15 @@ impl<'a> DataTypeMember<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct Field {
     pub attrs: MemberAttrs,
     pub idx: usize,
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub member: Member,
     pub member_str: String,
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub ty: Option<Path>
 }
 

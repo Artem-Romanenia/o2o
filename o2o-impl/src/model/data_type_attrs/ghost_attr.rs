@@ -1,27 +1,28 @@
 use crate::model::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct GhostsAttr {
     pub attr: StructGhostAttrCore,
     pub applicable_to: ApplicableTo,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct StructGhostAttrCore {
     pub container_ty: Option<TypePath>,
-    pub ghost_data: Punctuated<GhostData, Token![,]>,
+    pub ghost_data: Vec<GhostData>,
 }
 
 impl Parse for StructGhostAttrCore {
     fn parse(input: ParseStream) -> Result<Self> {
+        let ghost_data: Punctuated<GhostData, Token![,]> = Punctuated::parse_terminated(input)?;
         Ok(StructGhostAttrCore {
             container_ty: try_parse_container_ident(input, false),
-            ghost_data: Punctuated::parse_terminated(input)?,
+            ghost_data: ghost_data.into_iter().collect(),
         })
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct GhostData {
     pub child_path: Option<ChildPath>,
     pub ghost_ident: GhostIdent,
@@ -60,9 +61,10 @@ impl Parse for GhostData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) enum GhostIdent {
-    Member(Member),
+    Member(#[derivative(Debug(format_with="crate::debug_to_tokens"))] Member),
     Destruction(TokenStream),
 }
 

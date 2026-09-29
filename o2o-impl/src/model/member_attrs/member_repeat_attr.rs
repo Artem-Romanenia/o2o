@@ -1,6 +1,6 @@
 use crate::{kw, model::*};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct MemberRepeatAttr {
     pub permeate: bool,
     pub repeat_for: MemberRepeatFor,

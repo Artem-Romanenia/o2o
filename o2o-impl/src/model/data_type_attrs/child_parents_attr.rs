@@ -42,6 +42,7 @@ impl Hash for ChildParentData {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ChildParentAction {
     pub action: InlineExpression,
     pub applicable_to: ApplicableTo

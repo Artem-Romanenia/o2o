@@ -1,5 +1,6 @@
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct Attribute {
     pub attr: TokenStream,
     pub inner: bool,

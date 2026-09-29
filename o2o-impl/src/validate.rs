@@ -278,8 +278,8 @@ fn validate_parent_attrs(named_root_struct: bool, parent_attrs: &[ParentAttr], d
         for _ in data_type_attrs_by_kind.iter().filter(|(x, kind)|kind.is_from() && (p.container_ty.is_none() || &x.ty == p.container_ty.as_ref().unwrap())) {
             if let Some(fields) = p.child_fields.as_ref() { fields.iter().for_each(|f| {
                 for i in f.sub_path.iter() {
-                    if i.1.is_none() {
-                        errors.insert(format!("Field '{0}' should have type here, e.g. '{0}: SomeStruct'", i.0.to_token_stream().to_string()), i.0.span());
+                    if i.path.is_none() {
+                        errors.insert(format!("Field '{0}' should have type here, e.g. '{0}: SomeStruct'", i.mem.to_token_stream().to_string()), i.mem.span());
                     }
                 }
             })}

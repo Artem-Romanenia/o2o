@@ -1,6 +1,9 @@
 use crate::render::*;
 
+#[derive(derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct TheseGenerics<'a> {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub gens: &'a Generics
 }
 
@@ -24,7 +27,10 @@ impl<'a> Render for TheseGenerics<'a> {
     }
 }
 
+#[derive(derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct ThoseGenerics<'a> {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub gens: &'a Option<AngleBracketedGenericArguments>
 }
 
@@ -34,7 +40,10 @@ impl<'a> Render for ThoseGenerics<'a>  {
     }
 }
 
+#[derive(derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct ImplGenerics {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub gens: Generics
 }
 

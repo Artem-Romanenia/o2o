@@ -1,5 +1,6 @@
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct StructInitBlockLine<'a> {
     pub dst_ty: &'a TypePath,
     pub field: &'a Field,

@@ -1,5 +1,6 @@
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct Implementation<'a> {
     pub impl_attr: Option<Attribute>,
     pub err_ty: Option<&'a TokenStream>,

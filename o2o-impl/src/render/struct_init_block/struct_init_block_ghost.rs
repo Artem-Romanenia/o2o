@@ -1,12 +1,13 @@
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct StructInitBlockGhost<'a> {
     pub child_path: Option<&'a ChildPath>,
     pub ghost_ident: &'a GhostIdent,
     pub expr: Expression<'a>
 }
 
-impl Render for StructInitBlockGhost<'_> {
+impl<'a> Render for StructInitBlockGhost<'a> {
     fn render(&self, ctx: &RenderContext) -> TokenStream {
         let child_path = match &self.child_path {
             Some(ghost_data) => {

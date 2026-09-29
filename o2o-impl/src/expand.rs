@@ -719,8 +719,8 @@ fn build_parent_child_fragment<'a, F: FnOnce() -> StructInitBlockFragment<'a>>(
     if depth.is_none() || depth.unwrap() < parent_child_field.sub_path.len() {
         let new_depth = depth.map_or(0, |x| x + 1);
         if ctx.kind.is_from() {
-            let ty = if let Some(depth) = depth { parent_child_field.sub_path[depth].1.as_ref().unwrap() } else { field.ty.as_ref().unwrap() };
-            let child_path = ChildPath::new(field.member.clone(), parent_child_field.sub_path.iter().map(|x| x.0.clone()));
+            let ty = if let Some(depth) = depth { parent_child_field.sub_path[depth].path.as_ref().unwrap() } else { field.ty.as_ref().unwrap() };
+            let child_path = ChildPath::new(field.member.clone(), parent_child_field.sub_path.iter().map(|x| x.mem.clone()));
             StructInitBlockFragment::Child(StructInitBlockChild {
                 block: StructInitBlock {
                     fragments: struct_init_block_fragments_inner(fields, ctx, Some((&child_path, None, new_depth))),

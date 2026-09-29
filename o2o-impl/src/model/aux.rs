@@ -52,8 +52,10 @@ impl Display for FallibleKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct ChildPath {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub child_path: Punctuated<Member, Token![.]>,
     pub child_path_str: Vec<String>,
 }
@@ -76,11 +78,13 @@ impl ChildPath {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct TypePath {
     pub span: Span,
     pub path: TokenStream,
     pub path_str: String,
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub generics: Option<AngleBracketedGenericArguments>,
     pub nameless_tuple: bool,
 }
@@ -129,7 +133,7 @@ impl Hash for TypePath {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum TypeHint {
     Unit = 0,
     Struct = 1,
@@ -259,7 +263,7 @@ impl InlineExpressionWithSpan {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct InlineExpression {
     pub expr: TokenStream
 }

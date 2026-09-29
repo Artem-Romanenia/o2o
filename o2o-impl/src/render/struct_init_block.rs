@@ -8,6 +8,7 @@ pub(crate) use struct_init_block_ghost::*;
 
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct StructInitBlock<'a> {
     pub fragments: Vec<StructInitBlockFragment<'a>>,
     pub type_hint: TypeHint,
@@ -50,6 +51,7 @@ impl<'a> Render for StructInitBlock<'a> {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum StructInitBlockFragment<'a> {
     Line(StructInitBlockLine<'a>),
     Child(StructInitBlockChild<'a>),

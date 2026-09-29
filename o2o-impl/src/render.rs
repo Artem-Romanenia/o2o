@@ -53,7 +53,7 @@ pub(crate) struct RenderContext<'a> {
     pub fallible: bool,
 }
 
-pub(crate) trait Render {
+pub(crate) trait Render: std::fmt::Debug {
     fn render(&self, ctx: &RenderContext) -> TokenStream;
 }
 

@@ -1,5 +1,6 @@
 use crate::render::*;
 
+#[derive(Debug)]
 pub(crate) struct WhereClause {
     pub where_clause: TokenStream
 }

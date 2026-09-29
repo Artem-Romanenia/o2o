@@ -1,6 +1,6 @@
 use crate::model::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct ChildAttr {
     pub container_ty: Option<TypePath>,
     pub child_path: ChildPath,

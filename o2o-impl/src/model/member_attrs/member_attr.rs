@@ -2,7 +2,7 @@ use std::ops::Not;
 
 use crate::model::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct MemberAttr {
     pub attr: MemberAttrCore,
     pub fallible: bool,
@@ -10,9 +10,11 @@ pub(crate) struct MemberAttr {
     pub applicable_to: ApplicableTo,
 }
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct MemberAttrCore {
     pub container_ty: Option<TypePath>,
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub member: Option<Member>,
     pub action: Option<InlineExpression>,
 }

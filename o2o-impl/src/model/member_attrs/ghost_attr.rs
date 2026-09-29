@@ -2,13 +2,13 @@ use std::ops::Not;
 
 use crate::model::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct GhostAttr {
     pub attr: FieldGhostAttrCore,
     pub applicable_to: ApplicableTo,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct FieldGhostAttrCore {
     pub container_ty: Option<TypePath>,
     pub action: Option<InlineExpression>,

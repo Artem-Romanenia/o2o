@@ -2,7 +2,7 @@ use std::ops::Not;
 
 use crate::model::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct ParentAttr {
     pub container_ty: Option<TypePath>,
     pub child_fields: Option<Vec<ParentChildField>>,
@@ -17,16 +17,16 @@ impl Parse for ParentAttr {
     }
 }
 
-fn convert_parent_child_field(child_fields_as_parsed: Punctuated<ParentChildFieldAsParsed, Comma>, sub_path: Vec<(Member, Option<syn::Path>)>) -> Vec<ParentChildField> {
+fn convert_parent_child_field(child_fields_as_parsed: Punctuated<ParentChildFieldAsParsed, Comma>, sub_path: Vec<PathFragment>) -> Vec<ParentChildField> {
     let mut child_fields_as_used = vec![];
 
     for child_field in child_fields_as_parsed {
         if let Some(parent_attr) = child_field.parent_attr {
             let mut path = sub_path.clone();
-            path.push((child_field.this_member, child_field.ty));
+            path.push(PathFragment { mem: child_field.this_member, path: child_field.ty });
             child_fields_as_used.extend(convert_parent_child_field(parent_attr, path));
         } else {
-            let path_tokens = sub_path.iter().map(|x|x.0.to_token_stream()).fold(TokenStream::new(), |a,b| quote!(#a.#b));
+            let path_tokens = sub_path.iter().map(|x|x.path.to_token_stream()).fold(TokenStream::new(), |a,b| quote!(#a.#b));
             child_fields_as_used.push(ParentChildField { this_member: child_field.this_member, attrs: child_field.attrs, sub_path: sub_path.clone(), sub_path_tokens: path_tokens });
         }
     }
@@ -86,12 +86,23 @@ impl Parse for ParentChildFieldAsParsed {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct ParentChildField {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub this_member: Member,
     pub attrs: Vec<ParentChildFieldAttr>,
-    pub sub_path: Vec<(Member, Option<syn::Path>)>,
+    pub sub_path: Vec<PathFragment>,
     pub sub_path_tokens: TokenStream,
+}
+
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
+pub(crate) struct PathFragment {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
+    pub mem: Member,
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
+    pub path: Option<syn::Path>
 }
 
 impl<'a> ParentChildField {
@@ -110,8 +121,10 @@ impl<'a> ParentChildField {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct ParentChildFieldAttr {
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub that_member: Option<Member>,
     pub action: Option<InlineExpression>,
     pub applicable_to: ApplicableTo,

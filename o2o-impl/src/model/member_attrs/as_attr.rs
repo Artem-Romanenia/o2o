@@ -1,8 +1,10 @@
 use crate::model::*;
 
-#[derive(Clone)]
+#[derive(Clone, derivative::Derivative)]
+#[derivative(Debug)]
 pub(crate) struct AsAttr {
     pub container_ty: Option<TypePath>,
+    #[derivative(Debug(format_with="crate::debug_to_tokens"))]
     pub member: Option<Member>,
     pub tokens: TokenStream,
 }
