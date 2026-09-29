@@ -83,91 +83,28 @@ fn data_type_impl(input: DataType) -> TokenStream {
 
     let has_post_init = |a: &TraitAttrCore| input.get_members().iter().any(|x|x.get_attrs().has_parameterless_parent_attr(&a.ty));
 
-    let impls = std::iter::empty().chain(attrs.iter_for_kind_core(&Kind::FromOwned, false).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::FromOwned,
-        dst_ty: &ty,
-        src_ty: &struct_attr.ty.path,
-        has_post_init: false,
-        fallible: false,
-    })).chain(attrs.iter_for_kind_core(&Kind::FromOwned, true).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::FromOwned,
-        dst_ty: &ty,
-        src_ty: &struct_attr.ty.path,
-        has_post_init: false,
-        fallible: true,
-    })).chain(attrs.iter_for_kind_core(&Kind::FromRef, false).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::FromRef,
-        dst_ty: &ty,
-        src_ty: &struct_attr.ty.path,
-        has_post_init: false,
-        fallible: false,
-    })).chain(attrs.iter_for_kind_core(&Kind::FromRef, true).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::FromRef,
-        dst_ty: &ty,
-        src_ty: &struct_attr.ty.path,
-        has_post_init: false,
-        fallible: true,
-    })).chain(attrs.iter_for_kind_core(&Kind::OwnedInto, false).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::OwnedInto,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: false,
-    })).chain(attrs.iter_for_kind_core(&Kind::OwnedInto, true).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::OwnedInto,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: true,
-    })).chain(attrs.iter_for_kind_core(&Kind::RefInto, false).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::RefInto,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: false,
-    })).chain(attrs.iter_for_kind_core(&Kind::RefInto, true).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::RefInto,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: true,
-    })).chain(attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, false).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::OwnedIntoExisting,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: false,
-    })).chain(attrs.iter_for_kind_core(&Kind::OwnedIntoExisting, true).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::OwnedIntoExisting,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: true,
-    })).chain(attrs.iter_for_kind_core(&Kind::RefIntoExisting, false).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::RefIntoExisting,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: false,
-    })).chain(attrs.iter_for_kind_core(&Kind::RefIntoExisting, true).map(|struct_attr| ImplContext {
-        input: &input, impl_type, struct_attr,
-        kind: Kind::RefIntoExisting,
-        dst_ty: &struct_attr.ty.path,
-        src_ty: &ty,
-        has_post_init: has_post_init(struct_attr),
-        fallible: true,
-    })).map(|mut ctx| quote_trait(&input, &mut ctx));
+    let trait_types = vec![
+        (Kind::FromOwned, true), (Kind::FromOwned, false),
+        (Kind::FromRef, true), (Kind::FromRef, false),
+        (Kind::OwnedInto, true), (Kind::OwnedInto, false),
+        (Kind::RefInto, true), (Kind::RefInto, false),
+        (Kind::OwnedIntoExisting, true), (Kind::OwnedIntoExisting, false),
+        (Kind::RefIntoExisting, true), (Kind::RefIntoExisting, false),
+    ];
+
+    let impls = trait_types.iter()
+        .flat_map(|(kind, fallible)| attrs.iter_for_kind_core(kind, *fallible).map(|x| (kind.clone(), fallible.clone(), x)))
+        .map(|(kind, fallible, struct_attr)| {
+            let is_from = kind.is_from();
+            ImplContext {
+                input: &input, impl_type, struct_attr,
+                kind: kind,
+                dst_ty: if is_from { &ty } else { &struct_attr.ty.path },
+                src_ty: if is_from { &struct_attr.ty.path } else { &ty },
+                has_post_init: if is_from { false } else { has_post_init(struct_attr) },
+                fallible,
+            }
+        }).map(|mut ctx| quote_trait(&input, &mut ctx));
 
     quote! { #(#impls)* }
 }
