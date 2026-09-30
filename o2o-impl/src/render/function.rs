@@ -1,3 +1,4 @@
+use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -12,11 +13,11 @@ pub(crate) struct Function<'a> {
 }
 
 impl<'a> Render for Function<'a> {
-    fn render(&self, ctx: &RenderContext) -> TokenStream {
-        let attr = self.attr.as_ref().map(|x| x.render(ctx));
-        let inner_attr = self.inner_attr.as_ref().map(|x| x.render(ctx));
-        let these_gens = self.these_gens.render(ctx);
-        let those_gens = self.those_gens.render(ctx);
+    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
+        let attr = self.attr.as_ref().map(|x| x.render_imm(ctx));
+        let inner_attr = self.inner_attr.as_ref().map(|x| x.render_imm(ctx));
+        let these_gens = self.these_gens.render_imm(ctx);
+        let those_gens = self.those_gens.render_imm(ctx);
         let src = ctx.src_ty;
         let dst = ctx.dst_ty;
         let r = &self.r;
@@ -32,14 +33,14 @@ impl<'a> Render for Function<'a> {
             (Kind::OwnedIntoExisting | Kind::RefIntoExisting, true) => quote!(try_into_existing(self, other: &mut #dst #those_gens) -> ::core::result::Result<(), #err_ty>),
         };
 
-        let body = self.body.render(ctx);
+        let body = self.body.render_imm(ctx);
 
-        quote! {
+        stream.append_all(quote! {
             #attr
             fn #func_def {
                 #inner_attr
                 #body
             }
-        }
+        });
     }
 }

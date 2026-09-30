@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-
+use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -29,20 +29,20 @@ impl<'a> Expression<'a> {
 }
 
 impl<'a> Render for Expression<'a> {
-    fn render(&self, ctx: &RenderContext) -> TokenStream {
+    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
         let expr = &self.expr;
         let ident = match ctx.kind {
             Kind::FromOwned | Kind::FromRef => quote!(value),
             _ => quote!(self),
         };
-        
+
         let val = replace_tilde_or_at_in_expr(
-            &expr, 
-            self.at_tokens.as_ref().map(|x| x.render(ctx)).as_ref().or(Some(&ident)),
-            self.tilde_tokens.as_ref().map(|x| x.render(ctx)).as_ref());
+            &expr,
+            self.at_tokens.as_ref().map(|x| { x.render_imm(ctx) }).as_ref().or(Some(&ident)),
+            self.tilde_tokens.as_ref().map(|x| { x.render_imm(ctx) }).as_ref());
 
         let postfix = &self.postfix;
 
-        quote!(#val #postfix)
+        stream.append_all(quote!(#val #postfix));
     }
 }

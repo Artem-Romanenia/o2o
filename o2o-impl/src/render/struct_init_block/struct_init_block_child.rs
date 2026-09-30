@@ -1,3 +1,4 @@
+use quote::TokenStreamExt;
 use crate::render::*;
 
 pub(crate) struct StructInitBlockChild<'a> {
@@ -16,8 +17,8 @@ impl<'a> std::fmt::Debug for StructInitBlockChild<'a> {
 }
 
 impl<'a> Render for StructInitBlockChild<'a> {
-    fn render(&self, ctx: &RenderContext) -> TokenStream {
-        let block = self.block.render(ctx);
+    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
+        let block = self.block.render_imm(ctx);
         let child_name = &self.name;
         let ty = self.ty;
         let type_initialization = if let Some(action) = self.action {
@@ -28,10 +29,10 @@ impl<'a> Render for StructInitBlockChild<'a> {
 
         match (self.struct_kind, self.parent_hint) {
             (StructKind::Tuple, TypeHint::Struct) |
-            (StructKind::Struct, TypeHint::Struct | TypeHint::Unspecified) => quote!(#child_name: #type_initialization,),
+            (StructKind::Struct, TypeHint::Struct | TypeHint::Unspecified) => stream.append_all(quote!(#child_name: #type_initialization,)),
             (StructKind::Struct, TypeHint::Tuple) |
-            (StructKind::Tuple, TypeHint::Tuple | TypeHint::Unspecified) => quote!(#type_initialization,),
+            (StructKind::Tuple, TypeHint::Tuple | TypeHint::Unspecified) => stream.append_all(quote!(#type_initialization,)),
             (_, _) => unreachable!("15"),
-        }
+        };
     }
 }

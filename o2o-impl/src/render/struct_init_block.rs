@@ -2,6 +2,7 @@ mod struct_init_block_line;
 mod struct_init_block_child;
 mod struct_init_block_ghost;
 
+use quote::TokenStreamExt;
 pub(crate) use struct_init_block_line::*;
 pub(crate) use struct_init_block_child::*;
 pub(crate) use struct_init_block_ghost::*;
@@ -18,8 +19,8 @@ pub(crate) struct StructInitBlock<'a> {
 }
 
 impl<'a> Render for StructInitBlock<'a> {
-    fn render(&self, ctx: &RenderContext) -> TokenStream {
-        let fragments = self.fragments.iter().map(|f| f.render(ctx));
+    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
+        let fragments = self.fragments.iter().map(|f| f.render_imm(ctx));
 
         let block = if ctx.has_post_init || ctx.kind.is_into_existing() {
             quote!(#(#fragments)*)
@@ -44,9 +45,9 @@ impl<'a> Render for StructInitBlock<'a> {
         };
 
         if self.ok_wrap {
-            quote!(Ok(#block))
+            stream.append_all(quote!(Ok(#block)));
         } else {
-            block
+            stream.append_all(block);
         }
     }
 }
@@ -60,15 +61,15 @@ pub(crate) enum StructInitBlockFragment<'a> {
 }
 
 impl Render for StructInitBlockFragment<'_> {
-    fn render(&self, ctx: &RenderContext) -> TokenStream {
+    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
         match self {
-            StructInitBlockFragment::Line(line) => line.render(ctx),
-            StructInitBlockFragment::Child(child) => child.render(ctx),
-            StructInitBlockFragment::Ghost(ghost) => ghost.render(ctx),
+            StructInitBlockFragment::Line(line) => line.render(ctx, stream),
+            StructInitBlockFragment::Child(child) => child.render(ctx, stream),
+            StructInitBlockFragment::Ghost(ghost) => ghost.render(ctx, stream),
             StructInitBlockFragment::Update(expr) => {
-                let expr = expr.render(ctx);
-                quote!(..#expr)
+                let expr = expr.render_imm(ctx);
+                stream.append_all(quote!(..#expr));
             },
-        }
+        };
     }
 }

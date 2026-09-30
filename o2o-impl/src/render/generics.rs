@@ -1,3 +1,4 @@
+use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(derivative::Derivative)]
@@ -8,7 +9,7 @@ pub(crate) struct TheseGenerics<'a> {
 }
 
 impl<'a> Render for TheseGenerics<'a> {
-    fn render(&self, _: &RenderContext) -> TokenStream {
+    fn render(&self, _: &RenderContext, stream: &mut TokenStream) {
         if !self.gens.params.is_empty() {
             let filtered = self.gens.params.iter().map(|param| match param {
                 GenericParam::Type(syn::TypeParam { ident, .. }) =>
@@ -20,9 +21,9 @@ impl<'a> Render for TheseGenerics<'a> {
                 GenericParam::Const(syn::ConstParam { ident, .. }) =>
                     quote!(#ident)
             });
-            quote!(<#(#filtered),*>)
+            stream.append_all(quote!(<#(#filtered),*>));
         } else {
-            quote!()
+            stream.append_all(quote!());
         }
     }
 }
@@ -35,8 +36,8 @@ pub(crate) struct ThoseGenerics<'a> {
 }
 
 impl<'a> Render for ThoseGenerics<'a>  {
-    fn render(&self, _: &RenderContext) -> TokenStream {
-        self.gens.to_token_stream()
+    fn render(&self, _: &RenderContext, stream: &mut TokenStream) {
+        stream.append_all(self.gens);
     }
 }
 
@@ -48,7 +49,7 @@ pub(crate) struct ImplGenerics {
 }
 
 impl Render for ImplGenerics {
-    fn render(&self, _: &RenderContext) -> TokenStream {
+    fn render(&self, _: &RenderContext, stream: &mut TokenStream) {
         if !self.gens.params.is_empty() {
             let filtered = self.gens.params.iter().map(|param| match param {
                 GenericParam::Type(syn::TypeParam { ident, colon_token, bounds, .. }) =>
@@ -59,9 +60,7 @@ impl Render for ImplGenerics {
                     quote!(const #ident #colon_token #ty)
             });
 
-            quote!(<#(#filtered),*>)
-        } else {
-            quote!()
+            stream.append_all(quote!(<#(#filtered),*>));
         }
     }
 }

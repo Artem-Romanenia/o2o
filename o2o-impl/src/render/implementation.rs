@@ -1,3 +1,4 @@
+use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -13,12 +14,12 @@ pub(crate) struct Implementation<'a> {
 }
 
 impl<'a> Render for Implementation<'a> {
-    fn render(&self, ctx: &RenderContext) -> TokenStream {
-        let impl_attr = self.impl_attr.as_ref().map(|x| x.render(ctx));
-        let impl_gens = self.impl_gens.render(ctx);
-        let these_gens = self.these_gens.render(ctx);
-        let those_gens = self.those_gens.render(ctx);
-        let where_clause = self.where_clause.as_ref().map(|x| x.render(ctx));
+    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
+        let impl_attr = self.impl_attr.as_ref().map(|x| x.render_imm(ctx));
+        let impl_gens = self.impl_gens.render_imm(ctx);
+        let these_gens = self.these_gens.render_imm(ctx);
+        let those_gens = self.those_gens.render_imm(ctx);
+        let where_clause = self.where_clause.as_ref().map(|x| x.render_imm(ctx));
         let src = ctx.src_ty;
         let dst = ctx.dst_ty;
         let r = &self.r;
@@ -41,13 +42,13 @@ impl<'a> Render for Implementation<'a> {
 
         let err_ty = &self.err_ty.as_ref().map(|x| quote!(type Error = #x;));
 
-        let function = self.function.render(ctx);
-        quote! {
+        let function = self.function.render_imm(ctx);
+        stream.append_all(quote! {
             #impl_attr
             impl #impl_gens #trait_def #where_clause {
                 #err_ty
                 #function
             }
-        }
+        });
     }
 }

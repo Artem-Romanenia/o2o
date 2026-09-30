@@ -289,7 +289,7 @@ fn render_enum_line(v: &Variant, ctx: &ImplContext) -> TokenStream {
                 ok_wrap: false,
             }
         };
-        block.render(&new_ctx.to_render_ctx())
+        block.render_imm(&new_ctx.to_render_ctx())
     };
 
     match (v.variant_kind.is_struct(), attr, lit, pat, &ctx.kind) {
@@ -450,8 +450,8 @@ fn quote_trait(input: &DataType, ctx: &mut ImplContext) -> TokenStream {
     };
 
     // println!("{:#?}", implementation);
-    
-    implementation.render(&ctx.to_render_ctx())
+
+    implementation.render_imm(&ctx.to_render_ctx())
 }
 
 fn struct_init_block_fragments<'a>(input: &'a Struct, ctx: &'a ImplContext) -> Vec<StructInitBlockFragment<'a>> {

@@ -54,7 +54,14 @@ pub(crate) struct RenderContext<'a> {
 }
 
 pub(crate) trait Render: std::fmt::Debug {
-    fn render(&self, ctx: &RenderContext) -> TokenStream;
+    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream);
+
+    #[inline]
+    fn render_imm(&self, ctx: &RenderContext) -> TokenStream {
+        let mut stream = TokenStream::new();
+        self.render(ctx, &mut stream);
+        stream
+    }
 }
 
 pub(crate) fn render_action(expr: &TokenStream, tilde_postfix: Option<&TokenStream>, ctx: &RenderContext) -> TokenStream {
