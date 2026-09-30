@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use o2o_impl::expand::derive;
 use quote::quote;
@@ -64,5 +66,10 @@ fn derive_complex_benchmark(c: &mut Criterion) {
     c.bench_function("derive_complex_benchmark", |b| b.iter(|| derive(black_box(&input.clone()))));
 }
 
-criterion_group!(benches, derive_simple_benchmark, derive_complex_benchmark);
+criterion_group!{
+    name = benches;
+    config = Criterion::default().measurement_time(Duration::from_secs(10)).sample_size(500);
+    targets = derive_simple_benchmark, derive_complex_benchmark
+}
+
 criterion_main!(benches);
