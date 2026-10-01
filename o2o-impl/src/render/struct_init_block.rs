@@ -20,7 +20,7 @@ pub(crate) struct StructInitBlock<'a> {
 
 impl<'a> Render for StructInitBlock<'a> {
     fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
-        let fragments = self.fragments.iter().map(|f| f.render_imm(ctx));
+        let fragments = self.fragments.iter().map(|f| ctx.with(f));
 
         let block = if ctx.has_post_init || ctx.kind.is_into_existing() {
             quote!(#(#fragments)*)
@@ -67,7 +67,7 @@ impl Render for StructInitBlockFragment<'_> {
             StructInitBlockFragment::Child(child) => child.render(ctx, stream),
             StructInitBlockFragment::Ghost(ghost) => ghost.render(ctx, stream),
             StructInitBlockFragment::Update(expr) => {
-                let expr = expr.render_imm(ctx);
+                let expr = WithCtx(expr, ctx);
                 stream.append_all(quote!(..#expr));
             },
         };

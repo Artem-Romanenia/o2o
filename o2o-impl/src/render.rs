@@ -53,14 +53,32 @@ pub(crate) struct RenderContext<'a> {
     pub fallible: bool,
 }
 
+impl<'a> RenderContext<'a> {
+    pub(crate) fn with<'b, T: Render + ?Sized>(
+        &'b self,
+        node: &'b T,
+    ) -> WithCtx<'b, T> {
+        WithCtx(node, self)
+    }
+}
+
 pub(crate) trait Render: std::fmt::Debug {
-    fn render(&self, ctx: &RenderContext, stream: &mut TokenStream);
+    fn render(&self, ctx: &RenderContext<'_>, stream: &mut TokenStream);
 
     #[inline]
     fn render_imm(&self, ctx: &RenderContext) -> TokenStream {
         let mut stream = TokenStream::new();
         self.render(ctx, &mut stream);
         stream
+    }
+}
+
+
+pub(crate) struct WithCtx<'a, T: ?Sized>(&'a T, &'a RenderContext<'a>);
+
+impl<T: Render + ?Sized> ToTokens for WithCtx<'_, T> {
+    fn to_tokens(&self, out: &mut TokenStream) {
+        self.0.render(self.1, out);
     }
 }
 

@@ -49,7 +49,7 @@ impl<'a> Render for StructInitBlockLine<'a> {
         };
         let get_from_right_side = |x: &Member| match &self.child_parent_expr {
             Some(expr) => {
-                let expr = expr.render_imm(ctx);
+                let expr = ctx.with(expr);
                 quote!(#expr.#x)
             },
             None => {

@@ -38,8 +38,8 @@ impl<'a> Render for Expression<'a> {
 
         let val = replace_tilde_or_at_in_expr(
             &expr,
-            self.at_tokens.as_ref().map(|x| { x.render_imm(ctx) }).as_ref().or(Some(&ident)),
-            self.tilde_tokens.as_ref().map(|x| { x.render_imm(ctx) }).as_ref());
+            self.at_tokens.as_ref().map(|x| x.render_imm(ctx)).as_ref().or(Some(&ident)),
+            self.tilde_tokens.as_ref().map(|x| x.render_imm(ctx)).as_ref());
 
         let postfix = &self.postfix;
 

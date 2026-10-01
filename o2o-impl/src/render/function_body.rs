@@ -10,9 +10,9 @@ pub(crate) struct FunctionBody<'a> {
 
 impl<'a> Render for FunctionBody<'a> {
     fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
-        let pre_init = self.pre_init.as_ref().map(|x| x.render_imm(ctx));
-        let init = self.main_code_block.render_imm(ctx);
-        let post_init_statements: Vec<_> = self.post_init_statements.iter().map(|s| s.render_imm(ctx)).collect();
+        let pre_init = self.pre_init.as_ref().map(|x| ctx.with(x));
+        let init = ctx.with(self.main_code_block);
+        let post_init_statements: Vec<_> = self.post_init_statements.iter().map(|s| ctx.with(s)).collect();
 
         match (ctx.kind.is_into_existing(), ctx.fallible){
             (true, false) => stream.append_all(quote!(#pre_init #init #(#post_init_statements)*)),
@@ -48,7 +48,7 @@ impl<'a> Render for PreInit<'a> {
     fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
        self.vars.iter().for_each(|(expr, ident)| {
             let a = ident;
-            let b = expr.render_imm(ctx);
+            let b = ctx.with(expr);
 
            stream.append_all(quote!(let #a = #b;))
         });

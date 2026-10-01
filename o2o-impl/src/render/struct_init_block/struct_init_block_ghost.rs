@@ -18,7 +18,7 @@ impl<'a> Render for StructInitBlockGhost<'a> {
             None => TokenStream::new(),
         };
         
-        let right_side = self.expr.render_imm(ctx);
+        let right_side = ctx.with(&self.expr);
         let ghost_ident = self.ghost_ident.get_ident();
 
         match (ghost_ident, &ctx.kind) {

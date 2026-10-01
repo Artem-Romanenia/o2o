@@ -18,7 +18,7 @@ impl<'a> std::fmt::Debug for StructInitBlockChild<'a> {
 
 impl<'a> Render for StructInitBlockChild<'a> {
     fn render(&self, ctx: &RenderContext, stream: &mut TokenStream) {
-        let block = self.block.render_imm(ctx);
+        let block = ctx.with(&self.block);
         let child_name = &self.name;
         let ty = self.ty;
         let type_initialization = if let Some(action) = self.action {
