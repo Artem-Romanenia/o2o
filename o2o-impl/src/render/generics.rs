@@ -21,9 +21,9 @@ impl<'a> Render for TheseGenerics<'a> {
                 GenericParam::Const(syn::ConstParam { ident, .. }) =>
                     quote!(#ident)
             });
-            stream.append_all(quote!(<#(#filtered),*>));
+            stream.extend(quote!(<#(#filtered),*>));
         } else {
-            stream.append_all(quote!());
+            stream.extend(quote!());
         }
     }
 }
@@ -60,7 +60,7 @@ impl Render for ImplGenerics {
                     quote!(const #ident #colon_token #ty)
             });
 
-            stream.append_all(quote!(<#(#filtered),*>));
+            stream.extend(quote!(<#(#filtered),*>));
         }
     }
 }

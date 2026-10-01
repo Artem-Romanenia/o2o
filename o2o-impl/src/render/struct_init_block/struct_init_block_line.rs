@@ -1,4 +1,3 @@
-use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -60,65 +59,65 @@ impl<'a> Render for StructInitBlockLine<'a> {
 
         match (member, attr, &ctx.kind, hint) {
             (Named(ident), None, Kind::OwnedInto | Kind::RefInto, TypeHint::Struct | TypeHint::Unspecified) =>
-                if ctx.has_post_init { stream.append_all(quote!(obj.#ident = #obj #ident;)) } else { stream.append_all(quote!(#ident: #obj #ident,)) },
+                if ctx.has_post_init { stream.extend(quote!(obj.#ident = #obj #ident;)) } else { stream.extend(quote!(#ident: #obj #ident,)) },
             (Named(ident), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Struct | TypeHint::Unspecified) => {
                 let field_path = get_field_path(&f.member);
-                stream.append_all(quote!(other.#field_path = #obj #ident;));
+                stream.extend(quote!(other.#field_path = #obj #ident;));
             },
             (Named(ident), None, Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple) =>
-                stream.append_all(quote!(#obj #ident,)),
+                stream.extend(quote!(#obj #ident,)),
             (Named(ident), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple) => {
                 let index = Unnamed(Index { index: f.idx as u32, span: Span::call_site() });
-                stream.append_all(quote!(other.#index = #obj #ident;));
+                stream.extend(quote!(other.#index = #obj #ident;));
             }
             (Named(ident), None, Kind::FromOwned | Kind::FromRef, TypeHint::Struct | TypeHint::Unspecified | TypeHint::Unit) =>
                 if f.attrs.has_parent_attr(&self.dst_ty) {
                     match (ctx.kind.is_ref(), ctx.fallible) {
-                        (true, true) => stream.append_all(quote!(#ident: value.try_into()?,)),
-                        (true, false) => stream.append_all(quote!(#ident: value.into(),)),
-                        (false, true) => stream.append_all(quote!(#ident: (&value).try_into()?,)),
-                        (false, false) => stream.append_all(quote!(#ident: (&value).into(),)),
+                        (true, true) => stream.extend(quote!(#ident: value.try_into()?,)),
+                        (true, false) => stream.extend(quote!(#ident: value.into(),)),
+                        (false, true) => stream.extend(quote!(#ident: (&value).try_into()?,)),
+                        (false, false) => stream.extend(quote!(#ident: (&value).into(),)),
                     }
                 } else {
                     let right_side = get_from_right_side(&f.member);
-                    stream.append_all(quote!(#ident: #right_side,))
+                    stream.extend(quote!(#ident: #right_side,))
                 },
             (Named(ident), None, Kind::FromOwned | Kind::FromRef, TypeHint::Tuple) => {
                 let index = Unnamed(Index { index: f.idx as u32, span: Span::call_site() });
                 let field_path = if ctx.impl_type.is_variant() { get_field_path(&Named(format_ident!("f{}", index))) } else { get_field_path(&index) };
-                stream.append_all(quote!(#ident: #obj #field_path,))
+                stream.extend(quote!(#ident: #obj #field_path,))
             },
             (Unnamed(index), None, Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple | TypeHint::Unspecified) =>
                 if ctx.has_post_init {
                     let index2 = Unnamed(Index { index: idx as u32, span: Span::call_site() });
-                    stream.append_all(quote!(obj.#index2 = #obj #index;))
+                    stream.extend(quote!(obj.#index2 = #obj #index;))
                 } else {
                     let index = if ctx.impl_type.is_variant() { format_ident!("f{}", index.index).to_token_stream() } else { index.to_token_stream() };
-                    stream.append_all(quote!(#obj #index,))
+                    stream.extend(quote!(#obj #index,))
                 },
             (Unnamed(index), None, Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple | TypeHint::Unspecified) => {
                 let index2 = Unnamed(Index { index: f.idx as u32, span: Span::call_site() });
-                stream.append_all(quote!(other.#index2 = #obj #index;))
+                stream.extend(quote!(other.#index2 = #obj #index;))
             },
             (Unnamed(index), None, Kind::FromOwned | Kind::FromRef, TypeHint::Tuple | TypeHint::Unspecified | TypeHint::Unit) =>
                 if f.attrs.has_parent_attr(&self.dst_ty) {
                     match (ctx.kind.is_ref(), ctx.fallible) {
-                        (true, true) => stream.append_all(quote!(value.try_into()?,)),
-                        (true, false) => stream.append_all(quote!(value.into(),)),
-                        (false, true) => stream.append_all(quote!((&value).try_into()?,)),
-                        (false, false) => stream.append_all(quote!((&value).into(),)),
+                        (true, true) => stream.extend(quote!(value.try_into()?,)),
+                        (true, false) => stream.extend(quote!(value.into(),)),
+                        (false, true) => stream.extend(quote!((&value).try_into()?,)),
+                        (false, false) => stream.extend(quote!((&value).into(),)),
                     }
                 } else {
                     let field_path = if ctx.impl_type.is_variant() { get_field_path(&Named(format_ident!("f{}", index.index))) } else { get_field_path(&f.member) };
-                    stream.append_all(quote!(#obj #field_path,));
+                    stream.extend(quote!(#obj #field_path,));
                 },
             (Unnamed(_), None, _, TypeHint::Struct) =>
                 if f.attrs.has_parent_attr(&self.dst_ty) {
                     match (ctx.kind.is_ref(), ctx.fallible) {
-                        (true, true) => stream.append_all(quote!(value.try_into()?,)),
-                        (true, false) => stream.append_all(quote!(value.into(),)),
-                        (false, true) => stream.append_all(quote!((&value).try_into()?,)),
-                        (false, false) => stream.append_all(quote!((&value).into(),)),
+                        (true, true) => stream.extend(quote!(value.try_into()?,)),
+                        (true, false) => stream.extend(quote!(value.into(),)),
+                        (false, true) => stream.extend(quote!((&value).try_into()?,)),
+                        (false, false) => stream.extend(quote!((&value).into(),)),
                     }
                 } else {
                     unreachable!("6")
@@ -127,46 +126,46 @@ impl<'a> Render for StructInitBlockLine<'a> {
                 let field_name = attr.get_field_name_or(&f.member);
                 let field_path = get_child_field_path(&f.member);
                 let right_side = attr.get_action_or(Some(&field_path), ctx, || quote!(#field_path));
-                if ctx.has_post_init { stream.append_all(quote!(obj.#field_name = #right_side;)); } else { stream.append_all(quote!(#field_name: #right_side,)); }
+                if ctx.has_post_init { stream.extend(quote!(obj.#field_name = #right_side;)); } else { stream.extend(quote!(#field_name: #right_side,)); }
             },
             (Named(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Struct | TypeHint::Unspecified) => {
                 let left_field_path = get_field_path(attr.get_field_name_or(&f.member));
                 let right_field_path = get_child_field_path(&f.member);
                 let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#right_field_path));
-                stream.append_all(quote!(other.#left_field_path = #right_side;));
+                stream.extend(quote!(other.#left_field_path = #right_side;));
             },
             (Named(_), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple) => {
                 let right_field_path = get_child_field_path(&f.member);
                 let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#right_field_path));
-                stream.append_all(quote!(#right_side,));
+                stream.extend(quote!(#right_side,));
             },
             (Named(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple) => {
                 let left_field_path = get_field_path(&Unnamed(Index { index: idx as u32, span: Span::call_site() }));
                 let right_field_path = get_child_field_path(&f.member);
                 let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#right_field_path));
-                stream.append_all(quote!(other.#left_field_path = #right_side;));
+                stream.extend(quote!(other.#left_field_path = #right_side;));
             },
             (Named(_), Some(attr), Kind::FromOwned | Kind::FromRef, TypeHint::Struct | TypeHint::Unspecified | TypeHint::Unit) => {
                 let right_side = attr.get_stuff(None, get_from_right_side, ctx, || &f.member);
                 let idnt = parent_child.map_or(&f.member, |g| &g.this_member);
-                stream.append_all(quote!(#idnt: #right_side,));
+                stream.extend(quote!(#idnt: #right_side,));
             },
             (Named(ident), Some(attr), Kind::FromOwned | Kind::FromRef, TypeHint::Tuple) => {
                 let or = Named(format_ident!("f{}", f.idx));
                 let right_side = attr.get_stuff(None, get_from_right_side, ctx, || if ctx.impl_type.is_variant() { &or } else { &f.member });
-                stream.append_all(quote!(#ident: #right_side,));
+                stream.extend(quote!(#ident: #right_side,));
             },
             (Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Tuple | TypeHint::Unspecified) => {
                 let index = if ctx.impl_type.is_variant() { &Member::Named(format_ident!("f{}", index.index)) } else { &f.member };
                 let field_path = get_child_field_path(index);
                 let right_side = attr.get_action_or(Some(&field_path), ctx, || quote!(#field_path));
-                stream.append_all(quote!(#right_side,));
+                stream.extend(quote!(#right_side,));
             },
             (Unnamed(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Tuple | TypeHint::Unspecified) => {
                 let left_field_path = get_field_path(attr.get_field_name_or(&f.member));
                 let right_field_path = get_child_field_path(&f.member);
                 let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#right_field_path));
-                stream.append_all(quote!(other.#left_field_path = #right_side;));
+                stream.extend(quote!(other.#left_field_path = #right_side;));
             },
             (Unnamed(index), Some(attr), Kind::OwnedInto | Kind::RefInto, TypeHint::Struct) => {
                 let field_name = attr.get_ident();
@@ -174,21 +173,21 @@ impl<'a> Render for StructInitBlockLine<'a> {
                 let or = if ctx.impl_type.is_variant() { format_ident!("f{}", index.index).to_token_stream() } else { field_path };
                 let right_side = attr.get_action_or(Some(&or), ctx, || quote!(#or));
                 if ctx.has_post_init {
-                    stream.append_all(quote!(obj.#field_name = #right_side;));
+                    stream.extend(quote!(obj.#field_name = #right_side;));
                 } else {
-                    stream.append_all(quote!(#field_name: #right_side,));
+                    stream.extend(quote!(#field_name: #right_side,));
                 }
             },
             (Unnamed(_), Some(attr), Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Struct) => {
                 let left_field_path = get_field_path(attr.get_ident());
                 let right_field_path = get_child_field_path(&f.member);
                 let right_side = attr.get_action_or(Some(&right_field_path), ctx, || quote!(#right_field_path));
-                stream.append_all(quote!(other.#left_field_path = #right_side;));
+                stream.extend(quote!(other.#left_field_path = #right_side;));
             },
             (Unnamed(index), Some(attr), Kind::FromOwned | Kind::FromRef, _) => {
                 let or = Named(format_ident!("f{}", index.index));
                 let right_side = attr.get_stuff(None, get_from_right_side, ctx, || if ctx.impl_type.is_variant() { &or } else { &f.member });
-                stream.append_all(quote!(#right_side,))
+                stream.extend(quote!(#right_side,))
             },
             (_, _, Kind::OwnedInto | Kind::RefInto | Kind::OwnedIntoExisting | Kind::RefIntoExisting, TypeHint::Unit) => {}
         };

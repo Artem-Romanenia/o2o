@@ -1,4 +1,3 @@
-use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -35,7 +34,7 @@ impl<'a> Render for Function<'a> {
 
         let body = ctx.with(&self.body);
 
-        stream.append_all(quote! {
+        stream.extend(quote! {
             #attr
             fn #func_def {
                 #inner_attr

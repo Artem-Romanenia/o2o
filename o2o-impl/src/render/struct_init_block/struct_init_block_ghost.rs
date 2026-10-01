@@ -1,4 +1,3 @@
-use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -22,10 +21,10 @@ impl<'a> Render for StructInitBlockGhost<'a> {
         let ghost_ident = self.ghost_ident.get_ident();
 
         match (ghost_ident, &ctx.kind) {
-            (Named(ident), Kind::OwnedInto | Kind::RefInto) => stream.append_all(quote!(#ident: #right_side,)),
-            (Unnamed(_), Kind::OwnedInto | Kind::RefInto) => stream.append_all(quote!(#right_side,)),
-            (Named(ident), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => stream.append_all(quote!(other.#child_path #ident = #right_side;)),
-            (Unnamed(index), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => stream.append_all(quote!(other.#child_path #index = #right_side;)),
+            (Named(ident), Kind::OwnedInto | Kind::RefInto) => stream.extend(quote!(#ident: #right_side,)),
+            (Unnamed(_), Kind::OwnedInto | Kind::RefInto) => stream.extend(quote!(#right_side,)),
+            (Named(ident), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => stream.extend(quote!(other.#child_path #ident = #right_side;)),
+            (Unnamed(index), Kind::OwnedIntoExisting | Kind::RefIntoExisting) => stream.extend(quote!(other.#child_path #index = #right_side;)),
             (_, _) => unreachable!("7"),
         };
     }

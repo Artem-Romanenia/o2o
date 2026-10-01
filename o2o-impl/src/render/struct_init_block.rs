@@ -2,7 +2,6 @@ mod struct_init_block_line;
 mod struct_init_block_child;
 mod struct_init_block_ghost;
 
-use quote::TokenStreamExt;
 pub(crate) use struct_init_block_line::*;
 pub(crate) use struct_init_block_child::*;
 pub(crate) use struct_init_block_ghost::*;
@@ -45,9 +44,9 @@ impl<'a> Render for StructInitBlock<'a> {
         };
 
         if self.ok_wrap {
-            stream.append_all(quote!(Ok(#block)));
+            stream.extend(quote!(Ok(#block)));
         } else {
-            stream.append_all(block);
+            stream.extend(block);
         }
     }
 }
@@ -68,7 +67,7 @@ impl Render for StructInitBlockFragment<'_> {
             StructInitBlockFragment::Ghost(ghost) => ghost.render(ctx, stream),
             StructInitBlockFragment::Update(expr) => {
                 let expr = WithCtx(expr, ctx);
-                stream.append_all(quote!(..#expr));
+                stream.extend(quote!(..#expr));
             },
         };
     }

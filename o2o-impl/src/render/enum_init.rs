@@ -1,4 +1,3 @@
-use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -12,8 +11,8 @@ impl Render for EnumInit {
         let temp = &self.temp;
         
         match self.ok_wrap {
-            true => stream.append_all(quote!(Ok(#temp))),
-            false =>  stream.append_all(quote!(#temp))
+            true => stream.extend(quote!(Ok(#temp))),
+            false =>  stream.extend(quote!(#temp))
         };
     }
 }

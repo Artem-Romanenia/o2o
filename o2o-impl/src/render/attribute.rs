@@ -1,5 +1,4 @@
 use crate::render::*;
-use quote::TokenStreamExt;
 
 #[derive(Debug)]
 pub(crate) struct Attribute {
@@ -11,8 +10,8 @@ impl Render for Attribute {
     fn render(&self, _: &RenderContext, stream: &mut TokenStream) {
         let attr = &self.attr;
         match self.inner {
-            true => stream.append_all(quote!(#![ #attr ])),
-            false => stream.append_all(quote!(#[ #attr ])),
+            true => stream.extend(quote!(#![ #attr ])),
+            false => stream.extend(quote!(#[ #attr ])),
         };
     }
 }

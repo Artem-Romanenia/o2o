@@ -1,4 +1,3 @@
-use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -43,7 +42,7 @@ impl<'a> Render for Implementation<'a> {
         let err_ty = &self.err_ty.as_ref().map(|x| quote!(type Error = #x;));
 
         let function = ctx.with(&self.function);
-        stream.append_all(quote! {
+        stream.extend(quote! {
             #impl_attr
             impl #impl_gens #trait_def #where_clause {
                 #err_ty

@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use quote::TokenStreamExt;
 use crate::render::*;
 
 #[derive(Debug)]
@@ -43,6 +42,6 @@ impl<'a> Render for Expression<'a> {
 
         let postfix = &self.postfix;
 
-        stream.append_all(quote!(#val #postfix));
+        stream.extend(quote!(#val #postfix));
     }
 }
