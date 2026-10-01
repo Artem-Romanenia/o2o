@@ -54,10 +54,7 @@ pub(crate) struct RenderContext<'a> {
 }
 
 impl<'a> RenderContext<'a> {
-    pub(crate) fn with<'b, T: Render + ?Sized>(
-        &'b self,
-        node: &'b T,
-    ) -> WithCtx<'b, T> {
+    pub(crate) fn with<'b, T: Render + ?Sized>(&'b self, node: &'b T) -> WithCtx<'b, T> {
         WithCtx(node, self)
     }
 }
@@ -72,7 +69,6 @@ pub(crate) trait Render: std::fmt::Debug {
         stream
     }
 }
-
 
 pub(crate) struct WithCtx<'a, T: ?Sized>(&'a T, &'a RenderContext<'a>);
 
