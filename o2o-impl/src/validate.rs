@@ -20,6 +20,7 @@ pub(crate) fn validate(input: &DataType) -> Result<()> {
     }
 
     validate_error_instrs(input, attrs, &mut errors);
+    validate_existing_attrs(input, &mut errors);
 
     validate_struct_attrs(attrs.iter_for_kind_core(&Kind::FromOwned, false), false, &mut errors);
     validate_struct_attrs(attrs.iter_for_kind_core(&Kind::FromRef, false), false, &mut errors);
@@ -160,7 +161,8 @@ fn validate_member_error_instrs(input: &DataType, attrs: &MemberAttrs, errors: &
 fn validate_struct_attrs<'a, I: Iterator<Item = &'a TraitAttrCore>>(attrs: I, fallible: bool, errors: &mut HashMap<String, Span>) {
     let mut unique_ident = HashSet::new();
     for attr in attrs {
-        if !unique_ident.insert(&attr.ty) {
+        // `from(T)` and `from_existing(T)` may coexist
+        if !unique_ident.insert((&attr.ty, attr.existing)) {
             errors.insert("Ident here must be unique.".into(), attr.ty.span);
         }
 
@@ -244,6 +246,22 @@ fn bark_at_member_attr<T, U: Fn(&T) -> Span>(attrs: &Vec<T>, instr_name: &'stati
     }
 }
 
+fn validate_existing_attrs(input: &DataType, errors: &mut HashMap<String, Span>) {
+    let existing = input.get_attrs().attrs.iter().filter(|x| x.core.existing);
+    for attr in existing {
+        let ty = &attr.core.ty;
+        match input {
+            DataType::Struct(s) if s.named_fields => {},
+            _ => {
+                errors.insert("'from_existing' instructions are only applicable to structs with named fields.".into(), ty.span);
+            },
+        }
+        if attr.core.update.is_some() || attr.core.quick_return.is_some() {
+            errors.insert("'from_existing' instructions do not support '..' (struct update syntax) and 'return' (quick return).".into(), ty.span);
+        }
+    }
+}
+
 fn validate_dedicated_member_attrs<T, U: Fn(&T) -> Option<&TypePath>>(attrs: &Vec<T>, extract_type_path: U, instr_name: Option<&'static str>, member_span: Span, type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     if let Some(inst_name) = instr_name {
         if attrs.iter().filter(|x| extract_type_path(x).is_none()).count() > 1 {
@@ -292,7 +310,8 @@ fn validate_parent_attrs(named_root_struct: bool, parent_attrs: &[ParentAttr], d
 
 fn validate_fields(input: &Struct, data_type_attrs: &DataTypeAttrs, data_type_attrs_by_kind: &[(&TraitAttrCore, Kind)], type_paths: &HashSet<&TypePath>, errors: &mut HashMap<String, Span>) {
     let into_type_paths = data_type_attrs_by_kind.iter().filter_map(|(x, kind)|(!kind.is_from() && !kind.is_into_existing()).then_some(&x.ty)).collect::<HashSet<_>>();
-    let from_type_paths = data_type_attrs_by_kind.iter().filter_map(|(x, kind)|(x.update.is_none() && kind.is_from()).then_some(&x.ty)).collect::<HashSet<_>>();
+    // `from_existing` keeps the current value of a ghost field, so it needs no action
+    let from_type_paths = data_type_attrs_by_kind.iter().filter_map(|(x, kind)|(x.update.is_none() && kind.is_from() && !x.existing).then_some(&x.ty)).collect::<HashSet<_>>();
 
     for field in &input.fields {
         for ghost_attr in field.attrs.ghost_attrs.iter() {

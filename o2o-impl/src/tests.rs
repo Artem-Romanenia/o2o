@@ -2873,6 +2873,39 @@ fn invalid_map_instruction(code_fragment: TokenStream, err: &str) {
 
 // endregion: invalid_map_instruction
 
+// region: from_existing_restrictions
+
+#[test_case(quote! {
+    #[from_existing(EntityDto)]
+    struct Entity(i32);
+}, "'from_existing' instructions are only applicable to structs with named fields."; "tuple_struct")]
+#[test_case(quote! {
+    #[ref_from_existing(EnumDto)]
+    enum Enum { Var1 }
+}, "'from_existing' instructions are only applicable to structs with named fields."; "enum")]
+#[test_case(quote! {
+    #[from_existing(EntityDto| ..Default::default())]
+    struct Entity { field: i32 }
+}, "'from_existing' instructions do not support '..' (struct update syntax) and 'return' (quick return)."; "update")]
+#[test_case(quote! {
+    #[owned_from_existing(EntityDto| return Entity { field: 1 })]
+    struct Entity { field: i32 }
+}, "'from_existing' instructions do not support '..' (struct update syntax) and 'return' (quick return)."; "quick_return")]
+#[test_case(quote! {
+    #[from_existing(EntityDto)]
+    #[ref_from_existing(EntityDto)]
+    struct Entity { field: i32 }
+}, "Ident here must be unique."; "duplicate")]
+fn from_existing_restrictions(code_fragment: TokenStream, err: &str) {
+    let input: DeriveInput = syn::parse2(code_fragment).unwrap();
+    let output = derive(&input);
+    let message = get_error(output, true);
+
+    assert_eq!(message, err);
+}
+
+// endregion: from_existing_restrictions
+
 fn get_error(output: Result<TokenStream, Error>, expect_root_error: bool) -> String {
     assert!(output.is_err());
     let mut err_iter = output.unwrap_err().into_iter();

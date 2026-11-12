@@ -5,7 +5,7 @@ use crate::{
     attr::{ApplicableAttr, ChildParentData, ChildPath, DataTypeAttrs, GhostData, GhostIdent, Kind, MemberAttrCore, ParentChildField, TraitAttrCore, TypeHint},
     validate::validate,
 };
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
 
 #[cfg(feature = "syn2")]
@@ -226,6 +226,7 @@ fn struct_main_code_block(input: &Struct, ctx: &ImplContext) -> TokenStream {
     let struct_init_block = struct_init_block(input, ctx);
 
     match ctx.kind {
+        Kind::FromOwned | Kind::FromRef if ctx.struct_attr.existing => struct_init_block,
         Kind::FromOwned | Kind::FromRef => {
             let dst = ctx.dst_ty;
             quote!(#dst #struct_init_block)
@@ -301,6 +302,26 @@ fn struct_init_block<'a>(input: &'a Struct, ctx: &ImplContext) -> TokenStream {
     struct_init_block_inner(&mut fields.iter().peekable(), input.named_fields, ctx, None)
 }
 
+/// Turns a field initializer `field: value_expr,` into the assignment `self.field = value_expr;`
+/// used by `from_existing`.
+fn existing_assignment(fragment: TokenStream) -> TokenStream {
+    let mut tokens: Vec<TokenTree> = fragment.into_iter().collect();
+    if matches!(tokens.last(), Some(TokenTree::Punct(p)) if p.as_char() == ',') {
+        tokens.pop();
+    }
+    match (tokens.first(), tokens.get(1)) {
+        (Some(TokenTree::Ident(field)), Some(TokenTree::Punct(colon))) if colon.as_char() == ':' => {
+            let field = field.clone();
+            let value: TokenStream = tokens.into_iter().skip(2).collect();
+            quote!(self.#field = #value;)
+        },
+        _ => {
+            let fragment: TokenStream = tokens.into_iter().collect();
+            quote!(#fragment;)
+        },
+    }
+}
+
 fn struct_init_block_inner(
     members: &mut Peekable<Iter<FieldContainer>>,
     named_fields: bool, 
@@ -332,7 +353,8 @@ fn struct_init_block_inner(
 
                 if ctx.kind.is_from() {
                     if let Some(ghost_attr) = attrs.ghost(&ctx.struct_attr.ty, &ctx.kind) {
-                        if ghost_attr.action.is_none() {
+                        // `from_existing` keeps the current value of a ghost field
+                        if ghost_attr.action.is_none() || ctx.struct_attr.existing {
                             members.next();
                             continue;
                         }
@@ -348,6 +370,9 @@ fn struct_init_block_inner(
                 };
                 fragments.push(fragment);
                 idx += 1;
+            },
+            FieldData::GhostData(_) if ctx.struct_attr.existing => {
+                members.next();
             },
             FieldData::GhostData(g) => {
                 let child_path = &g.child_path.as_ref().unwrap();
@@ -385,6 +410,11 @@ fn struct_init_block_inner(
 
     if ctx.has_post_init || ctx.kind.is_into_existing() {
         return quote!(#(#fragments)*);
+    }
+
+    if ctx.struct_attr.existing {
+        let assignments = fragments.into_iter().map(existing_assignment);
+        return quote!(#(#assignments)*);
     }
 
     match (&ctx.kind, type_hint, named_fields) {
@@ -1093,6 +1123,7 @@ fn quote_trait(input: &DataType, ctx: &mut ImplContext) -> TokenStream {
     ctx.has_post_init = post_init.is_some();
 
     match (ctx.kind, ctx.fallible) {
+        (Kind::FromOwned, false) | (Kind::FromRef, false) if ctx.struct_attr.existing => quote_from_existing_trait(input, ctx, pre_init, main_code_block(ctx)),
         (Kind::FromOwned, false) | (Kind::FromRef, false) => quote_from_trait(input, ctx, pre_init, main_code_block(ctx)),
         (Kind::FromOwned, true) | (Kind::FromRef, true) => quote_try_from_trait(input, ctx, pre_init, main_code_block_ok(ctx)),
         (Kind::OwnedInto, false) | (Kind::RefInto, false) => quote_into_trait(input, ctx, pre_init, main_code_block(ctx), post_init),
@@ -1109,6 +1140,21 @@ fn quote_from_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenS
         impl #impl_gens ::core::convert::From<#r #src #those_gens> for #dst #these_gens #where_clause {
             #attr
             fn from(value: #r #src #those_gens) -> #dst #these_gens {
+                #inner_attr
+                #pre_init
+                #init
+            }
+        }
+    }
+}
+
+fn quote_from_existing_trait(input: &DataType, ctx: &ImplContext, pre_init: Option<TokenStream>, init: TokenStream) -> TokenStream {
+    let QuoteTraitParams { attr, impl_attr, inner_attr, dst, src, these_gens, those_gens, impl_gens, where_clause, r } = get_quote_trait_params(input, ctx);
+    quote! {
+        #impl_attr
+        impl #impl_gens o2o::traits::FromExisting<#r #src #those_gens> for #dst #these_gens #where_clause {
+            #attr
+            fn from_existing(&mut self, value: #r #src #those_gens) {
                 #inner_attr
                 #pre_init
                 #init

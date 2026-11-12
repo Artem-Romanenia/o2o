@@ -143,6 +143,7 @@ And here's the code that `o2o` generates (from here on, generated code is produc
   - [Use struct update syntax (..Default::default())](#use-struct-update-syntax-defaultdefault)
   - [Define helper variables](#define-helper-variables)
   - [Quick return](#quick-return)
+  - [Update an existing instance (from\_existing)](#update-an-existing-instance-from_existing)
   - [Repeat trait instruction params](#repeat-trait-instruction-params)
   - [Item attributes (attributes for `#[] impl`, `#[] fn`, `fn() { #![] }`)](#item-attributes-attributes-for--impl--fn-fn---)
   - [Slightly complex example](#slightly-complex-example)
@@ -228,6 +229,12 @@ impl o2o::traits::IntoExisting<A> for &B { ... }
 
 // #[ref_try_into_existing(A)]
 impl o2o::traits::TryIntoExisting<A> for &B { ... }
+
+// #[owned_from_existing(A)]
+impl o2o::traits::FromExisting<A> for B { ... }
+
+// #[ref_from_existing(A)]
+impl o2o::traits::FromExisting<&A> for B { ... }
 ```
 
 o2o also has shortcuts to configure multiple trait implementations with fewer lines of code:
@@ -240,6 +247,8 @@ o2o also has shortcuts to configure multiple trait implementations with fewer li
 | **#[ref_into()]**            | ✔️       | ❌         | ✔️         | ❌            | ✔️            | ❌                |
 | **#[owned_into_existing()]** | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
 | **#[ref_into_existing()]**   | ❌      | ❌         | ❌        | ❌            | ❌           | ✔️                 |
+
+`#[from_existing()]` is a shortcut for `#[owned_from_existing()]` and `#[ref_from_existing()]`, the same way `#[into_existing()]` is for `#[owned_into_existing()]` and `#[ref_into_existing()]`.
 
 E.g. following two bits of code are equivalent:
 
@@ -289,7 +298,7 @@ In `#![no_std]` project, add this to `Cargo.toml`:
 ``` toml
 [dependencies]
 o2o-macros = "0.6.0"
-# Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
+# Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting or o2o::traits::FromExisting implementations
 o2o = { version = "0.6.0", default-features = false }
 ```
 
@@ -298,7 +307,7 @@ Or, if you want `no_std` *and* `syn1`:
 ``` toml
 [dependencies]
 o2o-macros = { version = "0.6.0", default-features = false, features = "syn1" }
-# Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting implementations
+# Following line can be ommited if you don't need o2o to produce o2o::traits::(Try)IntoExisting or o2o::traits::FromExisting implementations
 o2o = { version = "0.6.0", default-features = false }
 ```
 
@@ -915,6 +924,48 @@ struct Time {
   }
   ```
 </details>
+
+### Update an existing instance (from_existing)
+
+`#[into_existing()]` updates an instance of the *other* type. When the instructions live on the type that has to be updated (for example, an entity loaded from storage that receives the fields of a request), use `#[from_existing()]`, `#[owned_from_existing()]` or `#[ref_from_existing()]`. They implement `o2o::traits::FromExisting<T>` and reuse the member level instructions of `#[from()]`. A field marked `#[ghost]` keeps its current value, so `#[ghost]` needs no default value here.
+
+``` rust
+use o2o::o2o;
+use o2o::traits::FromExisting;
+
+struct EntityDto {
+    some_int: i32,
+    another_int: i16,
+}
+
+#[derive(o2o)]
+#[ref_from_existing(EntityDto)]
+struct Entity {
+    #[ghost]
+    id: i64,
+    some_int: i32,
+    #[from(another_int)]
+    different_int: i16,
+}
+
+let mut entity = Entity { id: 1, some_int: 0, different_int: 0 };
+entity.from_existing(&EntityDto { some_int: 123, another_int: 321 });
+assert_eq!((1, 123, 321), (entity.id, entity.some_int, entity.different_int));
+```
+<details>
+  <summary>View generated code</summary>
+
+  ``` rust ignore
+  impl o2o::traits::FromExisting<&EntityDto> for Entity {
+      fn from_existing(&mut self, value: &EntityDto) {
+          self.some_int = value.some_int;
+          self.different_int = value.another_int;
+      }
+  }
+  ```
+</details>
+
+`#[from_existing()]` applies to structs with named fields and does not accept `..` (struct update syntax) or `return` (quick return).
 
 ### Repeat trait instruction params
 

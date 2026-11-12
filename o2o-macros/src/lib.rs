@@ -16,6 +16,7 @@ use syn::{parse_macro_input, DeriveInput};
 /// * `::core::convert::TryInto<T>`
 /// * `o2o::traits::IntoExisting<T>`
 /// * `o2o::traits::TryIntoExisting<T>`
+/// * `o2o::traits::FromExisting<T>`
 ///  
 /// ... traits via procedural macro.
 ///
@@ -105,6 +106,9 @@ use syn::{parse_macro_input, DeriveInput};
         owned_try_into_existing,
         ref_try_into_existing,
         try_into_existing,
+        from_existing,
+        owned_from_existing,
+        ref_from_existing,
         child,
         children,
         child_parents,
