@@ -532,6 +532,8 @@ pub(crate) struct TraitAttrCore {
     pub attribute: Option<TokenStream>,
     pub impl_attribute: Option<TokenStream>,
     pub inner_attribute: Option<TokenStream>,
+    /// Set by `from_existing`: the `from` mapping updates an existing instance (`o2o::traits::FromExisting`).
+    pub existing: bool,
 }
 
 impl TraitAttrCore {
@@ -595,7 +597,7 @@ impl Parse for TraitAttrCore {
             } else { input.parse::<syn::Path>()?.into() })
         } else { None };
 
-        let mut attr = TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None, match_expr: None, repeat: None, skip_repeat: false, stop_repeat: false, attribute: None, impl_attribute: None, inner_attribute: None };
+        let mut attr = TraitAttrCore { ty, err_ty, type_hint, init_data: None, update: None, quick_return: None, default_case: None, match_expr: None, repeat: None, skip_repeat: false, stop_repeat: false, attribute: None, impl_attribute: None, inner_attribute: None, existing: false };
 
         if !input.peek(Token![|]) {
             return Ok(attr);
@@ -1259,6 +1261,15 @@ fn parse_data_type_instruction(instr: &Ident, input: TokenStream, own_instr: boo
                 appl_ref_into_existing(instr_str),
             ],
         })),
+        "from_existing" | "owned_from_existing" | "ref_from_existing" => Ok(DataTypeInstruction::Map(TraitAttr {
+            core: {
+                let mut core: TraitAttrCore = syn::parse2(input)?;
+                core.existing = true;
+                core
+            },
+            fallible: false,
+            applicable_to: [false, false, appl_owned_from_existing(instr_str), appl_ref_from_existing(instr_str), false, false],
+        })),
         "owned_try_into" | "ref_try_into" | "try_into" | "try_from_owned" | "try_from_ref" | "try_from" | "try_map_owned" | "try_map_ref" | "try_map" | "owned_try_into_existing" | "ref_try_into_existing" | "try_into_existing" => Ok(DataTypeInstruction::Map(TraitAttr {
             core: syn::parse2(input)?,
             fallible: true,
@@ -1532,6 +1543,14 @@ fn appl_owned_into_existing(instr: &str) -> bool {
 
 fn appl_ref_into_existing(instr: &str) -> bool {
     matches!(instr, "ref_into_existing" | "into_existing" | "ref_try_into_existing" | "try_into_existing")
+}
+
+fn appl_owned_from_existing(instr: &str) -> bool {
+    matches!(instr, "owned_from_existing" | "from_existing")
+}
+
+fn appl_ref_from_existing(instr: &str) -> bool {
+    matches!(instr, "ref_from_existing" | "from_existing")
 }
 
 fn appl_ghosts_owned(instr: &str) -> bool {
